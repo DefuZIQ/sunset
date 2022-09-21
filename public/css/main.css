@@ -1,0 +1,514 @@
+@import url('https://fonts.googleapis.com/css2?family=Istok+Web&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter&family=Istok+Web&display=swap');
+@import url('../bootstrap-5.0.2-dist/css/bootstrap-grid.css');
+html{
+
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+html::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+body{
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+    margin: 0;
+  }
+header{
+    display: flex;
+    position: sticky;
+    z-index: 10;
+    top: 0;
+}
+.header-back {
+    background: #3D3530;;
+    top: 0;
+    min-height: 73px;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    height: 7%;
+    left: 0px;
+    position: absolute;
+}
+.header-line {
+    top: 0;
+    min-height: 73px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 82.3%;
+    height: 7%;
+    left: 0px;
+}
+
+.logo a {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 39px;
+    color: #FFFDFB;
+    cursor: default;
+    text-decoration: none;
+    cursor: pointer;
+}
+nav {
+    display: flex;
+    width: 35%;
+    justify-content: space-between
+}
+.menu {
+    font-family: "Istok Web";
+    top: 20px;
+    color: #FFFDFB;
+    font-size: 16px;
+    line-height: 23px;
+    cursor: pointer;
+    text-decoration: none;
+    display: flex;
+}
+.menu:hover {
+    text-decoration: underline solid #FFFDFB;
+}
+.button-arrow:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+.search {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+.search:hover {
+    background: url(../image/searchhover.png);
+    background-repeat: no-repeat;
+    cursor: pointer;
+
+}
+.likes {
+    background: transparent;
+    border: none;
+}
+.likes:hover {
+    background: url(../image/LikesHover.png);
+    background-repeat: no-repeat;
+    cursor: pointer;
+
+}
+.basket {
+    background: transparent;
+    border: none;
+}
+.basket:hover {
+    background: url(../image/basketHover.png);
+    background-repeat: no-repeat;
+    cursor: pointer;
+    background-position: center top;
+}
+.avatar {
+    background: transparent;
+    border: none;
+}
+.avatar:hover {
+    background: url(../image/AvatarHover.png);
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+.lastmenu {
+    display: flex;
+    width: 13%;
+    justify-content: space-between;
+}
+main {
+    flex-grow: 1;
+    height: auto;
+    width: 100%;
+
+}
+section {
+    background-color: #FFFDFB;
+}
+.main {
+    background-image: url(../image/Background.png);
+    background-repeat: no-repeat;
+    background-size: cover;
+    width: 100%;
+    height: 93vh;
+    margin-top: 72px;
+}
+section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.collection {
+    display: flex;
+    flex-direction: column;
+    justify-content:  flex-end;
+    width: 403px;
+    height: 390px;
+    align-items: flex-start;
+    padding-top: 6%;
+    padding-left: 8.8%;
+    cursor: default;
+}
+.collection h2 {
+    margin-bottom: 35px;
+    font-family: "Istok Web";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 64px;
+    line-height: 114.52%;
+    color: #FFFDFB;
+}
+.collection a {
+    font-family: "Istok Web";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 20px;
+    line-height: 114.52%;
+    color: #FFFDFB;
+}
+.button-arrow {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 49px;
+    gap: 10px;
+    width: 238px;
+    height: 49px;
+    border: 1.5px solid #FFFDFB;
+    background: transparent;
+    color: #FFFDFB;
+    font-size: 20px;
+    cursor: pointer;
+    transition-duration: 0.7s;
+}
+.button-arrow image {
+    padding-top: 5px;
+}
+.button-arrow:hover {
+    background: rgba(255, 255, 255, 0.16); 
+}
+.newblock {
+    display: flex;
+    align-items: center;
+    margin-top: 50px;
+    margin-bottom: 50px;
+    width: 82.3%;
+    justify-content: space-between;
+}
+.newblock h2 {
+    font-family: "Istok Web";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 58px;
+    color: #222222;
+}
+.newblock hr {
+    width: 35%;
+    height: 0px;
+    border: 1px solid #222222;
+    margin: 0;
+}
+.newcard {
+    display: flex;
+    justify-content: space-between;
+    width: 82.3%;
+    height: 68vh;
+    gap: 1.56%;
+}
+.card {
+    width: 23.6%;
+}
+.cardobj {
+    width: 85%;
+}
+.cardname {
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 20px;
+    line-height: 29px;
+    color: #817064;
+}
+.cardprice {
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 24px;
+    line-height: 35px;
+    color: #3D3530;
+}
+.viewcatalog {
+    margin: 30px;
+}
+.viewcatalog a{
+  text-decoration: none;
+  font-family: "Istok Web";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 20px;
+    line-height: 29px;
+    text-decoration-line: underline;
+    color: #222222;
+    transition-duration: 0.5s;
+}
+.viewcatalog a:hover {
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 21px;
+    line-height: 29px;
+    text-decoration-line: underline;
+    color: #222222;
+    transition-duration: 0.5s;
+
+}
+.categoryblock {
+    display: flex;
+    align-items: center;
+    width: 82.3%;
+    justify-content: space-between;
+}
+.categoryblock  h3 {
+    font-family: "Istok Web";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 58px;
+    color: #222222;
+}
+.categoryblock hr {
+    width: 30%;
+    border: 1px solid #222222;
+    margin: 0;
+}
+.categorycoll {
+    display: flex;
+    flex-direction: row;
+    align-content: stretch;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    width: 82.3%;
+    gap: 1.56%;
+}
+.categorycard {
+    margin-top: 1.76%;
+    width: 32%;
+    height: 53.5vh;
+}
+.categorycard p {
+    position: absolute;
+    z-index: auto;
+    margin-top: 100%;
+    margin-left: 7%;
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 24px;
+    line-height: 29px;
+    color: #FFFDFB;
+    
+}
+.subscribe{
+    display: flex;
+    margin-top: 78px;
+    background: #817064;
+    width: 100%;
+    height: 136px;
+    align-items: flex-end;
+    justify-content: center;
+}
+.subscribeobj {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 82.3%;
+    height: 100%;
+}
+#subscribetext {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    height: 100%;
+    gap: 8.5%;
+}
+.subscribetext1 {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 39px;
+    color: #FFFDFB;
+    flex: none;
+    order: 0;
+    flex-grow: 0;
+    margin: 0;
+}
+.subscribetext2 {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 17px;
+    color: #FFFDFB;
+    flex: none;
+    order: 1;
+    flex-grow: 0;
+    margin: 0;
+}
+.socseti {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 10%;
+}
+.subscribeobj form {
+    display: flex;
+    align-items: center
+}
+.formsubscribe {
+    display: flex;
+    width: 59.35%;
+    height: 100%;
+}
+.subinput_one {
+    padding: 0 33px 0 32px;
+    width: 31vw;
+    height: 46px;
+    background: #FFFDFB;
+    border-radius: 28px;
+    outline:none;
+    border: none;
+    margin-left: 60px;
+    position: relative;
+}
+  
+.subinput_two {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    align-content: space-around;
+    position: absolute;
+    padding: 20px 57px;
+    width: 13%;
+    height: 47px;
+    background: #3D3530;
+    border-radius: 28px;
+    outline:none;
+    border: none;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 19px;
+    color: #FFFDFB;
+    margin: 0px 450px;
+}
+footer {
+    background: #3D3530;
+    width: 100%;
+    height: 274px;
+    display: flex;
+    justify-content: center;
+}
+.footer-line {
+    display: flex;
+    width: 82.3%;
+}
+.footer-block {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+}
+.footer-block-logo {
+    display: flex;
+    flex-direction: column;
+}
+.footer-block-logo p {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 39px;
+    color: #FFFDFB;
+}
+.footer-block-one {
+    display: flex;
+    flex-direction: column;
+}
+.footer-block-one h3 {
+    padding-top: 20px;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 19px;
+    color: #FFFDFB;
+}
+.footer-block-one a{
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 17px;
+    color: #FFFDFB;
+    margin: 10px 0 10px 0;
+}
+.footer-block-two {
+    display: flex;
+    flex-direction: column;
+}
+.footer-block-two h3{
+    padding-top: 20px;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 19px;
+    color: #FFFDFB;
+}
+.footer-block-two a {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 17px;
+    color: #FFFDFB;
+    margin: 10px 0 10px 0;
+}
+.footer-block-three {
+    display: flex;
+    flex-direction: column;
+}
+.footer-block-three h3{
+    padding-top: 20px;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 19px;
+    color: #FFFDFB;
+}
+.footer-block-three p{
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 17px;
+    color: #FFFDFB;
+}

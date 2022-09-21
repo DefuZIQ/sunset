@@ -1,0 +1,199 @@
+.popup {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.3);
+    top: 0;
+    left: 0;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition:  all 0.8s ease 0s;
+}
+.popup.active{
+    opacity: 1;
+    visibility: visible;
+}
+.popup.active .popup__content {
+    transform:  perspective(600px) translate(0px, 0px) rotateX(0deg);
+    opacity: 1;
+}
+.popup__body {
+    min-height: 100%;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    padding: 30px 10px;
+    transition:  all 0.8s ease 0s;
+}
+.popup__content {
+    background-color: #FFFDFB;
+    color: #000;
+    width: 24%;
+    height: 38vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12%;
+    position: relative;
+    opacity: 0;
+    transition:  all 0.8s ease 0s;
+    transform:  perspective(600px) translate(0px, -100%) rotateX(45deg);
+}
+.popup__close {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    font-size: 20px;
+    text-decoration: none;
+    color: #222222;
+    cursor: pointer;
+}
+.popup__title {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 3%;
+}
+.popup__title a {
+    margin-top: 8%;
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 26px;
+    color: #3D3530;
+}
+.popup__title p {
+    margin-top: 8%;
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 26px;
+    color: #3D3530;
+}
+.popup__text {
+    display: flex;
+    justify-content: center;;
+    width: 100%;
+    height: 70%;
+}
+.authinput {
+    outline: none;
+    border: none;
+    border-bottom: 1px solid #3D3530;
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 20px;
+    line-height: 23px;
+    color: #959595;
+    padding: 0 0 3% 0;
+    margin-bottom: 12%;
+}
+.authinput[type=text]{
+    width: 18vw;
+ }
+.authsubmit{
+    background: #3D3530;
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 23px;
+    color: #FFFDFB;
+    width: 58%;
+    height: 18%;
+    cursor: pointer;
+}
+.authinput-line {
+    display: flex;
+    justify-content: center;
+    height: 100%;
+}
+
+.popup__search {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.3);
+    top: 0;
+    left: 0;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition:  all 0.8s ease 0s;
+}
+.popup__search.active {
+    opacity: 1;
+    visibility: visible;
+}
+.popup__search.active .popup__search_content {
+    opacity: 1;
+}
+.popup__search_content {
+    background-color: #FFFDFB;
+    color: #000;
+    width: 100%;
+    height: 23%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
+    position: relative;
+    opacity: 0;
+    transition:  all 0.8s ease 0s;
+}
+.popup__search_close {
+    position: absolute;
+    right: 2.5%;
+    top: 11%;
+    font-size: 20px;
+    text-decoration: none;
+    color: #222222;
+    cursor: pointer;
+}
+.search__input {
+    outline: none;
+    border: none;
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 48px;
+    line-height: 69px;
+    color: #AEAEAE;
+    width: 84vw;
+}
+.popup__search_title {
+    display: flex;
+    width: 100%;
+}
+.popup__search_title p {
+    margin: 0;
+    margin-left: 3%;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 39px;
+    color: #3D3530;
+}
+.popup__search_text{
+    display: flex;
+}
+.popup__search_text form {
+    border-bottom: 0.5px solid #000000;
+}
+.search__reset {
+    padding-bottom: 0.7%;
+    border: none;
+    background: none;
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 24px;
+    line-height: 35px;
+    color: #AEAEAE;
+}

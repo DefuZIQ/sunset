@@ -1,0 +1,418 @@
+@import url('https://fonts.googleapis.com/css2?family=Istok+Web&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter&family=Istok+Web&display=swap');
+@import url('../bootstrap-5.0.2-dist/css/bootstrap-grid.css');
+html{
+
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    overflow-x: hidden;
+}
+html::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+body{
+    height: 100%;
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+    margin: 0;
+}
+header {
+    min-height: 8vh;
+}
+.header__background {
+    background: #3D3530;
+    min-height: 8vh;
+}
+.header__logo {
+    display: flex;
+    align-items: center;
+    height: 8vh;
+    color: #FFFDFB;
+}
+#header__logo {
+    font-family: 'Inter';
+    color: #FFFDFB;
+}
+.navigation {
+    display: flex;
+    align-items: center;
+    height: 8vh;
+    gap: 10%;
+}
+.header__menu {
+    font-family: "Istok Web";
+    top: 20px;
+    font-size: 16px;
+    line-height: 23px;
+    text-decoration: none;
+}
+.header__menu:hover {
+    text-decoration: underline solid #FFFDFB;
+    line-height: 2px;
+}
+.header__menu_icon {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 8vh;
+}
+.header__menu_icon button {
+    background: transparent;
+    border: none;
+}
+.search:hover {
+    background: url(../image/searchhover.png);
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+.likes:hover {
+    background: url(../image/LikesHover.png);
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+.basket:hover {
+    background: url(../image/basketHover.png);
+    background-repeat: no-repeat;
+    cursor: pointer;
+    background-position: center top;
+}
+.avatar:hover {
+    background: url(../image/AvatarHover.png);
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+section {
+    background-color: #FFFDFB;
+}
+.main__background {
+    background-image: url(../image/Background.png);
+    background-repeat: no-repeat;
+    background-size: cover;
+    width: 100%;
+    height: 92vh;
+}
+.main__collection {
+    padding-top: 18%;
+}
+.main__collection h2 {
+    font-family: "Istok Web";
+    font-size: 52px;
+    color: #FFFDFB;
+}
+.coll__button_arrow {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 49px;
+    gap: 10px;
+    width: 238px;
+    height: 49px;
+    border: 1.5px solid #FFFDFB;
+    background: transparent;
+    color: #FFFDFB;
+    font-size: 20px;
+    cursor: pointer;
+    transition-duration: 0.7s;
+}
+.coll__button_arrow image {
+    padding-top: 5px;
+}
+.coll__button_arrow:hover {
+    background: rgba(255, 255, 255, 0.16);   
+}
+.main__cards {
+    display: flex;
+    flex-direction: column;
+}
+.new__card_title {
+    display: flex;
+    align-items: center;
+    margin-top: 50px;
+    margin-bottom: 50px;
+    justify-content: space-between;
+}
+.new__card_title h2 {
+    font-family: "Istok Web";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 58px;
+    color: #222222;
+}
+.new__card_title hr {
+    width: 35%;
+    height: 0px;
+    border: 1px solid #222222;
+    margin: 0;
+}
+.new__card {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 1.56%;
+}
+.products__card_body {
+    width: 23.6%;
+}
+.products__card_name {
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 20px;
+    line-height: 29px;
+    color: #817064;
+}
+.products__card_price {
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 24px;
+    line-height: 35px;
+    color: #3D3530;
+}
+
+.catalog__view {
+    margin: 30px;
+}
+.catalog__view a{
+    text-decoration: none;
+    font-family: "Istok Web";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 20px;
+    line-height: 29px;
+    text-decoration-line: underline;
+    color: #222222;
+    transition-duration: 0.5s;
+}
+.catalog__view a:hover {
+    font-family: 'Istok Web';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 21px;
+    line-height: 29px;
+    text-decoration-line: underline;
+    color: #222222;
+    transition-duration: 0.5s;
+}
+.category__title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.category__title  h2 {
+    font-family: "Istok Web";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 58px;
+    color: #222222;
+}
+.category__title hr {
+    width: 30%;
+    border: 1px solid #222222;
+    margin: 0;
+}
+.category__card {
+    display: flex;
+    flex-direction: row;
+    align-content: stretch;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1.56%;
+    margin-bottom: 7vh;
+}
+
+.categorycard {
+    margin-top: 1.76%;
+    width: 32%;
+    height: 53.5vh;
+}
+.categorycard p {
+    position: absolute;
+    z-index: auto;
+    margin-top: 100%;
+    margin-left: 7%;
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 24px;
+    line-height: 29px;
+    color: #FFFDFB;
+    
+}
+
+.main__subscribe_background {
+    background: #817064;
+    height: 14vh;
+}
+.main__subscribe_title {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8.5%;
+}
+.main__subscribe_one {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 39px;
+    color: #FFFDFB;
+    flex: none;
+    order: 0;
+    flex-grow: 0;
+    margin: 0;
+}
+.main__subscribe_two {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 17px;
+    color: #FFFDFB;
+    flex: none;
+    order: 1;
+    flex-grow: 0;
+    margin: 0;
+}
+.main__subscribe_social {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+}
+.main__subscribe_form {
+    display: flex;
+    align-items: center;
+    height: 14vh;
+}
+.form__subinput_one {
+    padding: 0 33px 0 32px;
+    width: 31vw;
+    height: 5vh;
+    background: #FFFDFB;
+    border-radius: 28px;
+    outline:none;
+    border: none;
+    margin-left: 60px;
+    position: relative;
+}
+.form__subinput_two {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    align-content: space-around;
+    position: absolute;
+    padding: 1vh 3vw;
+    width: 13vw;
+    height: 5vh;
+    background: #3D3530;
+    border-radius: 28px;
+    outline:none;
+    border: none;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1px;
+    color: #FFFDFB;
+    margin: -5vh 25vw;
+}
+.main__footer_background {
+    background: #3D3530;
+    height: 25vh;
+    display: flex;
+    justify-content: center;
+}
+.main__footer_inline {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+}
+.main__footer_logo {
+    display: flex;
+    flex-direction: column;
+}
+.main__footer_logo p {
+    padding-top: 3vh;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 39px;
+    color: #FFFDFB;
+}
+.main__footer_block_one {
+    display: flex;
+    flex-direction: column;
+}
+.main__footer_block_one h3 {
+    padding-top: 4vh;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 19px;
+    color: #FFFDFB;
+}
+.main__footer_block_one a{
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 17px;
+    color: #FFFDFB;
+    margin: 10px 0 10px 0;
+}
+.main__footer_block_two {
+    display: flex;
+    flex-direction: column;
+}
+.main__footer_block_two h3{
+    padding-top: 4vh;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 19px;
+    color: #FFFDFB;
+}
+.main__footer_block_two a {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 17px;
+    color: #FFFDFB;
+    margin: 10px 0 10px 0;
+}
+.main__footer_block_three {
+    display: flex;
+    flex-direction: column;
+}
+.main__footer_block_three h3{
+    padding-top: 4vh;
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 19px;
+    color: #FFFDFB;
+}
+.main__footer_block_three p{
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 17px;
+    color: #FFFDFB;
+}
