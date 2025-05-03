@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: sunset
+  security:
+    jwt:
+      secret: mySuperSecretKey
+      expirationMs: 86400000
+
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: http://auth-service:8081
+          predicates:
+            - Path=/auth/**
+        - id: product-service
+          uri: http://product-service:8082
+          predicates:
+            - Path=/products/**
+        - id: order-service
+          uri: http://order-service:8083
+          predicates:
+            - Path=/order/**
