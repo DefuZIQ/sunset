@@ -1,0 +1,31 @@
+.likes-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.3s ease;
+}
+
+.likes-button svg path {
+  stroke: #3D3530; /* черный контур */
+  fill: none;      /* прозрачная заливка */
+  transition: all 0.3s ease;
+}
+
+/* Активное состояние: красная заливка, черный контур */
+.likes-button.active svg path {
+  fill: #EB5757;
+  stroke: #3D3530;
+}
+
+/* Наведение на неактивное: красная заливка, черный контур */
+.likes-button:hover:not(.active) svg path {
+  fill: #EB5757;
+  stroke: #3D3530;
+}
+
+/* Наведение на активное: белая заливка, черный контур */
+.likes-button.active:hover svg path {
+  fill: #fff;
+  stroke: #3D3530;
+}

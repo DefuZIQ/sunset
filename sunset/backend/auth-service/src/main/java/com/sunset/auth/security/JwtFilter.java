@@ -23,7 +23,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
 
-    // Получаем секрет из application.properties
     @Value("${spring.security.jwt.secret}")
     private String secretKey;
 
@@ -41,7 +40,7 @@ public class JwtFilter extends OncePerRequestFilter {
         logger.info("Поступил запрос на путь: {}", requestPath);
 
         if (isPublicPath(requestPath)) {
-            logger.info("Путь '{}' не требует авторизации. Пропускаем фильтр.", requestPath);
+            logger.debug("Путь '{}' не требует авторизации. Пропускаем фильтр.", requestPath);
             chain.doFilter(request, response);
             return;
         }
@@ -50,21 +49,21 @@ public class JwtFilter extends OncePerRequestFilter {
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             logger.warn("Отсутствует или некорректный заголовок Authorization");
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            response.getWriter().write("Доступ запрещён: отсутствует токен.");
+            reject(response, "Доступ запрещён: отсутствует токен.");
             return;
         }
 
         String token = authHeader.substring(7);
         try {
-            UUID userId = jwtUtil.extractUserId(token);  // секрет передаём сюда
+            UUID userId = jwtUtil.extractUserId(token);
 
             if (userId == null) {
-                logger.error("Не удалось извлечь userId из токена.");
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                response.getWriter().write("Неверный или просроченный токен.");
+                logger.warn("Не удалось извлечь userId из токена.");
+                reject(response, "Неверный или просроченный токен.");
                 return;
             }
+
+            logger.debug("Аутентификация пройдена. userId: {}", userId);
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(userId, null, null);
@@ -74,8 +73,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
         } catch (Exception e) {
             logger.error("Ошибка при проверке токена: {}", e.getMessage());
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            response.getWriter().write("Ошибка авторизации.");
+            reject(response, "Ошибка авторизации.");
             return;
         }
 
@@ -83,6 +81,12 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private boolean isPublicPath(String path) {
-        return path.equals("/auth/login") || path.equals("/auth/register");
+        return path.startsWith("/auth/login") || path.startsWith("/auth/register");
+    }
+
+    private void reject(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("text/plain;charset=UTF-8");
+        response.getWriter().write(message);
     }
 }

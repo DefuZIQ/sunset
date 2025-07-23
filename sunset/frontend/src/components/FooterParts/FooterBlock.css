@@ -1,0 +1,31 @@
+.footer__block {
+  flex: 1 1 200px;
+}
+
+.footer__block h3 {
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 1rem;
+}
+
+.footer__block a {
+  display: block;
+  font-family: "Inter", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #fffdfb;
+  text-decoration: none;
+  margin-bottom: 0.5rem;
+}
+
+.footer__block a:hover {
+  text-decoration: underline;
+}
+
+.footer__block p {
+  font-family: "Inter", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  margin-bottom: 0.5rem;
+}

@@ -1,4 +1,4 @@
-package java.com.sunset.apigateway;
+package com.sunset.apigateway;
 
 import com.sunset.apigateway.ApiGatewayApplication;
 import org.junit.jupiter.api.Test;

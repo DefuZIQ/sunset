@@ -5,8 +5,10 @@ import com.sunset.auth.dto.LoginRequest;
 import com.sunset.auth.dto.RegisterRequest;
 import com.sunset.auth.service.AuthService;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
 
 @RestController
+@ResponseBody
 @RequestMapping("/auth")
 public class AuthController {
 

@@ -2,6 +2,7 @@ package com.sunset.auth.model;
 
 import jakarta.persistence.*;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -16,14 +17,20 @@ public class User {
     @Column(unique = true, nullable = true)
     private String email;
 
-    @Column(unique = false, nullable = true)
+    @Column(nullable = true)
     private String password;
 
-    @Column(unique = false, nullable = false)
+    @Column(nullable = false)
     private String firstName;
 
-    @Column(unique = false, nullable = false)
+    @Column(nullable = false)
     private String lastName;
+
+    @Column(nullable = true)
+    private LocalDate birthday;
+
+    @Column(nullable = true)
+    private String avatar;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Timestamp createdAt;
@@ -73,6 +80,22 @@ public class User {
         this.lastName = lastName;
     }
 
+    public LocalDate getBirthday() {
+        return birthday;
+    }
+
+    public void setBirthday(LocalDate birthday) {
+        this.birthday = birthday;
+    }
+
+    public String getAvatar() {
+        return avatar;
+    }
+
+    public void setAvatar(String avatar) {
+        this.avatar = avatar;
+    }
+
     public Timestamp getCreatedAt() {
         return createdAt;
     }
@@ -89,17 +112,15 @@ public class User {
         this.updatedAt = updatedAt;
     }
 
-    // Метод, который сработает перед сохранением сущности (при создании)
     @PrePersist
     public void prePersist() {
         LocalDateTime now = LocalDateTime.now();
-        this.createdAt = Timestamp.valueOf(now); // Устанавливаем время создания
-        this.updatedAt = Timestamp.valueOf(now); // Устанавливаем время обновления
+        this.createdAt = Timestamp.valueOf(now);
+        this.updatedAt = Timestamp.valueOf(now);
     }
 
-    // Метод, который сработает перед обновлением сущности
     @PreUpdate
     public void preUpdate() {
-        this.updatedAt = Timestamp.valueOf(LocalDateTime.now()); // Устанавливаем время обновления
+        this.updatedAt = Timestamp.valueOf(LocalDateTime.now());
     }
 }

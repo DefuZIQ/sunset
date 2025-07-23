@@ -1,0 +1,27 @@
+.category__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.category__title h2 {
+  font-family: 'Istok Web', sans-serif;
+  font-weight: 400;
+  font-size: 40px;
+  color: #222222;
+}
+
+.category__title hr {
+  width: 30%;
+  border: 1px solid #222222;
+  margin: 0;
+}
+
+.category__card {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1.56%;
+  margin-bottom: 7vh;
+}

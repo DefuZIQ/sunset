@@ -1,51 +1,103 @@
-package com.sunset.order.service;
+package com.sunset.product.service;
 
-import com.sunset.order.dto.ProductRequest;
-import com.sunset.order.dto.ProductResponse;
+import com.sunset.product.dto.ProductDTO;
+import com.sunset.product.dto.ProductDTO.ColorDTO;
+import com.sunset.product.dto.ProductDTO.StockDTO;
+import com.sunset.product.model.Color;
+import com.sunset.product.model.Product;
+import com.sunset.product.repository.ProductCategoryRepository;
+import com.sunset.product.repository.ProductColorRepository;
+import com.sunset.product.repository.ProductRepository;
+import com.sunset.product.repository.ProductStockRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductService {
 
-    private Map<String, ProductResponse> products = new HashMap<>();
+    private final ProductRepository productRepository;
+    private final ProductCategoryRepository productCategoryRepository;
+    private final ProductColorRepository productColorRepository;
+    private final ProductStockRepository productStockRepository;
 
-    // Пример добавления нового продукта
-    public ProductResponse addProduct(ProductRequest productRequest) {
-        String productId = UUID.randomUUID().toString();
-        ProductResponse productResponse = new ProductResponse(
-                productId,
-                productRequest.getName(),
-                productRequest.getDescription(),
-                productRequest.getPrice(),
-                productRequest.getQuantity()
+    public ProductService(
+            ProductRepository productRepository,
+            ProductCategoryRepository productCategoryRepository,
+            ProductColorRepository productColorRepository,
+            ProductStockRepository productStockRepository
+    ) {
+        this.productRepository = productRepository;
+        this.productCategoryRepository = productCategoryRepository;
+        this.productColorRepository = productColorRepository;
+        this.productStockRepository = productStockRepository;
+    }
+
+    public List<ProductDTO> getProducts() {
+        List<Product> products = productRepository.findAllWithFullDetails();
+        return products.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public Optional<ProductDTO> getProductById(UUID id) {
+        return productRepository.findById(id)
+                .map(this::mapToDTO);
+    }
+
+    private ProductDTO mapToDTO(Product product) {
+        String imageUrl = product.getImages().stream()
+                .map(pi -> pi.getImage().getUrl())
+                .findFirst()
+                .orElse(null);
+
+        ProductDTO dto = new ProductDTO(
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getPrice(),
+                imageUrl
         );
-        products.put(productId, productResponse);
-        return productResponse;
-    }
 
-    // Пример получения продукта по ID
-    public ProductResponse getProduct(String productId) {
-        return products.get(productId);
-    }
+        // Добавляем категории
+        List<String> categories = productCategoryRepository.findByProductId(product.getId())
+                .stream()
+                .map(rel -> rel.getCategory().getName())
+                .collect(Collectors.toList());
+        dto.setCategories(categories);
 
-    // Пример обновления продукта
-    public ProductResponse updateProduct(String productId, ProductRequest productRequest) {
-        ProductResponse productResponse = products.get(productId);
-        if (productResponse != null) {
-            productResponse.setName(productRequest.getName());
-            productResponse.setDescription(productRequest.getDescription());
-            productResponse.setPrice(productRequest.getPrice());
-            productResponse.setQuantity(productRequest.getQuantity());
-        }
-        return productResponse;
-    }
+        // Добавляем цвета
+        List<ColorDTO> colors = productColorRepository.findByProductId(product.getId())
+                .stream()
+                .map(rel -> {
+                    Color color = rel.getColor();
+                    ColorDTO colorDTO = new ColorDTO();
+                    colorDTO.setId(color.getId());
+                    colorDTO.setName(color.getName());
+                    colorDTO.setHexCode(color.getHexCode());
+                    return colorDTO;
+                })
+                .collect(Collectors.toList());
+        dto.setColors(colors);
 
-    // Пример удаления продукта
-    public boolean deleteProduct(String productId) {
-        return products.remove(productId) != null;
+        // Добавляем наличие по размерам и цветам (склад)
+        List<StockDTO> stockList = productStockRepository.findByProductId(product.getId())
+                .stream()
+                .map(stock -> {
+                    StockDTO stockDTO = new StockDTO();
+                    stockDTO.setSizeId(stock.getSize().getId());
+                    stockDTO.setSizeName(stock.getSize().getName());
+                    stockDTO.setColorId(stock.getColor().getId());
+                    stockDTO.setColorName(stock.getColor().getName());
+                    stockDTO.setQuantity(stock.getQuantity());
+                    return stockDTO;
+                })
+                .collect(Collectors.toList());
+        dto.setStock(stockList);
+
+        return dto;
     }
 }

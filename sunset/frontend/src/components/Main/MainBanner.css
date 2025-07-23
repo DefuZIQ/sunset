@@ -1,0 +1,51 @@
+.main-banner {
+  width: 100%;
+  min-height: 94vh;
+  background-image: url("../../images/Background.png");
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: cover;
+  display: flex;
+  align-items: center;
+}
+
+.main-banner__content {
+  width: 100%;
+}
+
+.main-banner__title h2 {
+  font-family: 'Istok Web', sans-serif;
+  font-weight: 400;
+  font-size: 52px;
+  color: #FFFDFB;
+  margin: 0;
+}
+
+.main-banner__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 49px;
+  gap: 10px;
+  width: 238px;
+  height: 49px;
+  border: 1.5px solid #FFFDFB;
+  background: transparent;
+  color: #FFFDFB;
+  font-family: 'Istok Web', sans-serif;
+  font-size: 20px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.7s ease;
+  user-select: none;
+  border-radius: 0; /* если нужна */
+}
+
+.main-banner__button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.main-banner__button img {
+  padding-top: 5px;
+  display: block;
+}

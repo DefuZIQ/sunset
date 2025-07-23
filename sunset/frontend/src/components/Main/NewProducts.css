@@ -1,0 +1,49 @@
+.new__card_title {
+  display: flex;
+  align-items: center;
+  margin: 50px 0;
+  justify-content: space-between;
+}
+
+.new__card_title h2 {
+  font-family: 'Istok Web', sans-serif;
+  font-weight: 400;
+  font-size: 40px;
+  color: #222222;
+  margin: 0;
+}
+
+.new__card_title hr {
+  width: 30%;
+  border: 1px solid #222222;
+  margin: 0;
+}
+
+.new__card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.56%;
+}
+
+.products__card_body {
+  width: 23.5%;
+}
+
+.catalog__view {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.catalog__view a {
+  font-family: 'Istok Web', sans-serif;
+  font-weight: 400;
+  font-size: 20px;
+  text-decoration: underline;
+  color: #222222;
+  transition: font-weight 0.3s ease, font-size 0.3s ease;
+}
+
+.catalog__view a:hover {
+  font-weight: 700;
+  font-size: 22px;
+}

@@ -7,8 +7,10 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
     <!-- Миграция для создания таблиц -->
-    <changeSet id="2" author="defuziq">
-        <sqlFile path="classpath:/db/migrations/V1__init.sql"/>
+    <changeSet id="5" author="defuziq">
+        <sqlFile path="classpath:/db/migrations/V1__init.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
     </changeSet>
 
 </databaseChangeLog>

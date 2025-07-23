@@ -4,11 +4,6 @@ server:
 spring:
   application:
     name: sunset
-  security:
-    jwt:
-      secret: mySuperSecretKey
-      expirationMs: 86400000
-
   cloud:
     gateway:
       routes:
@@ -24,3 +19,36 @@ spring:
           uri: http://order-service:8083
           predicates:
             - Path=/order/**
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+
+jwt:
+  secret: MySuperSecretKeyThatIsAtLeast32BytesLong!!
+  expirationMs: 86400000
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    reactor.netty.http.client: DEBUG
+    reactor.netty.http.server: DEBUG
+
+security:
+  whitelist-paths:
+    - /auth/register
+    - /auth/login
+    - /products/all
+    - /products/by-uuid
+

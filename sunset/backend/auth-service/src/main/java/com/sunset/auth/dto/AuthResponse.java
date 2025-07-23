@@ -1,31 +1,31 @@
 package com.sunset.auth.dto;
 
-import java.util.UUID;
-
 public class AuthResponse {
 
-    private UUID userId;
+    private String uuid;
     private String email;
     private String firstName;
     private String lastName;
-    private String token;
+    private String token;  // Токен в DTO
 
-    // Конструкторы, геттеры и сеттеры
+    public AuthResponse() {}
 
-    public AuthResponse(UUID userId, String email, String firstName, String lastName, String token) {
-        this.userId = userId;
+    public AuthResponse(String uuid, String email, String firstName, String lastName, String token) {
+        this.uuid = uuid;
         this.email = email;
         this.firstName = firstName;
         this.lastName = lastName;
         this.token = token;
     }
 
-    public UUID getUserId() {
-        return userId;
+    // Геттеры и сеттеры
+
+    public String getUuid() {
+        return uuid;
     }
 
-    public void setUserId(UUID userId) {
-        this.userId = userId;
+    public void setUuid(String uuid) {
+        this.uuid = uuid;
     }
 
     public String getEmail() {

@@ -1,0 +1,153 @@
+.subscribe {
+  background-color: #363f46;
+  padding: 2rem 0;
+}
+
+.subscribe__container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.subscribe__content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 2rem;
+}
+
+.subscribe__text {
+  flex: 1 1 250px;
+}
+
+.subscribe__title {
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 32px;
+  line-height: 1.2;
+  color: #fffdfb;
+  margin: 0;
+}
+
+.subscribe__subtitle {
+  font-family: "Inter", sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #fffdfb;
+  margin-top: 0.5rem;
+}
+
+.subscribe__form-styled {
+  display: flex;
+  align-items: center;
+  background-color: #fdfbf9;
+  border-radius: 999px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  max-width: 500px;
+  width: 90%;
+  flex: 1 1 320px;
+  height: 48px;
+}
+
+.subscribe__form-styled input[type="email"] {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 0 1.5rem;
+  font-size: 16px;
+  background-color: #fdfbf9;
+  color: #333;
+  border-radius: 999px 0 0 999px;
+  height: 100%;
+}
+
+.subscribe__form-styled input::placeholder {
+  color: #aaa;
+}
+
+.subscribe__form-styled button {
+  padding: 0 2rem;
+  background-color: #3b322b;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  height: 100%;
+  transition: background-color 0.3s ease;
+  margin-left: -4px; /* перекрывает белый фон */
+}
+
+
+.subscribe__form-styled button:hover {
+  background-color: #2d251f;
+}
+
+.subscribe__social {
+  flex: 1 1 150px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1rem;
+  height: 48px; /* высота совпадает с формой */
+}
+
+.subscribe__social a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 48px; /* квадратная область для иконки */
+  padding: 0;
+}
+
+.subscribe__social svg {
+  height: 100%;
+  width: auto;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.subscribe__social a:hover svg {
+  transform: scale(1.05);
+}
+
+/* Адаптивность для подписки */
+@media (max-width: 768px) {
+  .subscribe__content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .subscribe__form-styled {
+    flex-direction: column;
+    border-radius: 20px;
+    box-shadow: none;
+    height: auto;
+  }
+
+  .subscribe__form-styled input,
+  .subscribe__form-styled button {
+    width: 100%;
+    height: 48px;
+    border-radius: 10px;
+  }
+
+  .subscribe__form-styled button {
+    margin: 0.5rem 0 0 0;
+  }
+
+  .subscribe__social {
+    justify-content: flex-start;
+    height: auto;
+    margin-top: 1rem;
+  }
+
+  .subscribe__social a {
+    width: 40px; /* чуть меньше на мобиле */
+  }
+}

@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    </properties>
 
     <parent>
         <groupId>com.sunset</groupId>
@@ -17,34 +15,60 @@
 
     <artifactId>order-service</artifactId>
 
+    <properties>
+        <java.version>17</java.version>
+        <spring-boot.version>3.4.4</spring-boot.version>
+        <spring-cloud.version>2023.0.1</spring-cloud.version>
+    </properties>
+
     <dependencies>
-        <!-- Зависимости для Order Service -->
+        <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Spring Data JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
+
+        <!-- PostgreSQL JDBC драйвер -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.5</version>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- HikariCP для пула соединений -->
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
             <version>5.1.0</version>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- Liquibase для миграций -->
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+            <version>4.31.1</version>
+        </dependency>
+
+        <!-- Тестовые зависимости -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.junit.vintage</groupId>
+                    <artifactId>junit-vintage-engine</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- JUnit 5 -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -57,26 +81,33 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Mockito (для моков, если нужно) -->
+        <!-- Mockito -->
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.liquibase</groupId>
-            <artifactId>liquibase-core</artifactId>
-            <version>4.31.1</version> <!-- Используйте актуальную версию -->
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
         </dependency>
+
     </dependencies>
 
     <build>
         <finalName>order-service</finalName>
         <plugins>
+            <!-- maven-compiler-plugin наследует настройки из родителя -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>3.4.4</version> <!-- Укажите актуальную версию плагина -->
+                <version>${spring-boot.version}</version>
                 <executions>
                     <execution>
                         <goals>
@@ -85,9 +116,10 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>com.sunset.order.OrderServiceApplication</mainClass>
+                    <mainClass>com.sunset.product.OrderServiceApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
 </project>

@@ -1,4 +1,4 @@
-package com.sunset.order.dto;
+package com.sunset.product.dto;
 
 public class ProductResponse {
     private String id;

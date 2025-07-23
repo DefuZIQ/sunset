@@ -1,0 +1,35 @@
+.footer {
+  background-color: #363f46;
+  padding: 3rem 0;
+  color: #fffdfb;
+}
+
+.footer__container {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer__grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2rem;
+  align-items: stretch; /* важно, чтобы растягивались по высоте */
+}
+
+.footer__logo,
+.footer__block {
+  flex: 1 1 200px; /* минимальная ширина 200px, гибкий рост и сжатие */
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* Адаптивность для футера */
+@media (max-width: 768px) {
+  .footer__grid {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

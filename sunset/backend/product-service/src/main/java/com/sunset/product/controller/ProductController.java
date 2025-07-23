@@ -1,37 +1,41 @@
-package com.sunset.order.controller;
+package com.sunset.product.controller;
 
-import com.sunset.order.dto.ProductRequest;
-import com.sunset.order.dto.ProductResponse;
-import com.sunset.order.service.ProductService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.CrossOrigin;
+import com.sunset.product.dto.ProductDTO;
+import com.sunset.product.service.ProductService;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import com.sunset.product.dto.ProductUuidRequest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
-@CrossOrigin(origins = "http://localhost:3000")
+import java.util.List;
+
 @RestController
 @RequestMapping("/products")
 public class ProductController {
 
-    @Autowired
-    private ProductService productService;
+    private final ProductService productService;
 
-    @PostMapping
-    public ProductResponse createProduct(@RequestBody ProductRequest productRequest) {
-        return productService.addProduct(productRequest);
+    public ProductController(ProductService productService) {
+        this.productService = productService;
     }
 
-    @GetMapping("/{id}")
-    public ProductResponse getProduct(@PathVariable String id) {
-        return productService.getProduct(id);
+    @GetMapping("/all")
+    public List<ProductDTO> getAllProducts() {
+        return productService.getProducts();
     }
 
-    @PutMapping("/{id}")
-    public ProductResponse updateProduct(@PathVariable String id, @RequestBody ProductRequest productRequest) {
-        return productService.updateProduct(id, productRequest);
-    }
+    @PostMapping("/by-uuid")
+    public ResponseEntity<ProductDTO> getProductByUuid(@RequestBody ProductUuidRequest request) {
+        if (request == null || request.getId() == null) {
+            return ResponseEntity.badRequest().build();
+        }
 
-    @DeleteMapping("/{id}")
-    public boolean deleteProduct(@PathVariable String id) {
-        return productService.deleteProduct(id);
+        return productService.getProductById(request.getId())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+
     }
 }

@@ -5,7 +5,15 @@ public class LoginRequest {
     private String email;
     private String password;
 
-    // Геттеры и сеттеры
+    public LoginRequest() {
+        // Пустой конструктор для Jackson или других сериализаторов
+    }
+
+    public LoginRequest(String email, String password) {
+        this.email = email;
+        this.password = password;
+    }
+
     public String getEmail() {
         return email;
     }

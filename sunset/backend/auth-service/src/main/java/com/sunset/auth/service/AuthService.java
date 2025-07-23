@@ -1,4 +1,3 @@
-// src/main/java/com/sunset/auth/service/AuthService.java
 package com.sunset.auth.service;
 
 import com.sunset.auth.dto.AuthResponse;
@@ -40,7 +39,8 @@ public class AuthService {
 
         userRepository.save(user);
 
-        return new AuthResponse(user.getId(), user.getEmail(), user.getFirstName(), user.getLastName(), null);
+        // Преобразуем user.getId() в String для ответа
+        return new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(), user.getLastName(), null);
     }
 
     public AuthResponse loginUser(LoginRequest request) {
@@ -54,8 +54,9 @@ public class AuthService {
             throw new InvalidPasswordException("Invalid password for user " + request.getEmail());
         }
 
+        // Преобразуем UUID в строку для генерации токена
         String token = jwtUtil.generateToken(user.getId());
 
-        return new AuthResponse(user.getId(), user.getEmail(), user.getFirstName(), user.getLastName(), token);
+        return new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(), user.getLastName(), token);
     }
 }

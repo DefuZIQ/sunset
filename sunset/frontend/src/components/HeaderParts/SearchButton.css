@@ -1,0 +1,6 @@
+/* Можно использовать если кнопка поиска содержит иконку внутри */
+.search-button img {
+  width: 24px;
+  height: 24px;
+  display: block;
+}

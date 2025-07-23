@@ -1,11 +1,12 @@
-package com.sunset.AuthService;
+package com.sunset.auth;
 
-import com.sunset.apigateway.ApiGatewayApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest(classes = ApiGatewayApplication.class)
-public class AuthServiceApplicationTests {
+@SpringBootTest
+@ActiveProfiles("test")
+class AuthServiceApplicationTests {
 
     @Test
     void contextLoads() {
