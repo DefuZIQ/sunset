@@ -1,4 +1,4 @@
-package com.sunset.product;
+package com.sunset.order;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

@@ -1,7 +1,7 @@
-package com.sunset.product.service;
+package com.sunset.order.service;
 
-import com.sunset.product.dto.ProductRequest;
-import com.sunset.product.dto.ProductResponse;
+import com.sunset.order.dto.ProductRequest;
+import com.sunset.order.dto.ProductResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;

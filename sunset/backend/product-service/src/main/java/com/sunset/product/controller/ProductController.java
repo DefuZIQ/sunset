@@ -1,11 +1,13 @@
-package com.sunset.product.controller;
+package com.sunset.order.controller;
 
-import com.sunset.product.dto.ProductRequest;
-import com.sunset.product.dto.ProductResponse;
-import com.sunset.product.service.ProductService;
+import com.sunset.order.dto.ProductRequest;
+import com.sunset.order.dto.ProductResponse;
+import com.sunset.order.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/products")
 public class ProductController {

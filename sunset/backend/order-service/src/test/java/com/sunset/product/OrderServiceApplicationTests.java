@@ -1,13 +1,14 @@
-package com.example.sunset;
+package com.sunset.order;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
-class SunsetApplicationTests {
+@ActiveProfiles("test")
+class OrderServiceApplicationTests {
 
     @Test
     void contextLoads() {
     }
-
 }
