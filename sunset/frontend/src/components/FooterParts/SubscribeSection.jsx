@@ -3,7 +3,7 @@ import "./SubscribeSection.css";
 
 export default function SubscribeSection() {
   const [email,setEmail]=useState(""); const [message,setMessage]=useState(""); const [loading,setLoading]=useState(false);
-  const subscribe=async(event)=>{event.preventDefault();setLoading(true);setMessage("");const user=JSON.parse(localStorage.getItem("user")||"null");try{const response=await fetch("/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,userId:user?.uuid||user?.id||null})});const data=await response.json();if(!response.ok)throw new Error(data.message||"Не удалось подписаться");setMessage("Готово! Скидка и новости уже ваши.");setEmail("");}catch(error){setMessage(error.message);}finally{setLoading(false);}};
+  const subscribe=async(event)=>{event.preventDefault();setLoading(true);setMessage("");const token=localStorage.getItem("authToken");try{const response=await fetch("/subscriptions",{method:"POST",headers:{"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({email})});const data=await response.json();if(!response.ok)throw new Error(data.message||"Не удалось подписаться");setMessage("Готово! Скидка и новости уже ваши.");setEmail("");}catch(error){setMessage(error.message);}finally{setLoading(false);}};
   return (
     <section className="subscribe">
       <div className="container subscribe__container">

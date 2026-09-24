@@ -34,7 +34,7 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
 
   useEffect(() => {
     if (!user) { setUnreadNotifications(0); return; }
-    fetch(`/notifications/unread-count?userId=${encodeURIComponent(user.uuid || user.id)}`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
+    fetch("/notifications/unread-count", { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
       .then((response) => response.ok ? response.json() : { count: 0 }).then((data) => setUnreadNotifications(data.count || 0)).catch(() => {});
   }, [user]);
 

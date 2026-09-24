@@ -35,13 +35,14 @@ spring:
               - GET
               - POST
               - PUT
+              - PATCH
               - DELETE
               - OPTIONS
             allowedHeaders: "*"
             allowCredentials: true
 
 jwt:
-  secret: MySuperSecretKeyThatIsAtLeast32BytesLong!!
+  secret: ${JWT_SECRET}
   expirationMs: 86400000
 
 logging:
@@ -63,7 +64,16 @@ security:
     - /products/reviews
     - /products/categories
     - /order/promotions
-    - /subscriptions
+    - /actuator/health
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 ollama:
   url: ${OLLAMA_URL:http://172.18.0.1:11434}

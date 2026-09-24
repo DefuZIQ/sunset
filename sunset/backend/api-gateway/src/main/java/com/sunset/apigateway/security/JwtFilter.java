@@ -9,6 +9,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -37,12 +38,14 @@ public class JwtFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
-        if (isPublicPath(path)) {
+        boolean publicRequest = isPublicRequest(request);
+        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+
+        if (publicRequest && (authHeader == null || !authHeader.startsWith("Bearer "))) {
             log.debug("Путь {} разрешён без авторизации", path);
-            return chain.filter(exchange);
+            return chain.filter(withTrustedUserId(exchange, null));
         }
 
-        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             log.warn("Отсутствует или некорректный Authorization заголовок");
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
@@ -59,11 +62,7 @@ public class JwtFilter implements GlobalFilter, Ordered {
             String userId = claims.getSubject();
             log.debug("JWT валиден. user-id: {}", userId);
 
-            ServerHttpRequest mutatedRequest = request.mutate()
-                    .header("user-id", userId)
-                    .build();
-
-            return chain.filter(exchange.mutate().request(mutatedRequest).build());
+            return chain.filter(withTrustedUserId(exchange, userId));
 
         } catch (ExpiredJwtException e) {
             log.warn("JWT просрочен: {}", e.getMessage());
@@ -81,12 +80,28 @@ public class JwtFilter implements GlobalFilter, Ordered {
         return exchange.getResponse().setComplete();
     }
 
-    private boolean isPublicPath(String path) {
+    private ServerWebExchange withTrustedUserId(ServerWebExchange exchange, String userId) {
+        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                .headers(headers -> {
+                    headers.remove("user-id");
+                    if (userId != null && !userId.isBlank()) {
+                        headers.set("user-id", userId);
+                    }
+                })
+                .build();
+        return exchange.mutate().request(mutatedRequest).build();
+    }
+
+    private boolean isPublicRequest(ServerHttpRequest request) {
+        String path = request.getURI().getPath();
+        if (HttpMethod.POST.equals(request.getMethod()) && "/subscriptions".equals(path)) {
+            return true;
+        }
         if (whitelistConfig.getWhitelistPaths() == null) {
             return false;
         }
         return whitelistConfig.getWhitelistPaths().stream()
-                .anyMatch(path::startsWith);
+                .anyMatch(publicPath -> path.equals(publicPath) || path.startsWith(publicPath + "/"));
     }
 
     @Override

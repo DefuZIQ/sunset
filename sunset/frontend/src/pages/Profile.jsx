@@ -53,17 +53,16 @@ export default function Profile({ user, setUser, section = "overview" }) {
 
   useEffect(() => {
     if (!user) return;
-    const accountId = user.uuid || user.id;
-    fetch(`/notifications?userId=${encodeURIComponent(accountId)}&limit=50`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
+    fetch(`/notifications?limit=50`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
       .then((response) => response.ok ? response.json() : [])
       .then((data) => setNotifications(Array.isArray(data) ? data : []))
       .catch(() => setNotifications([]));
   }, [user, section]);
   useEffect(() => { if (!user) return; const key = user.uuid || user.id; try { setSavedAddresses(JSON.parse(localStorage.getItem(`sunsetAddresses:${key}`)) || []); setPaymentMethods(JSON.parse(localStorage.getItem(`sunsetPayments:${key}`)) || []); } catch { setSavedAddresses([]); setPaymentMethods([]); } }, [user, section]);
-  useEffect(() => { if (!user) return; fetch(`/subscriptions/status?userId=${encodeURIComponent(user.uuid || user.id)}&email=${encodeURIComponent(user.email || "")}`,{headers:{Authorization:`Bearer ${localStorage.getItem("authToken")}`}}).then((r)=>r.ok?r.json():null).then(setSubscription).catch(()=>{}); },[user,section]);
+  useEffect(() => { if (!user) return; fetch("/subscriptions/status",{headers:{Authorization:`Bearer ${localStorage.getItem("authToken")}`}}).then((r)=>r.ok?r.json():null).then(setSubscription).catch(()=>{}); },[user,section]);
   const removeSavedAddress = (id) => { const next = savedAddresses.filter((item) => item.id !== id); setSavedAddresses(next); localStorage.setItem(`sunsetAddresses:${user.uuid || user.id}`, JSON.stringify(next)); };
   const removePayment = (id) => { const next = paymentMethods.filter((item) => item.id !== id); setPaymentMethods(next); localStorage.setItem(`sunsetPayments:${user.uuid || user.id}`, JSON.stringify(next)); };
-  const unsubscribe = async () => { await fetch(`/subscriptions?userId=${encodeURIComponent(user.uuid || user.id)}&email=${encodeURIComponent(user.email || "")}`,{method:"DELETE",headers:{Authorization:`Bearer ${localStorage.getItem("authToken")}`}}); setSubscription({active:false}); };
+  const unsubscribe = async () => { await fetch("/subscriptions",{method:"DELETE",headers:{Authorization:`Bearer ${localStorage.getItem("authToken")}`}}); setSubscription({active:false}); };
 
   if (!user) return (
     <div className="page-shell container">
@@ -78,8 +77,7 @@ export default function Profile({ user, setUser, section = "overview" }) {
   const visibleNotifications = notifications.filter((item) => notificationFilter === "all" || (notificationFilter === "unread" ? !item.read : String(item.type || "").toLowerCase() === notificationFilter));
   const markNotificationRead = async (item) => {
     if (item.read) return;
-    const accountId = user.uuid || user.id;
-    await fetch(`/notifications/${item.id}/read?userId=${encodeURIComponent(accountId)}`, { method: "PATCH", headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } }).catch(() => {});
+    await fetch(`/notifications/${item.id}/read`, { method: "PATCH", headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } }).catch(() => {});
     setNotifications((current) => current.map((entry) => entry.id === item.id ? { ...entry, read: true } : entry));
   };
   const favoriteProducts = products.filter((product) => favoriteIds.includes(String(product.id)));
@@ -238,7 +236,5 @@ export default function Profile({ user, setUser, section = "overview" }) {
     </div>
   );
 }
-
-
 
 

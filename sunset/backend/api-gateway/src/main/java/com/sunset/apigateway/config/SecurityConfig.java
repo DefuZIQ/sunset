@@ -84,6 +84,8 @@ public class SecurityConfig {
                 }))
                 .authorizeExchange(auth -> {
                     auth.pathMatchers(HttpMethod.OPTIONS).permitAll();
+                    auth.pathMatchers(HttpMethod.POST, "/subscriptions").permitAll();
+                    auth.pathMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll();
                     auth.pathMatchers(HttpMethod.GET, "/products/reviews/**", "/products/categories/tree").permitAll();
                     whitelistConfig.getWhitelistPaths()
                             .forEach(path -> auth.pathMatchers(path).permitAll());
@@ -101,7 +103,7 @@ public class SecurityConfig {
 
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowCredentials(true);
         config.addExposedHeader("Authorization");

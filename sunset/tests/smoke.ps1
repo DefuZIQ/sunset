@@ -38,6 +38,9 @@ function Assert-Check {
 $homeResponse = Invoke-Status GET "/"
 Assert-Check "Главная страница доступна" ($homeResponse.Status -eq 200 -and $homeResponse.Content -match '<div id="root">') "HTTP $($homeResponse.Status)"
 
+$health = Invoke-Status GET "/actuator/health"
+Assert-Check "Gateway сообщает о готовности" ($health.Status -eq 200 -and $health.Content -match '"status"\s*:\s*"UP"') "HTTP $($health.Status)"
+
 $catalog = Invoke-Status GET "/products/all"
 $products = if ($catalog.Status -eq 200) { @($catalog.Content | ConvertFrom-Json) } else { @() }
 Assert-Check "Каталог возвращает товары" ($catalog.Status -eq 200 -and $products.Count -gt 0) "HTTP $($catalog.Status), товаров $($products.Count)"

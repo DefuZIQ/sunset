@@ -14,13 +14,13 @@ class NewsletterControllerTest {
     private final NewsletterController controller = new NewsletterController(repository);
 
     @Test void rejectsInvalidEmail() {
-        assertThrows(IllegalArgumentException.class, () -> controller.subscribe(Map.of("email", "not-an-email")));
+        assertThrows(IllegalArgumentException.class, () -> controller.subscribe(null, Map.of("email", "not-an-email")));
         verify(repository, never()).save(any());
     }
 
     @Test void normalizesAndSavesNewSubscription() {
         when(repository.findByEmailIgnoreCase("USER@Example.com")).thenReturn(Optional.empty());
-        var response = controller.subscribe(Map.of("email", " USER@Example.com ", "userId", "user-1"));
+        var response = controller.subscribe("user-1", Map.of("email", " USER@Example.com ", "userId", "intruder"));
         assertEquals(true, response.get("active"));
         assertEquals("user@example.com", response.get("email"));
         verify(repository).save(argThat(item -> item.isActive() && "user-1".equals(item.getUserId())));
@@ -28,7 +28,7 @@ class NewsletterControllerTest {
 
     @Test void unsubscribeIsSafeWhenSubscriptionDoesNotExist() {
         when(repository.findFirstByUserIdOrderByUpdatedAtDesc("user-1")).thenReturn(Optional.empty());
-        assertEquals(false, controller.unsubscribe("user-1", null).get("active"));
+        assertEquals(false, controller.unsubscribe("user-1").get("active"));
         verify(repository, never()).save(any());
     }
 }

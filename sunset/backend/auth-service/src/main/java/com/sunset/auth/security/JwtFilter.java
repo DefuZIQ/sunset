@@ -81,7 +81,7 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private boolean isPublicPath(String path) {
-        return path.startsWith("/auth/login") || path.startsWith("/auth/register");
+        return path.startsWith("/auth/login") || path.startsWith("/auth/register") || path.startsWith("/actuator/health");
     }
 
     private void reject(HttpServletResponse response, String message) throws IOException {

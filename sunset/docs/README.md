@@ -11,6 +11,9 @@
 - [Автоматическое тестирование](TESTING.md)
 - [Отчёт о последнем прогоне](TEST_REPORT.md)
 - [План улучшений](improvements/ROADMAP.md)
+- [Полный аудит возможностей улучшения](improvements/IMPROVEMENT_AUDIT.md)
+- [Спецификация релиза P0](improvements/P0_IMPLEMENTATION_SPEC.md)
+- [Чек-лист проверки улучшений](improvements/VALIDATION_CHECKLIST.md)
 - [Безопасность и эксплуатация](improvements/SECURITY_AND_OPERATIONS.md)
 
 ## Сервисы

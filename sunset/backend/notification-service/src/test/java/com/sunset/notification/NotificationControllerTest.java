@@ -27,6 +27,14 @@ class NotificationControllerTest {
         assertEquals(7L, controller.unread("user-1").get("count"));
     }
 
+    @Test void createsNotificationForTrustedHeaderUser() {
+        when(repository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Notification created = controller.create("trusted-user",
+                new NotificationController.CreateRequest("SYSTEM", "Тема", "Текст"));
+        assertEquals("trusted-user", created.getRecipientUuid());
+        verify(repository).save(created);
+    }
+
     @Test void ownerCanMarkNotificationAsRead() {
         UUID id = UUID.randomUUID();
         Notification notification = new Notification("user-1", "ORDER", "Заказ", "Подтверждён");
