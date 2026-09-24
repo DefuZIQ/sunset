@@ -24,6 +24,9 @@ public class Product {
     @Column(nullable = false)
     private BigDecimal price;
 
+    @Column(nullable = false)
+    private String gender = "WOMEN";
+
     @OneToMany(mappedBy = "product", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private Set<ProductImage> images = new HashSet<>();
 
@@ -97,6 +100,10 @@ public class Product {
     public BigDecimal getPrice() {
         return price;
     }
+
+    public String getGender() { return gender; }
+
+    public void setGender(String gender) { this.gender = gender; }
 
     public void setPrice(BigDecimal price) {
         this.price = price;

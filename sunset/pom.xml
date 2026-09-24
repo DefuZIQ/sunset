@@ -11,11 +11,17 @@
     <version>1.0.0</version>
     <packaging>pom</packaging>
 
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
     <modules>
         <module>backend/api-gateway</module>
         <module>backend/auth-service</module>
         <module>backend/order-service</module>
         <module>backend/product-service</module>
+        <module>backend/notification-service</module>
     </modules>
 
     <dependencyManagement>

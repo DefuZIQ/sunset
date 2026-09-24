@@ -20,7 +20,7 @@ export default function Footer() {
               title="Магазин"
               links={[
                 { to: "/about", text: "О нас" },
-                { to: "/new", text: "Новая коллекция" },
+                { to: "/newproducts", text: "Новая коллекция" },
                 { to: "#subscribe-form", text: "Рассылка" },
               ]}
             />

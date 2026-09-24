@@ -1,11 +1,12 @@
 import React from "react";
+import BrandLogo from "../BrandLogo";
 import "./FooterLogo.css";
 
 export default function FooterLogo() {
   return (
     <div className="footer__logo">
-      <p>SUNSET</p>
-      <img src="" alt="Логотип" />
+      <BrandLogo tone="light" />
+      <p>Одежда, в которой остаётся ваше настроение.</p>
     </div>
   );
 }

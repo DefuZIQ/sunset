@@ -4,12 +4,14 @@ import SearchButton from "./SearchButton";
 import LikesButton from "./LikesButton";
 import BasketButton from "./BasketButton";
 import AvatarMenu from "./AvatarMenu";
-import { useCart } from "../HeaderParts/CartContext"; // импорт контекста
+import BrandLogo from "../BrandLogo";
 import "./Header.css";
 
 export default function Header({ isAuthenticated, user, onLogout, isPopupOpen }) {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -30,8 +32,22 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
     };
   }, []);
 
+  useEffect(() => {
+    if (!user) { setUnreadNotifications(0); return; }
+    fetch(`/notifications/unread-count?userId=${encodeURIComponent(user.uuid || user.id)}`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
+      .then((response) => response.ok ? response.json() : { count: 0 }).then((data) => setUnreadNotifications(data.count || 0)).catch(() => {});
+  }, [user]);
+
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const submitSearch = (event) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
+    popupSearchClose();
+    navigate(`/search?q=${encodeURIComponent(query)}`);
   };
 
   const handleLogoClick = (e) => {
@@ -53,7 +69,7 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
           {/* Логотип */}
           <div className="header-left">
             <a href="/" className="navbar__logo" onClick={handleLogoClick}>
-              SUNSET
+              <BrandLogo compact />
             </a>
           </div>
 
@@ -72,6 +88,9 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
             </li>
             <li>
               <Link to="/newproducts" onClick={() => setIsMobileMenuOpen(false)}>НОВИНКИ</Link>
+            </li>
+            <li>
+              <Link to="/promotions" onClick={() => setIsMobileMenuOpen(false)}>АКЦИИ</Link>
             </li>
             <li>
               <Link to="/contacts" onClick={() => setIsMobileMenuOpen(false)}>КОНТАКТЫ</Link>
@@ -97,14 +116,19 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
       {/* Поисковый попап */}
       {isSearchActive && (
         <div className="popup_search" onClick={popupSearchClose}>
+          <form className="search-form" onSubmit={submitSearch} onClick={(e) => e.stopPropagation()}>
+          <span className="search-label">ПОИСК ПО КАТАЛОГУ</span>
           <input
             className="input-search"
             type="text"
             placeholder="Что ищем?"
             autoFocus
-            onClick={(e) => e.stopPropagation()}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <button className="btn-search" onClick={popupSearchClose}>Поиск</button>
+          <button className="btn-search" type="submit">Найти</button>
+          {isAuthenticated && <Link className="search-notifications-link" to="/profile/notifications" onClick={popupSearchClose}>Уведомления {unreadNotifications > 0 && <b>{unreadNotifications}</b>} <span>→</span></Link>}
+          </form>
         </div>
       )}
     </>

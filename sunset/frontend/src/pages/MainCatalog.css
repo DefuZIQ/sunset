@@ -1,37 +1,89 @@
-.catalog-container {
-  display: flex;
-  gap: 20px;
-  padding: 20px;
-}
+.catalog-page { padding-top: 7.5rem; padding-bottom: 6rem; color: #3d3530; }
+.catalog-head { display: flex; justify-content: space-between; align-items: end; gap: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #dcd5cf; }
+.catalog-head h1 { margin: 0; font: 400 clamp(3rem, 7vw, 6.5rem)/.9 'Istok Web'; letter-spacing: -.05em; }
+.catalog-head__controls { display: flex; gap: 1rem; align-items: center; color: #7c7068; white-space: nowrap; }
+.catalog-head__controls select { max-width: 210px; border: 0; border-bottom: 1px solid #aaa099; background: transparent; padding: .65rem 1.5rem .65rem .2rem; color: #3d3530; }
+.catalog-gender { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 620px; margin-top: 1.4rem; border: 1px solid #d6cec8; }
+.catalog-gender button { padding: .9rem 1rem; color: #6b6059; border-right: 1px solid #d6cec8; transition: .2s ease; }
+.catalog-gender button:last-child { border-right: 0; }
+.catalog-gender button.active { background: #3d3530; color: #fff; }
+.filter-toggle { display: none; border: 1px solid #3d3530; padding: .65rem 1rem; }
+.active-filters { display: flex; flex-wrap: wrap; gap: .55rem; padding: 1.25rem 0 0; }
+.active-filters button { display: inline-flex; align-items: center; gap: .55rem; padding: .5rem .8rem; border: 1px solid #d6cec8; background: #f3eeea; color: #554b45; }
+.active-filters button span { font-size: 1.1rem; line-height: 1; }
+.active-filters .active-filters__reset { border-color: transparent; background: transparent; text-decoration: underline; }
+.catalog-layout { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 3rem; padding-top: 2.5rem; }
+.filter-sidebar { position: sticky; top: 92px; align-self: start; max-height: calc(100vh - 112px); overflow-y: auto; scrollbar-width: thin; width: auto; margin: 0; padding: 0 2rem 1rem 0; border-right: 1px solid #dcd5cf; background: #fffdfb; }
+.filter-heading { display: flex; justify-content: space-between; align-items: center; padding-bottom: .5rem; }
+.filter-heading span { color: #9a8d84; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; }
+.filter-heading h2 { margin: .15rem 0 0; font: 400 1.65rem 'Istok Web'; }
+.filter-close { display: none; font-size: 2rem; color: #3d3530; }
+.filter-field { display: grid; gap: .5rem; margin: 1rem 0 1.5rem; }
+.filter-field span, .filter-section h3 { font: 600 .74rem 'Inter'; letter-spacing: .09em; text-transform: uppercase; }
+.filter-field input, .price-row input { width: 100%; box-sizing: border-box; border: 0; border-bottom: 1px solid #bdb4ad; padding: .75rem 0; background: transparent; outline: 0; }
+.filter-field input:focus, .price-row input:focus { border-color: #3d3530; }
+.filter-section { padding: 1.2rem 0; border-top: 1px solid #e2dcd7; }
+.filter-section h3 { margin: 0 0 1rem; }
+.filter-section__title { display: flex; align-items: center; justify-content: space-between; }
+.filter-section__title small { color: #9a8d84; }
+.check-line { display: flex; gap: .65rem; align-items: center; margin: .7rem 0; color: #655b55; cursor: pointer; }
+.check-line input { width: 16px; height: 16px; accent-color: #3d3530; }
+.category-tree { display: grid; }
+.category-tree .check-line { margin: .45rem 0; }
+.category-tree__level-0 { font-weight: 600; }
+.category-tree__level-1 { padding-left: 1.2rem; font-size: .92rem; }
+.category-tree__level-2 { padding-left: 2.4rem; font-size: .88rem; }
+.price-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.price-range { width: 100%; margin: 1.2rem 0 .6rem; accent-color: #3d3530; }
+.price-presets, .color-filter, .size-filter, .gender-filter { display: flex; flex-wrap: wrap; gap: .45rem; }
+.size-groups { display: grid; gap: 1rem; }
+.size-group:empty { display: none; }
+.size-group__label { display: block; margin-bottom: .5rem; color: #8b7e76; font-size: .7rem; letter-spacing: .05em; }
+.price-presets button, .color-filter button, .size-filter button, .gender-filter button { border: 1px solid #d3cbc5; padding: .48rem .62rem; display: inline-flex; gap: .45rem; align-items: center; color: #625750; }
+.price-presets button:hover, .color-filter button:hover, .size-filter button:hover { border-color: #746860; }
+.color-filter button.selected, .size-filter button.selected, .gender-filter button.selected { border-color: #3d3530; background: #e8e0da; color: #3d3530; }
+.color-filter i { width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); }
+.rating-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; margin-bottom: .9rem; }
+.rating-presets button { border: 1px solid #d3cbc5; padding: .52rem .25rem; color: #625750; font-size: .76rem; }
+.rating-presets button:hover, .rating-presets button.selected { border-color: #3d3530; background: #3d3530; color: #fff; }
+.rating-values { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.rating-values label { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .45rem; color: #8b7e76; font-size: .76rem; }
+.rating-values input { min-width: 0; width: 100%; box-sizing: border-box; border: 1px solid #d3cbc5; padding: .55rem; background: #fff; }
+.rating-range { width: 100%; margin: 1rem 0 .35rem; accent-color: #3d3530; }
+.filter-actions, .filter-backdrop { display: none; }
+.catalog-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 1.25rem; }
+.catalog-grid .product-image-link { height: clamp(360px, 48vw, 690px); max-height: 58vh; min-height: 340px; }
 
-.filter-sidebar {
-  width: 250px;
-  margin-top: 5rem;
-  padding: 20px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background-color: #f9f9f9;
+@media (max-width: 1180px) {
+  .catalog-layout { grid-template-columns: 240px minmax(0, 1fr); gap: 2rem; }
+  .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-.filter-group {
-  margin-bottom: 20px;
+@media (max-width: 900px) {
+  .catalog-page { padding-top: 7rem; }
+  .catalog-head { align-items: flex-start; }
+  .catalog-head__controls { flex-wrap: wrap; justify-content: flex-end; }
+  .filter-toggle { display: block; }
+  .catalog-layout { display: block; padding-top: 1.5rem; }
+  .filter-backdrop { display: block; position: fixed; inset: 0; z-index: 14000; width: 100%; background: rgba(42, 36, 32, .56); backdrop-filter: blur(3px); }
+  .filter-sidebar { position: fixed; display: block; top: 0; right: 0; z-index: 15000; width: min(430px, 92vw); height: 100dvh; max-height: none; padding: 1.5rem 1.5rem 6rem; box-sizing: border-box; border: 0; overflow-y: auto; transform: translateX(105%); transition: transform .25s ease; box-shadow: -20px 0 50px rgba(34, 29, 26, .15); }
+  .filter-sidebar.open { transform: translateX(0); }
+  .filter-close { display: block; }
+  .filter-actions { position: fixed; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr auto; gap: .75rem; width: min(430px, 92vw); padding: 1rem 1.5rem; box-sizing: border-box; background: #fffdfb; border-top: 1px solid #dcd5cf; }
+  .filter-actions button { padding: .8rem 1rem; }
+  .filter-actions .filter-apply { background: #3d3530; color: #fff; }
 }
-
-.filter-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
+@media (max-width: 640px) {
+  .catalog-page { padding-top: 6.5rem; padding-bottom: 4rem; }
+  .catalog-head { flex-direction: column; gap: 1.25rem; padding-bottom: 1.25rem; }
+  .catalog-head__controls { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: .75rem; }
+  .catalog-head__controls span { grid-column: 1 / -1; }
+  .catalog-head__controls select { width: 100%; max-width: none; }
+  .catalog-gender { max-width: none; }
+  .catalog-gender button { padding: .72rem .35rem; font-size: .78rem; }
+  .catalog-grid { gap: 1.75rem .75rem; }
+  .catalog-grid .product-image-link { min-height: 250px; height: 58vw; }
 }
-
-.filter-group input {
-  width: 100%;
-  padding: 6px 8px;
-  font-size: 14px;
-}
-
-.products-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(auto-fill,minmax(300px,1fr));
-  gap: 20px;
+@media (max-width: 420px) {
+  .catalog-grid { grid-template-columns: 1fr; }
+  .catalog-grid .product-image-link { height: 118vw; max-height: 560px; }
 }

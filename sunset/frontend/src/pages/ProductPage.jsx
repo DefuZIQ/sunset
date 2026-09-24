@@ -1,5 +1,5 @@
-import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
 import { useCart } from "../components/HeaderParts/CartContext";
 import "../App.css"; // Для .container
 import "../components/Main/ProductCard.css"; // Переиспользуем стили
@@ -7,9 +7,15 @@ import "./ProductPage.css"; // Подключаем стили для стран
 
 export default function ProductPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const requestedColorId = searchParams.get("color");
+  const requestedSizeId = searchParams.get("size");
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [review, setReview] = useState({ rating: 5, body: "" });
+  const [reviewMessage, setReviewMessage] = useState("");
   const { addToCart, getItemQuantity, decreaseQuantity } = useCart();
 
   // Состояния для выбранных опций
@@ -23,7 +29,7 @@ export default function ProductPage() {
     setLoading(true);
     setError(null);
 
-    fetch("http://localhost:8080/products/by-uuid", {
+    fetch("/products/by-uuid", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -41,19 +47,34 @@ export default function ProductPage() {
         setProduct(data);
         setLoading(false);
 
-        // Инициализация выбора: если есть цвета и размеры — выбрать первые из них
-        if (data.colors.length > 0) {
-          setSelectedColorId(data.colors[0].id);
-        }
-        if (data.stock.length > 0) {
-          setSelectedSizeId(data.stock[0].sizeId);
+        const requestedStock = data.stock.find((item) =>
+          String(item.colorId) === String(requestedColorId) &&
+          String(item.sizeId) === String(requestedSizeId)
+        );
+        if (requestedStock) {
+          setSelectedColorId(requestedStock.colorId);
+          setSelectedSizeId(requestedStock.sizeId);
+        } else {
+          if (data.colors.length > 0) setSelectedColorId(data.colors[0].id);
+          if (data.stock.length > 0) setSelectedSizeId(data.stock[0].sizeId);
         }
       })
       .catch((err) => {
         setError(err.message);
         setLoading(false);
       });
-  }, [id]);
+  }, [id, requestedColorId, requestedSizeId]);
+
+  const loadReviews = useCallback(() => fetch(`/products/reviews/${id}`).then((response) => response.ok ? response.json() : []).then(setReviews).catch(() => setReviews([])), [id]);
+  useEffect(() => { if (id) loadReviews(); }, [id, loadReviews]);
+
+  const submitReview = async (event) => {
+    event.preventDefault();
+    const response = await fetch(`/products/review/${id}`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify(review) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) { setReviewMessage(response.status === 401 ? "Сначала войдите в аккаунт" : data.message || "Не удалось сохранить отзыв"); return; }
+    setReview({ rating: 5, body: "" }); setReviewMessage("Спасибо! Отзыв опубликован."); loadReviews();
+  };
 
   // Обновляем доступное количество при изменении выбора цвета или размера
   useEffect(() => {
@@ -98,6 +119,7 @@ export default function ProductPage() {
         </div>
 
         <div className="product-detail-info">
+          <div className="product-category-path"><span>{product.gender === "MEN" ? "Для мужчин" : product.gender === "UNISEX" ? "Унисекс" : "Для женщин"}</span>{(product.categories || []).map((category) => <span key={category}>{category}</span>)}</div>
           <h1>{product.name}</h1>
           <p>{product.description}</p>
           <p className="product-detail-price">{product.price} ₽</p>
@@ -194,6 +216,13 @@ export default function ProductPage() {
           </div>
         </div>
       </div>
+      <section className="reviews-section">
+        <div className="reviews-head"><div><p className="page-kicker">Мнения покупателей</p><h2>Отзывы</h2></div><div className="reviews-summary"><strong>{Number(product.rating || 0).toFixed(1)}</strong><span>★★★★★</span><small>{reviews.length} отзывов</small></div></div>
+        <div className="reviews-layout">
+          <div className="reviews-list">{reviews.length ? reviews.map((item) => <article className="review-card" key={item.id}><div><strong>{item.authorName}</strong><span>{"★".repeat(item.rating)}{"☆".repeat(5-item.rating)}</span></div><p>{item.body}</p><time>{new Date(item.createdAt).toLocaleDateString("ru-RU")}</time></article>) : <div className="reviews-empty">Пока нет отзывов — станьте первым.</div>}</div>
+          {localStorage.getItem("authToken") ? <form className="review-form" onSubmit={submitReview}><h3>Оставить отзыв</h3><label>Ваша оценка<select value={review.rating} onChange={(event) => setReview({ ...review, rating: Number(event.target.value) })}>{[5,4,3,2,1].map((value) => <option value={value} key={value}>{"★".repeat(value)} · {value}</option>)}</select></label><label>Комментарий<textarea required minLength="3" maxLength="1500" value={review.body} onChange={(event) => setReview({ ...review, body: event.target.value })} placeholder="Расскажите о посадке, ткани и впечатлениях" /></label><button className="primary-action">Опубликовать</button>{reviewMessage && <p>{reviewMessage}</p>}</form> : <div className="review-login"><h3>Поделитесь впечатлением</h3><p>Чтобы оставить отзыв, войдите в личный кабинет.</p><Link className="primary-action" to="/login">Войти</Link></div>}
+        </div>
+      </section>
     </div>
   );
 }

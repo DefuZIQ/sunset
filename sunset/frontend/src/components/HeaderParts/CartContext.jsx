@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 
 const CartContext = createContext();
 
+const cartKey = (productId, colorId, sizeId) =>
+  [productId, colorId || "default", sizeId || "default"].join("::");
+
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState(() => {
     try {
@@ -21,56 +24,63 @@ export function CartProvider({ children }) {
   // Добавление товара (увеличение количества)
   const addToCart = (product) => {
     setCartItems((prevItems) => {
-      const existing = prevItems[product.id];
+      const key = cartKey(product.id, product.selectedColorId, product.selectedSizeId);
+      const existing = prevItems[key];
       return {
         ...prevItems,
-        [product.id]: {
+        [key]: {
           product,
           quantity: existing ? existing.quantity + 1 : 1,
         },
       };
     });
-    console.log("Добавлен:", product);
   };
 
   // Уменьшение количества товара
-  const decreaseQuantity = (productId) => {
+  const decreaseQuantity = (productId, colorId, sizeId) => {
     setCartItems((prevItems) => {
-      const item = prevItems[productId];
+      const key = cartKey(productId, colorId, sizeId);
+      const legacyKey = prevItems[key] ? key : productId;
+      const item = prevItems[legacyKey];
       if (!item) return prevItems;
 
       if (item.quantity <= 1) {
         // Если количество 1, удаляем товар из корзины
         const updated = { ...prevItems };
-        delete updated[productId];
+        delete updated[legacyKey];
         return updated;
       } else {
         // Иначе уменьшаем количество на 1
         return {
           ...prevItems,
-          [productId]: {
+          [legacyKey]: {
             ...item,
             quantity: item.quantity - 1,
           },
         };
       }
     });
-    console.log("Уменьшено количество товара с ID:", productId);
   };
 
   // Полное удаление товара из корзины
-  const removeFromCart = (productId) => {
+  const removeFromCart = (productId, colorId, sizeId) => {
     setCartItems((prevItems) => {
       const updated = { ...prevItems };
-      delete updated[productId];
+      const key = cartKey(productId, colorId, sizeId);
+      delete updated[prevItems[key] ? key : productId];
       return updated;
     });
-    console.log("Удалён ID:", productId);
   };
 
+  const clearCart = () => setCartItems({});
+
   // Получение количества по ID товара
-  const getItemQuantity = (productId) =>
-    cartItems[productId]?.quantity || 0;
+  const getItemQuantity = (productId, colorId, sizeId) => {
+    if (colorId || sizeId) return cartItems[cartKey(productId, colorId, sizeId)]?.quantity || 0;
+    return Object.values(cartItems)
+      .filter((item) => item.product.id === productId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+  };
 
   // Общее количество товаров в корзине
   const cartItemCount = Object.values(cartItems).reduce(
@@ -87,6 +97,7 @@ export function CartProvider({ children }) {
         removeFromCart,
         getItemQuantity,
         cartItemCount,
+        clearCart,
       }}
     >
       {children}

@@ -1,31 +1,36 @@
 /* === HEADER === */
 
 .nav__background {
-  background-color: #fff;
-  box-shadow: inset 0 -1px 0 0 #ebeff3;
-}
-
-.header-container {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  background-color: #fff;
   z-index: 10000;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  background-color: #fff;
+  box-shadow: 0 2px 12px rgba(49, 42, 37, 0.08), inset 0 -1px 0 #ebeff3;
+}
+
+.header-container {
+  position: relative;
+  background-color: transparent;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 6vh;
+  min-height: 72px;
 }
+.nav-menu li a.active { border-bottom: 1px solid #3d3530; }
+.popup_search { position: fixed; inset: 0; z-index: 20000; display: grid; place-items: start center; padding-top: 16vh; background: rgba(43,38,34,.72); backdrop-filter: blur(6px); }
+.search-form { width: min(760px, calc(100% - 2rem)); padding: 2.5rem; box-sizing: border-box; background: #fffdfb; display: grid; grid-template-columns: 1fr auto; gap: 1rem; }
+.search-notifications-link { grid-column: 1 / -1; display:flex; align-items:center; gap:8px; color:#8e5c3f; text-decoration:none; font-size:13px; padding-top:4px; }
+.search-notifications-link b { display:grid; place-items:center; min-width:20px; height:20px; padding:0 5px; border-radius:99px; background:#b96d48; color:#fff; font-size:11px; }
+.search-notifications-link span { margin-left:auto; font-size:18px; }
+.search-label { grid-column: 1 / -1; font-size: .75rem; letter-spacing: .16em; color: #897a70; }
+.input-search { min-width: 0; border: 0; border-bottom: 1px solid #3d3530; padding: .8rem 0; font: 400 1.7rem 'Istok Web'; background: transparent; outline: 0; }
+.btn-search { padding: .8rem 1.8rem; background: #3d3530; color: #fffdfb; font: 1rem 'Istok Web'; }
+.likes-button { position: relative; display: flex; align-items: center; justify-content: center; color: #3d3530; }
+.icon-count { position: absolute; right: -5px; top: -6px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 2px; box-sizing: border-box; border: 1.5px solid #fff; border-radius: 9px; background: #9b4f49; color: #fff; box-shadow: 0 2px 6px rgba(61,53,48,.22); font: 700 9px/1 'Inter', sans-serif; }
 
-.navbar__logo {
-  font-size: 2rem;
-  font-weight: bold;
-  font-family: 'Inter', sans-serif;
-  color: #333;
-  text-decoration: none;
-}
+.navbar__logo { display: inline-flex; color: #333; text-decoration: none; }
 
 .nav-menu {
   position: absolute;
@@ -55,6 +60,7 @@
 .header-right {
   display: flex;
   align-items: center;
+  align-self: stretch;
   gap: 1rem;
 }
 
@@ -72,6 +78,9 @@ button:focus {
 /* Dropdowns */
 .dropdown {
   position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
 }
 
 .dropdown-basket,
@@ -81,16 +90,48 @@ button:focus {
   position: absolute;
   right: 0;
   top: 100%;
-  background: #fff;
+  margin: 0;
+  box-sizing: border-box;
+  background: #fffdfb;
   min-width: 200px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  border-top: 1px solid #e4ddd7;
+  box-shadow: 0 14px 30px rgba(48, 40, 35, .12);
   z-index: 1000;
-  padding: 0.5rem;
+  padding: .75rem;
 }
+
+.dropdown-basket { width: min(370px, calc(100vw - 2rem)); }
+.dropdown-content, .dropdown-profile { width: 280px; }
+
+.dropdown-basket::before,
+.dropdown-content::before,
+.dropdown-profile::before,
+.dropdown-basket::after,
+.dropdown-content::after,
+.dropdown-profile::after {
+  content: "";
+  position: absolute;
+  right: 9px;
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+}
+
+.dropdown-basket::before,
+.dropdown-content::before,
+.dropdown-profile::before { top: -10px; border-bottom: 10px solid #d7cec7; }
+
+.dropdown-basket::after,
+.dropdown-content::after,
+.dropdown-profile::after { top: -8px; border-bottom: 9px solid #fffdfb; }
 
 .dropdown:hover .dropdown-basket,
 .dropdown:hover .dropdown-content,
-.dropdown:hover .dropdown-profile {
+.dropdown:hover .dropdown-profile,
+.dropdown:focus-within .dropdown-basket,
+.dropdown:focus-within .dropdown-content,
+.dropdown:focus-within .dropdown-profile {
   display: block;
 }
 
@@ -103,15 +144,19 @@ button:focus {
   background-color: #FFFDFB;
 }
 
-.dropdown__background a {
+.dropdown__background a,
+.dropdown__background_profile a {
   padding: 0.5rem;
   text-decoration: none;
   color: #333;
 }
 
-.dropdown__background a:hover {
+.dropdown__background a:hover,
+.dropdown__background_profile a:hover {
   background-color: #f2f2f2;
 }
+
+.dropdown__background_profile p { margin: 0; font-weight: 600; }
 
 .logout {
   background: none;
@@ -136,35 +181,32 @@ button:focus {
 
 /* === АДАПТИВ === */
 
-@media (max-width: 1024px) {
+@media (max-width: 960px) {
   .header-container {
-    padding: 0 5rem;
-  }
-}
-
-@media (max-width: 768px) {
-  .header-container {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 1rem 2rem;
+    flex-direction: row;
+    align-items: center;
+    padding: .75rem 1rem;
     height: auto;
   }
 
   .burger {
     display: block;
+    order: 3;
   }
 
   .nav-menu {
     display: none;
-    position: static;
+    position: absolute;
+    top: 100%; left: -1rem;
     transform: none;
     flex-direction: column;
     align-items: flex-start;
     background: #fff;
-    width: 100%;
-    margin-top: 1rem;
+    width: calc(100% + 2rem);
+    box-sizing: border-box;
+    margin-top: 0;
     gap: 1rem;
-    padding: 1rem 0;
+    padding: 1rem;
     border-top: 1px solid #eee;
   }
 
@@ -173,10 +215,12 @@ button:focus {
   }
 
   .header-right {
-    width: 100%;
-    justify-content: space-between;
-    margin-top: 1rem;
+    width: auto;
+    margin-left: auto;
+    margin-right: .75rem;
   }
+  .search-form { grid-template-columns: 1fr; padding: 1.5rem; }
+  .btn-search { min-height: 48px; }
 }
 
 @media (max-width: 480px) {
@@ -189,6 +233,15 @@ button:focus {
   }
 
   .header-container {
-    padding: 1rem;
+    padding: .75rem 0;
   }
+  .header-right { gap: .55rem; margin-right: .5rem; }
+  .header-right svg { width: 20px; height: 20px; }
+  .input-search { font-size: 1.25rem; }
+}
+
+@media (max-width: 360px) {
+  .navbar__logo { font-size: 1.3rem; }
+  .header-right { gap: .35rem; }
+  .likes-button { display: none; }
 }

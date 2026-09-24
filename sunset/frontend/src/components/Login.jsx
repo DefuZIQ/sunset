@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import "./Auth.css";
 
 export default function Login({ setUser }) {
   const [email, setEmail] = useState("");
@@ -11,7 +12,7 @@ export default function Login({ setUser }) {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    fetch("http://localhost:8080/auth/login", {
+    fetch("/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -24,7 +25,7 @@ export default function Login({ setUser }) {
         return res.json();
       })
       .then((data) => {
-        const { uuid, email, firstName, lastName, token } = data;
+        const { uuid, email, firstName, lastName, phone, birthday, avatar, role, token } = data;
 
         if (!token || !uuid || !email) {
           throw new Error("Ответ от сервера некорректен");
@@ -33,8 +34,12 @@ export default function Login({ setUser }) {
         const user = {
           uuid,
           email,
-          name: firstName,
-          surname: lastName
+          firstName,
+          lastName,
+          phone,
+          birthday,
+          avatar,
+          role
         };
 
         localStorage.setItem("authToken", token);

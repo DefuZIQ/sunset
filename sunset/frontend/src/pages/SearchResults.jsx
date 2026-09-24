@@ -1,0 +1,5 @@
+import { Link, useSearchParams } from "react-router-dom";
+import ProductCard from "../components/Main/ProductCard";
+import { useStore } from "../contexts/StoreContext";
+import "./ContentPages.css";
+export default function SearchResults() { const [params] = useSearchParams(); const query = params.get("q")?.trim() || ""; const { products } = useStore(); const found = products.filter((p) => `${p.name} ${p.description || ""} ${(p.categories || []).join(" ")}`.toLowerCase().includes(query.toLowerCase())); return <div className="page-shell container"><p className="page-kicker">Результаты поиска</p><h1 className="page-title">{query ? `«${query}»` : "Поиск"}</h1>{found.length ? <><p className="page-intro">Найдено товаров: {found.length}</p><div className="product-list-grid">{found.map((p) => <ProductCard key={p.id} product={p} />)}</div></> : <div className="empty-state"><h2>Ничего не найдено</h2><p>Попробуйте изменить запрос или посмотрите весь ассортимент.</p><Link className="text-link" to="/catalog">Перейти в каталог</Link></div>}</div>; }

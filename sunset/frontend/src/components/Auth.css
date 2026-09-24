@@ -1,0 +1,11 @@
+.login_background, .reg_background { min-height: 100svh; box-sizing: border-box; display: grid; place-items: center; padding: calc(72px + 2.5rem) 0 2.5rem; background: linear-gradient(120deg, #eee8e2 0 44%, #fffdfb 44%); color: #3d3530; }
+.login, .reg { display: grid; place-items: center; }
+.login_inline, .reg_inline { width: 100%; display: flex; justify-content: center; align-items: center; }
+.login_form, .reg_form { width: min(100%, 560px); box-sizing: border-box; padding: clamp(2rem, 5vw, 4rem); background: #fffdfb; box-shadow: 0 20px 60px rgba(55,45,38,.08); }
+.login_form h1, .reg_form h1 { margin: 0 0 2rem; font: 400 clamp(2.4rem, 5vw, 4rem) 'Istok Web'; }
+.login_form form, .reg_form form { display: grid; gap: 1rem; }
+.login_input, .reg_input { border: 0; border-bottom: 1px solid #bdb4ad; padding: 1rem 0; background: transparent; outline: 0; }
+.login_btn, .reg_btn { margin-top: 1rem; padding: 1rem; background: #3d3530; color: #fffdfb; }
+.reg_info { display: none; }
+@media (max-width: 760px) { .login_background, .reg_background { min-height: 100svh; padding: calc(72px + 1rem) 0 1rem; } .login_form, .reg_form { padding: 2rem 1.5rem; } }
+@media (max-width: 380px) { .login_form, .reg_form { padding-inline: 1.1rem; } }

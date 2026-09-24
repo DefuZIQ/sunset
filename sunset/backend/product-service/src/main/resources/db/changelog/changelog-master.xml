@@ -13,4 +13,76 @@
                  stripComments="false"/>
     </changeSet>
 
+    <changeSet id="6" author="codex">
+        <sqlFile path="classpath:/db/migrations/V2__seed_catalog.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="107" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V3__seed_extended_catalog.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="108" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V4__reviews_category_tree.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="109" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V5__unique_catalog_photos.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="110" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V6__proxy_catalog_photos.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="111" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V7__unique_photo_variants.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="112" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V8__gender_catalog_sizes_and_matching_photos.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="113" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V9__curated_product_photos.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="114" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V10__remove_legacy_seed_sizes.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="115" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V11__align_original_products_with_photos.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="116" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V12__complete_variant_dictionary.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="117" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V13__category_subtrees.sql"
+                 splitStatements="false"
+                 stripComments="false"/>
+    </changeSet>
+
 </databaseChangeLog>

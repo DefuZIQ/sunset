@@ -11,4 +11,12 @@
         <sqlFile path="classpath:/db/migrations/V1__init.sql"/>
     </changeSet>
 
+    <changeSet id="8" author="codex">
+        <sqlFile path="classpath:/db/migrations/V2__add_user_phone.sql"/>
+    </changeSet>
+
+    <changeSet id="9" author="codex">
+        <sqlFile path="classpath:/db/migrations/V3__add_user_role.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

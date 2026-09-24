@@ -51,31 +51,28 @@ export default function BasketButton() {
         <div className="dropdown__background_basket">
           <div className="basket__mini basket__mini_scroll">
             {items.length === 0 ? (
-              <div className="cart__item">Ваша корзина пуста</div>
+              <div className="cart-empty-state"><div className="cart-empty-state__art" aria-hidden="true">🛍️</div><strong>Корзина отдыхает</strong><span>Добавьте пару вещей — они будут ждать вас здесь</span><Link className="cart-empty-state__link" to="/catalog">Перейти в каталог <b>→</b></Link></div>
             ) : (
               items.map(({ product, quantity }) => (
                 <div
                   className="cart__item"
-                  key={product.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
+                  key={`${product.id}-${product.selectedColorId || "default"}-${product.selectedSizeId || "default"}`}
                 >
-                  <span>
-                    {product.name || "Без названия"} — {product.price}₽
-                  </span>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
+                  <Link
+                    className="cart__item-link"
+                    to={`/catalog/product/${product.id}?color=${encodeURIComponent(product.selectedColorId || "")}&size=${encodeURIComponent(product.selectedSizeId || "")}`}
+                    aria-label={`Открыть ${product.name || "товар"} с выбранными параметрами`}
                   >
+                    <img className="cart__item-image" src={product.imageUrl || product.image_url} alt={product.name || "Товар"} />
+                    <span className="cart__item-copy">
+                      <strong>{product.name || "Без названия"}</strong>
+                      <small>{[product.selectedColorName, product.selectedSizeName].filter(Boolean).join(" · ") || "Выбранный вариант"}</small>
+                      <b>{Number(product.price || 0).toLocaleString("ru-RU")} ₽</b>
+                    </span>
+                  </Link>
+                  <div className="cart__item-actions">
                     <button
-                      onClick={() => decreaseQuantity(product.id)}
+                      onClick={() => decreaseQuantity(product.id, product.selectedColorId, product.selectedSizeId)}
                       aria-label="Уменьшить количество"
                       style={{
                         cursor: "pointer",
@@ -98,7 +95,7 @@ export default function BasketButton() {
                       +
                     </button>
                     <button
-                      onClick={() => removeFromCart(product.id)}
+                      onClick={() => removeFromCart(product.id, product.selectedColorId, product.selectedSizeId)}
                       aria-label="Удалить товар"
                       style={{
                         background: "transparent",

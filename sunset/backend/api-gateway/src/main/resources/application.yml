@@ -19,6 +19,14 @@ spring:
           uri: http://order-service:8083
           predicates:
             - Path=/order/**
+        - id: notification-service
+          uri: http://notification-service:8084
+          predicates:
+            - Path=/notifications/**
+        - id: subscription-service
+          uri: http://notification-service:8084
+          predicates:
+            - Path=/subscriptions/**
       globalcors:
         corsConfigurations:
           '[/**]':
@@ -47,8 +55,17 @@ logging:
 
 security:
   whitelist-paths:
+    - /assistant/chat
     - /auth/register
     - /auth/login
     - /products/all
     - /products/by-uuid
+    - /products/reviews
+    - /products/categories
+    - /order/promotions
+    - /subscriptions
+
+ollama:
+  url: ${OLLAMA_URL:http://172.18.0.1:11434}
+  model: ${OLLAMA_MODEL:qwen2.5:0.5b}
 

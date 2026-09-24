@@ -1,31 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { Link } from "react-router-dom";
+import { useStore } from "../../contexts/StoreContext";
 import ProductCard from "../Main/ProductCard"; // проверь путь
 import "./NewProducts.css";
 
 export default function NewProducts() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        setLoading(true);
-        const res = await fetch("http://localhost:8080/products/all");
-        if (!res.ok) throw new Error("Ошибка загрузки продуктов");
-        const data = await res.json();
-        setProducts(data);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchProducts();
-  }, []);
-
-  if (loading) return <p>Загрузка...</p>;
-  if (error) return <p style={{ color: "red" }}>Ошибка: {error}</p>;
+  const { products, loading } = useStore();
+  if (loading) return <p className="container">Загрузка…</p>;
 
   return (
     <section className="container">
@@ -44,7 +25,7 @@ export default function NewProducts() {
       </div>
 
       <div className="catalog__view d-flex justify-content-center">
-        <a href="/catalog">СМОТРЕТЬ КАТАЛОГ</a>
+        <Link to="/catalog">СМОТРЕТЬ КАТАЛОГ</Link>
       </div>
     </section>
   );

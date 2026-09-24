@@ -11,4 +11,8 @@
         <sqlFile path="classpath:/db/migrations/V1__init.sql"/>
     </changeSet>
 
+    <changeSet id="7" author="codex">
+        <sqlFile path="classpath:/db/migrations/V2__loyalty_promotions.sql" splitStatements="false" stripComments="false"/>
+    </changeSet>
+
 </databaseChangeLog>

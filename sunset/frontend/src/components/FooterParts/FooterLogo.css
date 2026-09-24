@@ -1,7 +1,2 @@
-.footer__logo p {
-  font-family: "Inter", sans-serif;
-  font-weight: 700;
-  font-size: 32px;
-  margin-top: 0;      /* убираем верхний отступ */
-  margin-bottom: 1rem;
-}
+.footer__logo { display: grid; gap: 1rem; max-width: 270px; }
+.footer__logo p { margin: 0; color: rgba(255,253,251,.68); font: 400 .82rem/1.55 "Inter", sans-serif; }

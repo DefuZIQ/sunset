@@ -1,6 +1,8 @@
 .main-banner {
   width: 100%;
-  min-height: 94vh;
+  min-height: min(900px, 100svh);
+  padding-top: 72px;
+  box-sizing: border-box;
   background-image: url("../../images/Background.png");
   background-repeat: no-repeat;
   background-position: center top;
@@ -16,7 +18,7 @@
 .main-banner__title h2 {
   font-family: 'Istok Web', sans-serif;
   font-weight: 400;
-  font-size: 52px;
+  font-size: clamp(2.25rem, 5vw, 4.25rem);
   color: #FFFDFB;
   margin: 0;
 }
@@ -27,8 +29,9 @@
   justify-content: center;
   padding: 10px 49px;
   gap: 10px;
-  width: 238px;
-  height: 49px;
+  min-width: 210px;
+  min-height: 49px;
+  box-sizing: border-box;
   border: 1.5px solid #FFFDFB;
   background: transparent;
   color: #FFFDFB;
@@ -39,6 +42,16 @@
   transition: background 0.7s ease;
   user-select: none;
   border-radius: 0; /* если нужна */
+}
+
+@media (max-width: 760px) {
+  .main-banner { min-height: 82svh; background-position: 58% top; }
+  .main-banner__title h2 { max-width: 12ch; }
+  .main-banner__button { width: auto; padding-inline: 1.5rem; font-size: 1rem; }
+}
+
+@media (max-width: 420px) {
+  .main-banner { min-height: 76svh; }
 }
 
 .main-banner__button:hover {

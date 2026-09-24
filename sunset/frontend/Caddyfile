@@ -1,0 +1,27 @@
+:80 {
+    encode zstd gzip
+
+    @legacyAdmin path /admin /admin/
+    redir @legacyAdmin /#/admin 302
+
+  @api path /auth /auth/* /products /products/* /order /order/* /notifications /notifications/* /subscriptions /subscriptions/* /assistant /assistant/*
+    handle @api {
+        reverse_proxy api-gateway:8080
+    }
+
+    @spaEntry path / /index.html
+    header @spaEntry Cache-Control "no-cache, no-store, must-revalidate"
+
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+}

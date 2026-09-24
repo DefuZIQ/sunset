@@ -1,6 +1,7 @@
 package com.sunset.apigateway.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import com.sunset.apigateway.config.WhitelistConfig;
+
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class JwtFilter implements GlobalFilter, Ordered {
@@ -49,7 +52,7 @@ public class JwtFilter implements GlobalFilter, Ordered {
         String token = authHeader.substring(7);
         try {
             Claims claims = Jwts.parser()
-                    .setSigningKey(secretKey)
+                    .setSigningKey(Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8)))
                     .parseClaimsJws(token)
                     .getBody();
 

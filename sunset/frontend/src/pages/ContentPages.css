@@ -1,0 +1,109 @@
+.page-shell { padding-top: 7.5rem; padding-bottom: 6rem; color: #3d3530; }
+.page-kicker { margin: 0 0 .75rem; color: #897a70; font-size: .78rem; letter-spacing: .18em; text-transform: uppercase; }
+.page-title { margin: 0 0 2.5rem; font: 400 clamp(2.4rem, 6vw, 5.5rem)/.98 'Istok Web', sans-serif; letter-spacing: -.04em; }
+.page-intro { max-width: 760px; margin: -1rem 0 3.5rem; color: #6d625b; font-size: 1.1rem; line-height: 1.8; }
+.editorial-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 2rem; align-items: stretch; }
+.editorial-photo { min-height: 610px; background: url('../images/Background.png') center/cover; }
+.editorial-copy { display: flex; flex-direction: column; justify-content: center; padding: clamp(2rem, 6vw, 6rem); background: #eee8e2; }
+.editorial-copy h2 { font: 400 clamp(2rem, 4vw, 4rem)/1.05 'Istok Web'; margin: 0 0 1.5rem; }
+.editorial-copy p { line-height: 1.8; color: #625750; }
+.values-grid, .contact-grid, .profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 4rem; background: #d9d1cb; }
+.value-card, .contact-card, .profile-card { padding: 2rem; background: #fffdfb; }
+.value-card span { display: block; color: #9d8b7e; font-size: .8rem; letter-spacing: .1em; margin-bottom: 1rem; }
+.value-card h3, .contact-card h3, .profile-card h3 { font: 400 1.45rem 'Istok Web'; margin: 0 0 1rem; }
+.value-card p, .contact-card p, .profile-card p { color: #71665f; line-height: 1.65; }
+.contact-card a { color: #3d3530; }
+.map-card { margin-top: 2rem; min-height: 430px; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, .7fr); background: #e8e0d9; }
+.map-card__map { min-height: 430px; background: #d8cec5; overflow: hidden; }
+.map-card__map iframe { display: block; width: 100%; height: 100%; min-height: 430px; border: 0; filter: saturate(.7) contrast(.95); }
+.map-card__info { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: clamp(2rem, 5vw, 4rem); }
+.map-card strong { font: 400 clamp(1.7rem, 3vw, 2.4rem)/1.2 'Istok Web'; }
+.map-card__info > p:not(.page-kicker) { color: #71665f; line-height: 1.6; }
+.map-card__info a { margin-top: 1.5rem; padding-bottom: .2rem; border-bottom: 1px solid #3d3530; color: #3d3530; text-decoration: none; }
+.empty-state { padding: 5rem 1rem; text-align: center; border: 1px solid #ded8d3; }
+.empty-state h2 { font: 400 2rem 'Istok Web'; }
+.text-link, .primary-action { display: inline-flex; padding: .85rem 1.5rem; border: 1px solid #3d3530; color: #3d3530; text-decoration: none; font: 1rem 'Istok Web'; }
+.primary-action { background: #3d3530; color: #fffdfb; }
+.product-list-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2.5rem 1.25rem; }
+.cart-layout { display: grid; grid-template-columns: 1fr 360px; gap: 3rem; }
+.cart-line { display: grid; grid-template-columns: 110px 1fr auto; gap: 1.5rem; padding: 1.25rem 0; border-bottom: 1px solid #ded8d3; align-items: center; }
+.cart-line img { width: 110px; height: 140px; object-fit: cover; }
+.cart-line__image-link { display: block; width: 110px; height: 140px; overflow: hidden; }
+.cart-line__image-link img { display: block; transition: transform .35s ease; }
+.cart-line__image-link:hover img { transform: scale(1.035); }
+.cart-line__product-link { color: inherit; text-decoration: none; transition: color .2s ease; }
+.cart-line__product-link:hover { color: #8a5d45; }
+.cart-line h3 { margin: 0 0 .5rem; font: 400 1.2rem 'Istok Web'; }
+.cart-line__actions { display: flex; gap: .65rem; align-items: center; }
+.cart-line__actions button { width: 34px; height: 34px; border: 1px solid #bcb2aa; }
+.cart-summary { background: #eee8e2; padding: 2rem; height: fit-content; }
+.cart-summary h2 { font: 400 1.7rem 'Istok Web'; margin-top: 0; }
+.cart-summary__row { display: flex; justify-content: space-between; margin: 1rem 0; }
+.cart-summary .primary-action { width: 100%; justify-content: center; box-sizing: border-box; margin-top: 1rem; }
+.cart-summary button { cursor: pointer; }
+.checkout-field { display: grid; gap: .4rem; margin: 1rem 0; color: #746860; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
+.checkout-field input, .checkout-field textarea, .promo-field input { box-sizing: border-box; width: 100%; padding: .8rem; border: 1px solid #c8bdb5; background: #fffdfb; color: #3d3530; }
+.checkout-phone__control { position: relative; }
+.checkout-phone__control input { padding-right: 48px; }
+.checkout-phone__edit { position: absolute; top: 50%; right: 12px; transform: translateY(-50%) scaleX(-1); display: inline-grid; place-items: center; width: 24px; height: 28px; padding: 0; border: 0; border-radius: 0; background: transparent; color: #684b3c; font: 600 19px/1 Georgia, serif; transition: color .2s ease, transform .2s ease; }
+.checkout-phone__edit:hover { background: transparent; color: #a06f55; transform: translateY(-50%) scaleX(-1) rotate(-8deg); }
+.checkout-phone.is-locked input { background: #e7dfd8; color: #665b54; cursor: default; }
+.checkout-phone.is-editing input { border-color: #8a5d45; background: #fff; box-shadow: 0 0 0 3px rgba(138,93,69,.1); }
+.checkout-field textarea { min-height: 80px; resize: vertical; }
+.promo-field { display: grid; grid-template-columns: 1fr auto; margin: 1rem 0; }
+.promo-field button { border: 0; padding: 0 1rem; background: #756960; color: #fff; }
+.checkout-note, .checkout-error { color: #984b45; line-height: 1.45; }.checkout-success, .checkout-discount { color: #60755a; }
+.promotion-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.promotion-card { min-height: 350px; padding: clamp(1.5rem, 3vw, 2.5rem); box-sizing: border-box; background: #e9e1da; display: flex; flex-direction: column; align-items: flex-start; }
+.promotion-card--dark { background: #37302c; color: #fffdfb; }.promotion-card > span { margin-left: auto; font: 400 clamp(2.3rem,4vw,4rem) 'Istok Web'; }.promotion-card h2 { font: 400 1.8rem 'Istok Web'; margin: 1rem 0; }.promotion-card p { line-height: 1.6; }.promotion-card small { margin-top: auto; opacity: .7; }.promotion-card button { margin-top: 1rem; padding: .7rem 1rem; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; }
+.birthday-promo { margin-top: 1rem; padding: clamp(2rem,5vw,5rem); background: #d8c6b8; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }.birthday-promo h2 { max-width: 700px; font: 400 clamp(2rem,4vw,4rem)/1.05 'Istok Web'; margin: 0 0 1rem; }.birthday-promo p { max-width: 680px; line-height: 1.6; }
+.profile-card--wide { grid-column: span 2; }
+.profile-card ul { padding-left: 1rem; line-height: 2; color: #71665f; }
+.auth-note { margin-top: 1.5rem; color: #71665f; }
+@media (max-width: 1100px) { .product-list-grid { grid-template-columns: repeat(3, 1fr); } .editorial-grid { grid-template-columns: 1fr; } .editorial-photo { min-height: 500px; } }
+@media (max-width: 900px) { .cart-layout { grid-template-columns: 1fr; } .cart-summary { position: static; } .promotion-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .page-shell { padding-top: 6.5rem; } .values-grid, .contact-grid, .profile-grid { grid-template-columns: 1fr; } .profile-card--wide { grid-column: auto; } .product-list-grid { grid-template-columns: repeat(2, 1fr); } .cart-line { grid-template-columns: 80px 1fr; } .cart-line img, .cart-line__image-link { width: 80px; height: 105px; } .cart-line__actions { grid-column: 2; } .map-card { grid-template-columns: 1fr; } .map-card__map, .map-card__map iframe { min-height: 360px; } .promotion-grid { grid-template-columns: 1fr; }.birthday-promo { align-items:flex-start; flex-direction:column; } }
+@media (max-width: 480px) { .product-list-grid { grid-template-columns: 1fr; } }
+.delivery-switch { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:16px 0; padding:4px; border-radius:12px; background:#f4f0eb; }
+.delivery-switch button { border:0; border-radius:9px; padding:10px; background:transparent; color:#7b7067; cursor:pointer; }
+.delivery-switch button.active { background:#fff; color:#24201c; box-shadow:0 2px 8px rgba(30,20,10,.08); }
+.saved-addresses,.pickup-list { display:grid; gap:8px; margin-bottom:12px; }
+.saved-address-row { display:grid; grid-template-columns:1fr auto auto; gap:4px; align-items:stretch; padding:4px; border:1px solid #e8dfd6; border-radius:12px; background:#fff; }
+.saved-address-row.active { border-color:#9c6c4c; background:#fbf6f0; }
+.saved-address-select { display:flex; flex-direction:column; align-items:flex-start; gap:3px; border:0; background:transparent; text-align:left; cursor:pointer; padding:8px; }
+.saved-address-row .address-action { border:0; background:transparent; color:#986846; font-size:11px; cursor:pointer; padding:6px; }
+.saved-address-row .address-action--danger { color:#a35f58; }
+.saved-addresses button,.pickup-card { display:flex; flex-direction:column; align-items:flex-start; gap:3px; padding:12px; border:1px solid #e8dfd6; border-radius:12px; background:#fff; text-align:left; cursor:pointer; }
+.saved-addresses button.active,.pickup-card.active { border-color:#9c6c4c; background:#fbf6f0; }
+.saved-addresses span,.pickup-card span,.pickup-card small { color:#81766d; font-size:12px; }
+.saved-addresses .add-address { display:block; color:#a66d48; text-align:center; }
+.address-form { padding-top:8px; }
+.address-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.address-grid label { display:flex; flex-direction:column; gap:4px; }
+.address-grid span { color:#81766d; font-size:11px; }
+.address-grid input { width:100%; box-sizing:border-box; border:1px solid #e5ddd4; border-radius:8px; padding:9px; }
+.map-preview { margin:12px 0; overflow:hidden; border-radius:12px; border:1px solid #e6ded4; }
+.map-preview iframe { display:block; width:100%; height:170px; border:0; }
+.map-preview button { width:100%; border:0; padding:9px; background:#f6f1eb; color:#8d5d3e; cursor:pointer; }
+.cart-summary { position:relative; overflow:hidden; }
+.address-modal { position:absolute; inset:0; z-index:5; display:block; background:transparent; animation:none; }
+.address-modal__panel { width:100%; height:100%; max-height:none; overflow:auto; box-sizing:border-box; padding:24px 22px 30px; border-radius:inherit; background:#eee8e2; box-shadow:none; animation:addressDrawerIn .24s ease-out; }
+.address-modal__head { display:flex; justify-content:space-between; gap:20px; margin-bottom:18px; }
+.address-modal__head h3 { margin:3px 0 5px; font-size:25px; }
+.address-modal__head p:last-child { margin:0; color:#867b71; font-size:13px; }
+.address-modal__close { width:34px; height:34px; border:0; border-radius:50%; background:#f3eee8; color:#5c5048; font-size:25px; cursor:pointer; }
+.address-label-field { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+.address-label-field span,.address-grid span { color:#5f554d; font-size:12px; font-weight:600; }
+.address-label-field input { border:1px solid #e5ddd4; border-radius:10px; padding:11px; }
+.address-grid span small { display:block; margin-top:4px; color:#76695f; font-size:11px; line-height:1.25; font-weight:400; }
+.address-grid label:focus-within span small { color:#a56d4a; }
+.address-modal__panel::after { content:"Поля с подсказками помогают быстро проверить адрес перед сохранением"; display:block; margin-top:14px; color:#796d64; font-size:11px; }
+.address-grid input { transition:border .2s, box-shadow .2s; }
+.address-grid input:focus,.address-label-field input:focus { outline:0; border-color:#a97351; box-shadow:0 0 0 3px rgba(169,115,81,.12); }
+.map-confirm { display:flex; align-items:center; gap:8px; padding:10px 12px; color:#6d6259; font-size:12px; background:#fbf7f2; }
+.map-confirm input { accent-color:#a56d4a; }
+.address-modal__actions { display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:16px; }
+.address-modal__actions .primary-action { margin:0; }
+@media (max-width: 640px) { .address-grid { grid-template-columns:1fr; } }
+@keyframes addressDrawerIn { from { transform:translateX(100%); } to { transform:translateX(0); } }
+.checkout-field input.field-invalid { border-color:#bd6d62 !important; background:#fff5f3; box-shadow:0 0 0 3px rgba(189,109,98,.12); }

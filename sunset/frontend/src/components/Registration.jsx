@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import "./Auth.css";
 
-export default function Registration() {
+export default function Registration({ setUser }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -9,10 +11,11 @@ export default function Registration() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogin = async (email, password) => {
     try {
-      const response = await fetch("http://localhost:8080/auth/login", {
+      const response = await fetch("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -25,8 +28,22 @@ export default function Registration() {
         return false;
       }
 
-      // Успешный вход
+      const data = await response.json();
+      const user = {
+        uuid: data.uuid,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        birthday: data.birthday,
+        avatar: data.avatar,
+        role: data.role
+      };
+      localStorage.setItem("authToken", data.token);
+      localStorage.setItem("user", JSON.stringify(user));
+      setUser(user);
       setSuccess("Регистрация и вход прошли успешно!");
+      navigate("/profile");
       return true;
     } catch {
       setError("Ошибка сети при входе после регистрации");
@@ -54,7 +71,7 @@ export default function Registration() {
     };
 
     try {
-      const response = await fetch("http://localhost:8080/auth/register", {
+      const response = await fetch("/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

@@ -1,0 +1,111 @@
+.account-page { --account-dark: #37302c; }
+.account-hero { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.5rem; padding: clamp(1.5rem, 4vw, 3rem); background: #e9e1da; }
+.account-avatar { display: grid; place-items: center; width: clamp(76px, 9vw, 112px); aspect-ratio: 1; border-radius: 50%; background: var(--account-dark); color: #fffdfb; font: 400 clamp(1.4rem, 3vw, 2.3rem) 'Istok Web'; letter-spacing: .05em; }
+.account-avatar.has-image { overflow: hidden; background: #d8cec7; }
+.account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-hero__copy h1 { margin: 0; font: 400 clamp(1.8rem, 4vw, 3.6rem)/1.05 'Istok Web'; letter-spacing: -.035em; }
+.account-hero__copy > p:last-child { margin: .65rem 0 0; color: #756960; }
+.account-hero__shop { display: inline-flex; align-items: center; gap: 1.5rem; padding: .9rem 1.1rem; border: 1px solid #6e625a; color: #3d3530; text-decoration: none; white-space: nowrap; }
+.account-hero__shop span { font-size: 1.4rem; }
+.account-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: clamp(2rem, 5vw, 5rem); padding-top: 3rem; }
+.account-nav { display: flex; flex-direction: column; align-self: start; position: sticky; top: 100px; border-top: 1px solid #d9d1cb; }
+.account-nav a { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: .5rem; padding: 1rem .2rem; border-bottom: 1px solid #d9d1cb; color: #756a63; text-decoration: none; }
+.account-nav a > span { color: #aa9c92; font-size: .7rem; letter-spacing: .08em; }
+.account-nav a > em { display: grid; place-items: center; min-width: 22px; height: 22px; border-radius: 50%; background: #ede7e2; color: #3d3530; font-size: .72rem; font-style: normal; }
+.account-nav a:hover, .account-nav a.active { color: #2f2926; }
+.account-nav a.active { padding-left: .7rem; background: #f0ebe6; }
+.account-content { min-width: 0; }
+.account-section-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .7fr); gap: 2rem; align-items: end; margin-bottom: 2rem; }
+.account-section-head h2 { margin: 0; font: 400 clamp(2rem, 4vw, 3.8rem)/1 'Istok Web'; letter-spacing: -.035em; }
+.account-section-head > p { margin: 0; color: #786c64; line-height: 1.6; }
+.account-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: #d9d1cb; border: 1px solid #d9d1cb; }
+.account-stats a { display: flex; flex-direction: column; min-height: 170px; padding: 1.4rem; box-sizing: border-box; background: #fffdfb; color: #3d3530; text-decoration: none; }
+.account-stats a > span { color: #7d716a; font-size: .82rem; }
+.account-stats strong { margin: auto 0; font: 400 3rem 'Istok Web'; }
+.account-stats small { color: #7d716a; }
+.account-feature-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 1rem; margin-top: 1rem; }
+.account-feature { min-height: 280px; padding: clamp(1.5rem, 3vw, 2.5rem); box-sizing: border-box; background: #e9e1da; }
+.account-feature--dark { background: var(--account-dark); color: #fffdfb; }
+.account-feature > span { font-size: .68rem; letter-spacing: .15em; }
+.account-feature h3 { max-width: 460px; margin: 2.5rem 0 1rem; font: 400 clamp(1.6rem, 3vw, 2.6rem)/1.12 'Istok Web'; }
+.account-feature p { max-width: 480px; color: inherit; opacity: .72; line-height: 1.65; }
+.account-feature a { display: inline-block; margin-top: 1rem; color: inherit; text-underline-offset: .25rem; }
+.account-empty { padding: clamp(3rem, 8vw, 7rem) 1.5rem; text-align: center; border: 1px solid #d9d1cb; }
+.account-empty > span { color: #998b82; font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; }
+.account-empty h3 { margin: 1rem 0; font: 400 clamp(1.8rem, 4vw, 3rem) 'Istok Web'; }
+.account-empty p { max-width: 520px; margin: 0 auto 2rem; color: #786c64; line-height: 1.65; }
+.account-form { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem 2rem; padding: clamp(1.5rem, 4vw, 3rem); background: #f0ebe6; }
+.avatar-editor { grid-column: 1/-1; display:flex;align-items:center;gap:1.3rem;padding-bottom:1.5rem;border-bottom:1px solid #d3c9c2; }.avatar-editor .account-avatar{flex:0 0 96px;width:96px}.avatar-editor strong{font:500 1.15rem 'Istok Web'}.avatar-editor p{margin:.35rem 0 .8rem;color:#756960;font-size:.88rem}.avatar-upload{display:inline-flex!important;cursor:pointer;border:1px solid #70645c;padding:.65rem .9rem!important;font-size:.75rem;letter-spacing:.04em}.avatar-upload input{display:none}.avatar-remove{margin-left:.7rem;color:#8f4d49;text-decoration:underline}
+.account-form label { display: grid; gap: .6rem; }
+.account-form label span { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: #746860; }
+.account-form input { width: 100%; padding: .9rem 0; box-sizing: border-box; border: 0; border-bottom: 1px solid #aaa098; border-radius: 0; outline: 0; background: transparent; color: #3d3530; }
+.account-form input:focus { border-color: #3d3530; }
+.account-form__footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 1rem; padding-top: .75rem; }
+.account-form__footer .primary-action { cursor: pointer; }
+.account-form__footer > span { color: #65755e; }
+.account-form__footer .account-form__error { color: #9a3f3f; }
+.account-form__footer button:disabled { cursor: wait; opacity: .65; }
+.password-section { display: grid; grid-template-columns: minmax(220px, .65fr) minmax(0, 1.35fr); gap: clamp(2rem, 5vw, 4rem); margin-top: 1rem; padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid #d9d1cb; background: #fffdfb; }
+.password-section__intro h3 { margin: .35rem 0 .8rem; font: 400 clamp(1.65rem, 3vw, 2.4rem)/1.1 'Istok Web'; }
+.password-section__intro > p:last-child { margin: 0; color: #786c64; line-height: 1.6; }
+.password-form { display: grid; gap: 1.25rem; }
+.password-form label { display: grid; gap: .6rem; }
+.password-form label span { color: #746860; font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; }
+.password-form input { width: 100%; padding: .9rem 0; box-sizing: border-box; border: 0; border-bottom: 1px solid #aaa098; border-radius: 0; outline: 0; background: transparent; color: #3d3530; }
+.password-form input:focus { border-color: #3d3530; }
+.password-form .account-form__footer { grid-column: auto; }
+.account-favorites-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 1rem; }
+.account-favorites-grid .product-image-link { height: clamp(320px, 34vw, 560px); }
+.order-list { display: grid; gap: .75rem; }.order-card { display: grid; grid-template-columns: 1fr 1fr .8fr; gap: 1rem; align-items: center; padding: 1.5rem; border: 1px solid #d9d1cb; }.order-card>div { display:flex;flex-direction:column;gap:.35rem; }.order-card span,.order-card small { color:#857970;font-size:.78rem; }.order-card h3 { margin:0;font:400 1.15rem 'Istok Web'; }.order-status { color:#76634e; }.order-status--delivered { color:#60755a; }.order-status--cancelled { color:#984b45; }
+.order-card { color:inherit; text-decoration:none; transition:transform .18s, background .18s; }.order-card:hover { transform:translateY(-2px); background:#fbf8f5; }
+.order-detail__head { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin:24px 0; }.order-detail__head p { color:#857970; }.order-cancel { color:#984b45; }
+.order-detail__grid { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; margin-bottom:16px; }.order-detail__card { padding:22px; border:1px solid #ded5ce; background:#fffdfb; }.order-detail__card h2 { margin:0 0 18px; font-size:20px; }.order-detail__item,.order-detail__card aside>div { display:flex; justify-content:space-between; gap:16px; padding:13px 0; border-bottom:1px solid #eee7e1; }.order-detail__item div { display:flex; flex-direction:column; gap:4px; }.order-detail__item span,.order-detail__bonus { color:#857970; font-size:13px; }.order-detail__card aside div { display:flex; justify-content:space-between; margin:12px 0; }.order-detail__bonus { padding:10px; background:#f4ede6; }.order-detail__head .page-title { margin-bottom:5px; }
+@media (max-width: 700px) { .order-detail__grid { grid-template-columns:1fr; } .order-detail__head { flex-direction:column; } }
+.order-detail { max-width:1180px; }.order-detail__back { display:inline-block; margin-bottom:22px; }.order-detail__hero { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding:30px; background:linear-gradient(135deg,#27231f,#433a32); color:#fff; }.order-detail__hero h1 { margin:4px 0 12px; font:400 clamp(2rem,5vw,3.5rem) 'Istok Web'; }.order-detail__hero .page-kicker { color:#c6b8ac; }.order-detail__status { display:inline-flex; padding:7px 11px; border-radius:99px; background:#efe5da; color:#5e5147; font-size:12px; }.order-detail__status--cancelled { background:#f1d9d6; color:#8d4c46; }.order-detail__hero-total { display:flex; flex-direction:column; align-items:flex-end; }.order-detail__hero-total span { color:#c6b8ac; font-size:12px; }.order-detail__hero-total strong { font-size:25px; }.order-timeline { display:grid; grid-template-columns:repeat(5,1fr); padding:22px 14px; margin-bottom:16px; background:#eee8e2; }.order-timeline div { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; color:#9b9188; text-align:center; font-size:11px; }.order-timeline div:not(:last-child)::after { content:""; position:absolute; top:15px; left:calc(50% + 18px); right:calc(-50% + 18px); height:1px; background:#cec5bd; }.order-timeline i { position:relative; z-index:1; display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:#d8d0c8; font-style:normal; }.order-timeline .active { color:#4b423b; }.order-timeline .active i { background:#292521; color:#fff; }.order-timeline .active::after { background:#7e6c5f!important; }.order-detail__section-head { display:flex; align-items:center; gap:10px; margin-bottom:18px; }.order-detail__section-head > span { color:#a8704e; font-size:11px; }.order-detail__section-head h2 { margin:0; }.order-detail__products { padding:0; }.order-detail__products .order-detail__section-head { padding:22px 22px 0; }.order-detail__item { display:grid; grid-template-columns:72px 1fr auto; align-items:center; gap:14px; padding:14px 22px; }.order-detail__image { width:72px; height:86px; display:grid; place-items:center; overflow:hidden; background:#eee8e2; color:#8b6c58; font-size:25px; }.order-detail__image img { width:100%; height:100%; object-fit:cover; }.order-detail__item-copy { display:flex; flex-direction:column; gap:5px; }.order-detail__item-copy span,.order-detail__item-copy small { color:#857970; font-size:12px; }.order-detail__item-price { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }.order-detail__item-price span { color:#9c9189; font-size:11px; }.order-detail__summary > div:not(.order-detail__section-head) { display:flex; justify-content:space-between; gap:20px; margin:12px 0; }.order-detail__grand-total { font-size:18px; }.order-detail__grid--bottom { grid-template-columns:1fr 1fr; }.order-detail__address { font-size:16px; line-height:1.5; }.order-detail__actions { display:flex; align-items:center; gap:18px; padding:18px 0; }.order-detail__actions span { color:#8c8178; font-size:12px; }.order-cancelled-note { display:flex; justify-content:space-between; gap:14px; padding:16px 20px; margin-bottom:16px; background:#f1ddda; color:#7f4a45; }.order-loading { padding:50px; text-align:center; color:#857970; }
+@media(max-width:700px){.order-detail__hero{align-items:flex-start;flex-direction:column}.order-detail__hero-total{align-items:flex-start}.order-timeline{grid-template-columns:1fr;gap:10px}.order-timeline div{align-items:flex-start;flex-direction:row}.order-timeline div::after{display:none}.order-detail__item{grid-template-columns:58px 1fr}.order-detail__image{width:58px;height:70px}.order-detail__item-price{grid-column:2;align-items:flex-start;flex-direction:row}.order-detail__grid--bottom{grid-template-columns:1fr}}
+.order-detail__edit { display:flex; align-items:center; gap:14px; margin-top:16px; }.order-detail__edit .primary-action { margin:0; }.order-detail__edit span { color:#857970; font-size:12px; }.order-edit-panel { margin-top:16px; padding:24px; background:#eee8e2; border:1px solid #d7ccc3; }.order-edit-switch { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:4px; margin-bottom:16px; background:#ddd3ca; border-radius:10px; }.order-edit-switch button { padding:10px; border:0; border-radius:8px; background:transparent; cursor:pointer; }.order-edit-switch button.active { background:#fffdfb; box-shadow:0 2px 8px rgba(30,20,10,.08); }.order-edit-panel label { display:flex; flex-direction:column; gap:5px; color:#655a52; font-size:12px; }.order-edit-panel input,.order-edit-panel select { width:100%; box-sizing:border-box; padding:11px; border:1px solid #d7ccc3; border-radius:8px; background:#fffdfb; }.order-edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }.order-edit-grid label:last-child { grid-column:1/-1; }.order-edit-actions { display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:18px; }.order-edit-actions .primary-action { margin:0; }.order-edit-actions .link-button { border:0; background:transparent; } @media(max-width:600px){.order-edit-grid{grid-template-columns:1fr}.order-edit-grid label:last-child{grid-column:auto}.order-detail__edit{align-items:flex-start;flex-direction:column}}
+.loyalty-balance { display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#d9d1cb;border:1px solid #d9d1cb; }.loyalty-balance>div { min-height:190px;padding:1.5rem;background:#eee8e2;display:flex;flex-direction:column; }.loyalty-balance span { color:#857970;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em; }.loyalty-balance strong { margin:auto 0;font:400 clamp(2rem,4vw,3.5rem) 'Istok Web'; }.loyalty-balance p,.loyalty-balance small { color:#756960; }.loyalty-actions { display:flex;gap:.8rem;margin:1.5rem 0 2.5rem; }.loyalty-history { border-top:1px solid #d9d1cb; }.loyalty-history h3{font:400 1.6rem 'Istok Web';}.loyalty-history>div{display:grid;grid-template-columns:1fr auto 70px;gap:1rem;padding:1rem 0;border-bottom:1px solid #d9d1cb}.loyalty-history time{color:#857970}.loyalty-history strong{text-align:right}.loyalty-history .positive{color:#60755a}
+
+@media (max-width: 900px) {
+  .account-hero { grid-template-columns: auto 1fr; }
+  .account-hero__shop { grid-column: 1 / -1; justify-self: stretch; justify-content: space-between; }
+  .account-layout { grid-template-columns: 1fr; gap: 2rem; }
+  .account-nav { position: static; flex-direction: row; overflow-x: auto; border-bottom: 1px solid #d9d1cb; }
+  .account-nav a { flex: 0 0 auto; grid-template-columns: auto 1fr auto; min-width: max-content; border: 0; padding: .9rem 1.1rem; }
+  .account-nav a:first-child { padding-left: .2rem; }
+  .account-favorites-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .loyalty-balance { grid-template-columns:1fr; }
+  .password-section { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .account-hero { gap: 1rem; margin-left: -1rem; margin-right: -1rem; }
+  .account-section-head { grid-template-columns: 1fr; gap: .75rem; }
+  .account-stats { grid-template-columns: 1fr; }
+  .account-stats a { min-height: 130px; }
+  .account-feature-grid, .account-form { grid-template-columns: 1fr; }
+  .avatar-editor { align-items:flex-start; }.avatar-editor .account-avatar{flex-basis:76px;width:76px}
+  .account-form__footer { grid-column: auto; align-items: flex-start; flex-direction: column; }
+  .order-card { grid-template-columns:1fr 1fr; }.order-card>div:last-child{grid-column:1/-1}.loyalty-actions{align-items:stretch;flex-direction:column}.loyalty-history>div{grid-template-columns:1fr auto}.loyalty-history strong{grid-column:2}
+}
+@media (max-width: 420px) {
+  .account-avatar { width: 62px; }
+  .account-hero__copy h1 { font-size: 1.55rem; }
+  .account-hero__copy > p:last-child { overflow-wrap: anywhere; }
+  .account-favorites-grid { grid-template-columns: 1fr; }
+  .account-favorites-grid .product-image-link { height: 118vw; max-height: 560px; }
+}
+.notification-filters { display:flex; flex-wrap:wrap; gap:8px; margin:24px 0 16px; }
+.notification-filters button { border:1px solid #e6ded4; background:#fff; border-radius:999px; padding:9px 14px; color:#756c63; cursor:pointer; }
+.notification-filters button.active { background:#25211e; border-color:#25211e; color:#fff; }
+.notification-list { display:grid; gap:10px; }
+.notification-card { position:relative; width:100%; display:flex; align-items:flex-start; gap:13px; padding:17px; border:1px solid #eee7df; border-radius:15px; background:#fff; text-align:left; cursor:pointer; transition:transform .18s, box-shadow .18s; }
+.notification-card:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(35,25,15,.08); }
+.notification-card.is-read { background:#fcfbfa; }
+.notification-card__mark { display:grid; place-items:center; width:36px; height:36px; flex:0 0 36px; border-radius:12px; background:#f2e9df; color:#a46c45; font-weight:700; }
+.notification-card > span:nth-child(2) { display:flex; flex-direction:column; gap:4px; }
+.notification-card strong { color:#28231f; font-size:14px; }
+.notification-card small { color:#766c63; font-size:13px; line-height:1.45; }
+.notification-card time { color:#a39a91; font-size:11px; }
+.notification-card i { width:7px; height:7px; margin-left:auto; margin-top:4px; border-radius:50%; background:#c47d50; }
+.saved-profile-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }.saved-profile-card { padding:20px; border:1px solid #ded5ce; background:#fffdfb; }.saved-profile-card h3 { margin:0 0 14px; }.saved-profile-row { display:flex; justify-content:space-between; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid #eee7e1; }.saved-profile-row div { display:flex; flex-direction:column; gap:4px; }.saved-profile-row span,.muted { color:#857970; font-size:13px; }.saved-profile-row button { border:0; background:transparent; color:#a35f58; cursor:pointer; }.saved-profile-card .text-link { display:inline-block; margin-top:14px; border:0; background:transparent; padding:0; cursor:pointer; } @media(max-width:700px){.saved-profile-grid{grid-template-columns:1fr;}}
+.saved-profile-card--subscription { grid-column:1/-1; }.subscription-active { display:inline-flex; padding:7px 11px; border-radius:99px; background:#e4eee1; color:#557250; font-size:12px; }.subscription-cancel { margin-top:10px; border:0; background:transparent; color:#a35f58; cursor:pointer; padding:0; }.order-edit-pencil { margin-left:auto; display:grid; place-items:center; width:32px; height:32px; border:1px solid #ded5ce; border-radius:50%; background:#fffdfb; color:#8d5d3e; cursor:pointer; font-size:17px; transition:transform .18s,background .18s; }.order-edit-pencil:hover { transform:rotate(-8deg); background:#f3e9df; }

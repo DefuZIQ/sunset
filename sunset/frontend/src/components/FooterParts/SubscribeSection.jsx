@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import "./SubscribeSection.css";
 
 export default function SubscribeSection() {
+  const [email,setEmail]=useState(""); const [message,setMessage]=useState(""); const [loading,setLoading]=useState(false);
+  const subscribe=async(event)=>{event.preventDefault();setLoading(true);setMessage("");const user=JSON.parse(localStorage.getItem("user")||"null");try{const response=await fetch("/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,userId:user?.uuid||user?.id||null})});const data=await response.json();if(!response.ok)throw new Error(data.message||"Не удалось подписаться");setMessage("Готово! Скидка и новости уже ваши.");setEmail("");}catch(error){setMessage(error.message);}finally{setLoading(false);}};
   return (
     <section className="subscribe">
       <div className="container subscribe__container">
@@ -13,20 +15,24 @@ export default function SubscribeSection() {
             </p>
           </div>
 
-          <form
-            id="subscribe-form"
-            className="subscribe__form-styled"
-            action="http://localhost:8080/user/subscribe"
-            method="POST"
-          >
-            <input
-              type="email"
-              name="email"
-              placeholder="Ваш e-mail"
-              required
-            />
-            <button type="submit">Подписаться</button>
-          </form>
+          <div className="subscribe__form-wrap">
+            <form
+              id="subscribe-form"
+              className="subscribe__form-styled"
+              onSubmit={subscribe}
+            >
+              <input
+                type="email"
+                name="email"
+                placeholder="Ваш e-mail"
+                required
+                value={email}
+                onChange={(event)=>setEmail(event.target.value)}
+              />
+              <button type="submit" disabled={loading}>{loading?"Отправляем…":"Подписаться"}</button>
+            </form>
+            <div className="subscribe__message" aria-live="polite">{message}</div>
+          </div>
 
           <div className="subscribe__social">
             {/* Instagram */}

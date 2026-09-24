@@ -47,3 +47,5 @@
   font-weight: 700;
   font-size: 22px;
 }
+@media (max-width: 900px) { .new__card { flex-wrap: wrap; gap: 2rem 2%; } .products__card_body { width: 49%; } }
+@media (max-width: 520px) { .products__card_body { width: 100%; } .new__card_title h2 { font-size: 30px; } }

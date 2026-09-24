@@ -10,6 +10,8 @@ export default function AvatarMenu({ isAuthenticated, user, onLogout, isPopupOpe
     onLogout();
     navigate("/");
   };
+  const displayName = [user?.firstName || user?.name, user?.lastName || user?.surname].filter(Boolean).join(" ") || "Клиент SUNSET";
+  const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="dropdown">
@@ -26,12 +28,18 @@ export default function AvatarMenu({ isAuthenticated, user, onLogout, isPopupOpe
 
       {isAuthenticated ? (
         <div className="dropdown-profile" role="menu">
-          <div className="dropdown__background_profile">
-            <Link to="/profile" role="menuitem">
-              <p>{user?.lastName} {user?.firstName}</p>
+          <div className="profile-popup__head">
+            <Link to="/profile" className="profile-popup__avatar" role="menuitem">
+              {user?.avatar ? <img src={user.avatar} alt="" /> : initials}
             </Link>
-            <Link to="/profile/orders" role="menuitem">Проверить статус заказа</Link>
-            <Link to="/profile/settings" role="menuitem">Настройки профиля</Link>
+            <div><span>Ваш профиль</span><strong>{displayName}</strong><small>{user?.email || "SUNSET ID"}</small></div>
+          </div>
+          <div className="dropdown__background_profile">
+            <Link to="/profile" role="menuitem"><span className="profile-popup__icon">⌂</span>Личный кабинет</Link>
+            <Link to="/profile/orders" role="menuitem"><span className="profile-popup__icon">↗</span>Мои заказы</Link>
+            <Link to="/profile/notifications" role="menuitem"><span className="profile-popup__icon">♢</span>Уведомления</Link>
+            <Link to="/profile/settings#password" role="menuitem"><span className="profile-popup__icon">✦</span>Изменить пароль</Link>
+            {user?.role === "ADMIN" && <Link to="/admin" role="menuitem">Управление магазином</Link>}
             <button onClick={handleLogoutClick} className="logout" aria-label="Выйти">Выйти</button>
           </div>
         </div>
