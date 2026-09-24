@@ -15,7 +15,12 @@ function Invoke-Status {
             $params.Body = $Body | ConvertTo-Json -Depth 10
         }
         $response = Invoke-WebRequest @params
-        return @{ Status = [int]$response.StatusCode; Content = $response.Content }
+        $content = if ($response.Content -is [byte[]]) {
+            [System.Text.Encoding]::UTF8.GetString($response.Content)
+        } else {
+            [string]$response.Content
+        }
+        return @{ Status = [int]$response.StatusCode; Content = $content }
     } catch {
         if ($_.Exception.Response) {
             return @{ Status = [int]$_.Exception.Response.StatusCode; Content = "" }
@@ -31,36 +36,36 @@ function Assert-Check {
         Write-Host "PASS  $Name"
     } else {
         $script:failed++
-        Write-Host "FAIL  $Name — $Details" -ForegroundColor Red
+        Write-Host "FAIL  $Name - $Details" -ForegroundColor Red
     }
 }
 
 $homeResponse = Invoke-Status GET "/"
-Assert-Check "Главная страница доступна" ($homeResponse.Status -eq 200 -and $homeResponse.Content -match '<div id="root">') "HTTP $($homeResponse.Status)"
+Assert-Check "Home page is available" ($homeResponse.Status -eq 200 -and $homeResponse.Content -match '<div id="root">') "HTTP $($homeResponse.Status)"
 
 $health = Invoke-Status GET "/actuator/health"
-Assert-Check "Gateway сообщает о готовности" ($health.Status -eq 200 -and $health.Content -match '"status"\s*:\s*"UP"') "HTTP $($health.Status)"
+Assert-Check "Gateway readiness is UP" ($health.Status -eq 200 -and $health.Content -match '"status"\s*:\s*"UP"') "HTTP $($health.Status)"
 
 $catalog = Invoke-Status GET "/products/all"
 $products = if ($catalog.Status -eq 200) { @($catalog.Content | ConvertFrom-Json) } else { @() }
-Assert-Check "Каталог возвращает товары" ($catalog.Status -eq 200 -and $products.Count -gt 0) "HTTP $($catalog.Status), товаров $($products.Count)"
-Assert-Check "Каталог содержит 100+ товаров" ($products.Count -ge 100) "товаров $($products.Count)"
+Assert-Check "Catalog returns products" ($catalog.Status -eq 200 -and $products.Count -gt 0) "HTTP $($catalog.Status), products $($products.Count)"
+Assert-Check "Catalog contains 100+ products" ($products.Count -ge 100) "products $($products.Count)"
 
 $tree = Invoke-Status GET "/products/categories/tree"
 $categories = if ($tree.Status -eq 200) { @($tree.Content | ConvertFrom-Json) } else { @() }
-Assert-Check "Дерево категорий доступно" ($tree.Status -eq 200 -and $categories.Count -gt 0) "HTTP $($tree.Status)"
+Assert-Check "Category tree is available" ($tree.Status -eq 200 -and $categories.Count -gt 0) "HTTP $($tree.Status)"
 
 if ($products.Count -gt 0) {
     $product = Invoke-Status POST "/products/by-uuid" @{ id = $products[0].id }
     $productBody = if ($product.Status -eq 200) { $product.Content | ConvertFrom-Json } else { $null }
-    Assert-Check "Карточка товара открывается по UUID" ($product.Status -eq 200 -and $productBody.id -eq $products[0].id) "HTTP $($product.Status)"
+    Assert-Check "Product details open by UUID" ($product.Status -eq 200 -and $productBody.id -eq $products[0].id) "HTTP $($product.Status)"
 }
 
 $promotions = Invoke-Status GET "/order/promotions"
-Assert-Check "Публичные акции доступны" ($promotions.Status -eq 200) "HTTP $($promotions.Status)"
+Assert-Check "Public promotions are available" ($promotions.Status -eq 200) "HTTP $($promotions.Status)"
 
 $protected = Invoke-Status GET "/order/my"
-Assert-Check "Защищённый API отклоняет гостя" ($protected.Status -eq 401) "ожидался 401, получен $($protected.Status)"
+Assert-Check "Protected API rejects anonymous requests" ($protected.Status -eq 401) "expected 401, got $($protected.Status)"
 
-Write-Host "`nИтог: $passed успешно, $failed ошибок"
+Write-Host "`nResult: $passed passed, $failed failed"
 if ($failed -gt 0) { exit 1 }

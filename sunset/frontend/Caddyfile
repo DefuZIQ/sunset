@@ -4,7 +4,7 @@
     @legacyAdmin path /admin /admin/
     redir @legacyAdmin /#/admin 302
 
-  @api path /auth /auth/* /products /products/* /order /order/* /notifications /notifications/* /subscriptions /subscriptions/* /assistant /assistant/*
+  @api path /auth /auth/* /products /products/* /order /order/* /notifications /notifications/* /subscriptions /subscriptions/* /assistant /assistant/* /actuator/health /actuator/health/*
     handle @api {
         reverse_proxy api-gateway:8080
     }
