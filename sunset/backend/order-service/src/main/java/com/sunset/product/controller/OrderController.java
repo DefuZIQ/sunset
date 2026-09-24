@@ -4,6 +4,8 @@ import com.sunset.product.dto.OrderDtos.CreateOrderRequest;
 import com.sunset.product.dto.OrderDtos.PromotionRequest;
 import com.sunset.product.dto.OrderDtos.StatusRequest;
 import com.sunset.product.dto.OrderDtos.BonusAdjustmentRequest;
+import com.sunset.product.dto.OrderDtos.ReturnRequest;
+import com.sunset.product.dto.OrderDtos.ReturnStatusRequest;
 import com.sunset.product.service.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,12 +29,18 @@ public class OrderController {
     @GetMapping("/loyalty") public Object loyalty(@RequestHeader("user-id") UUID userId) { return service.loyalty(userId); }
     @GetMapping("/promotions") public Object promotions() { return service.activePromotions(); }
     @PostMapping("/promo/validate") public Object validate(@RequestHeader(value="user-id", required=false) UUID userId, @RequestBody Map<String,Object> request) { return service.validatePromo((String)request.get("code"), request.get("subtotal") == null ? BigDecimal.ZERO : new BigDecimal(request.get("subtotal").toString()), userId); }
+    @PostMapping("/delivery/quote") public Object deliveryQuote(@RequestBody Map<String,Object> request) { return service.deliveryQuote((String)request.get("method"), request.get("subtotal") == null ? BigDecimal.ZERO : new BigDecimal(request.get("subtotal").toString())); }
+    @PostMapping("/my/{id}/returns") public ResponseEntity<?> createReturn(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody ReturnRequest request) { return ResponseEntity.status(HttpStatus.CREATED).body(service.createReturn(userId,id,request)); }
+    @GetMapping("/my/returns") public Object myReturns(@RequestHeader("user-id") UUID userId) { return service.myReturns(userId); }
     @GetMapping("/admin/orders") public Object adminOrders(@RequestHeader("user-id") UUID userId) { return service.adminOrders(userId); }
     @PatchMapping("/admin/orders/{id}/status") public Object status(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody StatusRequest request) { return service.updateStatus(userId,id,request.status()); }
     @GetMapping("/admin/users") public Object users(@RequestHeader("user-id") UUID userId) { return service.adminUsers(userId); }
     @PostMapping("/admin/users/{id}/bonuses") public Object bonuses(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody BonusAdjustmentRequest request) { return service.adjustBonuses(userId,id,request); }
     @GetMapping("/admin/promotions") public Object promos(@RequestHeader("user-id") UUID userId) { return service.adminPromotions(userId); }
     @PostMapping("/admin/promotions") public ResponseEntity<?> promo(@RequestHeader("user-id") UUID userId, @RequestBody PromotionRequest request) { return ResponseEntity.status(HttpStatus.CREATED).body(service.createPromotion(userId,request)); }
+    @GetMapping("/admin/returns") public Object returns(@RequestHeader("user-id") UUID userId) { return service.adminReturns(userId); }
+    @PatchMapping("/admin/returns/{id}") public Object returnStatus(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody ReturnStatusRequest request) { return service.updateReturn(userId,id,request); }
+    @GetMapping("/admin/analytics") public Object analytics(@RequestHeader("user-id") UUID userId) { return service.adminAnalytics(userId); }
 
     @ExceptionHandler(IllegalArgumentException.class) ResponseEntity<?> badRequest(IllegalArgumentException e) { return ResponseEntity.badRequest().body(Map.of("message",e.getMessage())); }
     @ExceptionHandler(SecurityException.class) ResponseEntity<?> forbidden(SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message",e.getMessage())); }

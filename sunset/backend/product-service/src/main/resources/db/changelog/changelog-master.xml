@@ -85,4 +85,8 @@
                  stripComments="false"/>
     </changeSet>
 
+    <changeSet id="118" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V14__review_details.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

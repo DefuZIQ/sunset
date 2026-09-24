@@ -65,7 +65,12 @@ export default function Cart({ user }) {
     phone: user?.phone || "",
     promoCode: "",
     bonusesToUse: 0,
+    paymentMethod: "CARD",
   });
+  const [deliveryQuote, setDeliveryQuote] = useState({ cost: 0, estimatedDays: 3 });
+  const [checkoutKey, setCheckoutKey] = useState(() =>
+    window.crypto?.randomUUID?.() || `checkout-${Date.now()}-${Math.random()}`,
+  );
   const [phoneEditable, setPhoneEditable] = useState(false);
   const [promo, setPromo] = useState(null);
   const [state, setState] = useState({ loading: false, error: "" });
@@ -84,6 +89,17 @@ export default function Cart({ user }) {
     setForm((current) => ({ ...current, phone: user?.phone || "" }));
     setPhoneEditable(!user?.phone);
   }, [user?.phone]);
+  useEffect(() => {
+    if (!user) return;
+    fetch("/order/delivery/quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      body: JSON.stringify({ method: deliveryMode === "pickup" ? "pickup" : "courier", subtotal }),
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("quote")))
+      .then(setDeliveryQuote)
+      .catch(() => setDeliveryQuote({ cost: deliveryMode === "pickup" || subtotal >= 7000 ? 0 : 390, estimatedDays: deliveryMode === "pickup" ? 1 : 3 }));
+  }, [deliveryMode, subtotal, user]);
   const selectedAddress = addresses.find(
     (address) => address.id === selectedAddressId,
   );
@@ -209,6 +225,9 @@ export default function Cart({ user }) {
           customerEmail: user.email,
           customerPhone: form.phone,
           address,
+          deliveryMethod: deliveryMode === "pickup" ? "pickup" : "courier",
+          paymentMethod: form.paymentMethod,
+          idempotencyKey: checkoutKey,
           promoCode: form.promoCode || null,
           bonusesToUse: Number(form.bonusesToUse) || 0,
           items: items.map(({ product, quantity }) => ({
@@ -222,6 +241,7 @@ export default function Cart({ user }) {
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.message || "Не удалось оформить заказ");
+      setCheckoutKey(window.crypto?.randomUUID?.() || `checkout-${Date.now()}-${Math.random()}`);
       clearCart();
       navigate("/profile/orders", { state: { orderNumber: data.orderNumber } });
     } catch (error) {
@@ -252,7 +272,8 @@ export default function Cart({ user }) {
     loyalty?.balance || 0,
     Math.floor((subtotal - discount) * 0.3),
   );
-  const total = Math.max(0, subtotal - discount - bonusUse);
+  const deliveryCost = Number(deliveryQuote?.cost || 0);
+  const total = Math.max(0, subtotal - discount - bonusUse + deliveryCost);
   const mapLat = selectedAddress?.lat || addressDraft.lat;
   const mapLon = selectedAddress?.lon || addressDraft.lon;
   return (
@@ -582,6 +603,18 @@ export default function Cart({ user }) {
               )}
             </div>
           )}
+          <div className="payment-methods">
+            <span className="payment-methods__title">Способ оплаты</span>
+            {[
+              ["CARD", "Картой онлайн", "Тестовая оплата без ввода реквизитов"],
+              ["SBP", "СБП", "Тестовый платёж по СБП"],
+              ["ON_RECEIPT", "При получении", "Оплата в магазине или курьеру"],
+            ].map(([value, title, hint]) => (
+              <button type="button" key={value} className={form.paymentMethod === value ? "active" : ""} onClick={() => setForm({ ...form, paymentMethod: value })}>
+                <i>{form.paymentMethod === value ? "✓" : ""}</i><span><strong>{title}</strong><small>{hint}</small></span>
+              </button>
+            ))}
+          </div>
           <div className="promo-field">
             <input
               value={form.promoCode}
@@ -636,8 +669,9 @@ export default function Cart({ user }) {
           )}
           <div className="cart-summary__row">
             <span>{deliveryMode === "pickup" ? "Самовывоз" : "Доставка"}</span>
-            <span>Бесплатно</span>
+            <span>{deliveryCost ? `${deliveryCost.toLocaleString("ru-RU")} ₽` : "Бесплатно"}</span>
           </div>
+          <p className="checkout-delivery-hint">Ориентировочно: {deliveryQuote?.estimatedDays || 3} {Number(deliveryQuote?.estimatedDays) === 1 ? "день" : "дня"}</p>
           <hr />
           <div className="cart-summary__row">
             <strong>К оплате</strong>
