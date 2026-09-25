@@ -48,11 +48,11 @@ jwt:
 logging:
   level:
     root: INFO
-    org.springframework.cloud.gateway: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.security: DEBUG
-    reactor.netty.http.client: DEBUG
-    reactor.netty.http.server: DEBUG
+    org.springframework.cloud.gateway: INFO
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    reactor.netty.http.client: INFO
+    reactor.netty.http.server: INFO
 
 security:
   whitelist-paths:
@@ -70,7 +70,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never

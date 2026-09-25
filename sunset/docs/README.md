@@ -14,6 +14,7 @@
 - [Полный аудит возможностей улучшения](improvements/IMPROVEMENT_AUDIT.md)
 - [Спецификация релиза P0](improvements/P0_IMPLEMENTATION_SPEC.md)
 - [Коммерческая платформа v1](improvements/COMMERCE_PLATFORM_V1.md)
+- [Этап эксплуатации и автоматизации](improvements/OPERATIONS_STAGE.md)
 - [Чек-лист проверки улучшений](improvements/VALIDATION_CHECKLIST.md)
 - [Безопасность и эксплуатация](improvements/SECURITY_AND_OPERATIONS.md)
 

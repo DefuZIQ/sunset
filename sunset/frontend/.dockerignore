@@ -1,5 +1,4 @@
-*
-!build/
-!build/**
-!Caddyfile
-!Dockerfile
+node_modules
+build
+.git
+npm-debug.log
