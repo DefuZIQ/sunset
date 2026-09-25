@@ -14,7 +14,7 @@ try {
 
     Push-Location "frontend"
     try {
-        & npm test -- --watchAll=false
+        & npm test
         if ($LASTEXITCODE -ne 0) { throw "Frontend tests failed" }
         & npm run build
         if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }

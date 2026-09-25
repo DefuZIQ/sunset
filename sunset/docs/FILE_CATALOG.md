@@ -1,6 +1,6 @@
 # Каталог файлов проекта
 
-Каталог описывает поддерживаемые файлы репозитория. Пути указаны относительно корня проекта. Производные папки `node_modules`, `build`, `target`, `.git` не документируются поэлементно.
+Каталог описывает поддерживаемые файлы репозитория. Пути указаны относительно корня проекта. Производные папки `node_modules`, `dist`, `build`, `target`, `.git` не документируются поэлементно.
 
 ## Корень и развёртывание
 
@@ -21,18 +21,18 @@
 | `frontend/package-lock.json` | Точная фиксация дерева npm-зависимостей |
 | `frontend/Dockerfile` | Production-образ web на базе Caddy |
 | `frontend/Caddyfile` | Раздача SPA и reverse proxy API |
-| `frontend/README.md` | Стандартная памятка Create React App; требует замены ссылкой на `docs` |
-| `frontend/public/index.html` | HTML-шаблон SPA |
+| `frontend/README.md` | Краткая инструкция по локальному запуску, тестированию и Vite-сборке |
+| `frontend/index.html` | HTML-точка входа Vite SPA |
+| `frontend/vite.config.js` | Настройка React-плагина и Vitest/jsdom |
 | `frontend/public/manifest.json` | PWA/метаданные приложения |
 | `frontend/public/robots.txt` | Правила поисковых роботов |
 | `frontend/public/favicon.ico`, `logo192.png`, `logo512.png` | Иконки сайта и manifest |
-| `frontend/src/index.js` | Монтирование React-приложения |
+| `frontend/src/index.jsx` | Монтирование React-приложения |
 | `frontend/src/index.css` | Глобальные стили и базовые сбросы |
-| `frontend/src/App.js` | Маршрутизация, сессия пользователя, провайдеры и общий layout |
+| `frontend/src/App.jsx` | Маршрутизация, сессия пользователя, провайдеры и общий layout |
 | `frontend/src/App.css` | Общие стили приложения |
-| `frontend/src/App.test.js` | Базовый тест приложения |
-| `frontend/src/setupTests.js` | Настройка Jest DOM |
-| `frontend/src/reportWebVitals.js` | Необязательная отправка web-vitals |
+| `frontend/src/App.test.jsx` | Базовый Vitest-тест приложения |
+| `frontend/src/setupTests.js` | Настройка Testing Library DOM для Vitest |
 | `frontend/src/logo.svg` | Стандартный/служебный SVG CRA, в продуктовой логике не используется |
 
 ## Frontend: страницы
@@ -253,5 +253,4 @@
 - Архивы `*.tar.gz` — в release storage с контрольными суммами.
 - Дубли `src/images` и `public/images` — оставить один способ доставки ресурсов.
 - Пустые Java-заготовки — реализовать либо удалить после проверки ссылок.
-- Стандартный `frontend/README.md` — заменить краткой инструкцией, ведущей в этот каталог.
 - Пароли и секреты в `application.properties`/`application.yml` — заменить переменными окружения и ротировать.

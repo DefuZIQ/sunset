@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 
-jest.mock("./contexts/StoreContext", () => ({
+vi.mock("./contexts/StoreContext", () => ({
   StoreProvider: ({ children }) => children,
   useStore: () => ({ products: [], categoryTree: [], loading: false }),
 }));
@@ -9,13 +10,13 @@ jest.mock("./contexts/StoreContext", () => ({
 beforeEach(() => {
   localStorage.clear();
   window.location.hash = "#/";
-  global.fetch = jest.fn().mockResolvedValue({
+  global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => [],
   });
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => vi.restoreAllMocks());
 
 test("renders the main navigation and brand", () => {
   render(<App />);
