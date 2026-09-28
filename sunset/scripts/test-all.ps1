@@ -1,5 +1,6 @@
 param(
     [switch]$WithSmoke,
+    [switch]$WithE2E,
     [string]$BaseUrl = "http://192.168.1.186"
 )
 
@@ -18,6 +19,10 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Frontend tests failed" }
         & npm run build
         if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }
+        if ($WithE2E) {
+            & npm run test:e2e
+            if ($LASTEXITCODE -ne 0) { throw "Frontend E2E tests failed" }
+        }
     } finally {
         Pop-Location
     }

@@ -24,6 +24,8 @@
 | `frontend/README.md` | Краткая инструкция по локальному запуску, тестированию и Vite-сборке |
 | `frontend/index.html` | HTML-точка входа Vite SPA |
 | `frontend/vite.config.js` | Настройка React-плагина и Vitest/jsdom |
+| `frontend/playwright.config.js` | Desktop/mobile Chromium, локальный preview-сервер и артефакты ошибок E2E |
+| `frontend/e2e/storefront.spec.js` | E2E каталога, фильтров, поиска, выбора размера, корзины и защиты админки |
 | `frontend/public/manifest.json` | PWA/метаданные приложения |
 | `frontend/public/robots.txt` | Правила поисковых роботов |
 | `frontend/public/favicon.ico`, `logo192.png`, `logo512.png` | Иконки сайта и manifest |

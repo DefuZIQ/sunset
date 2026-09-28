@@ -35,7 +35,7 @@ Spring Cloud API Gateway :8080
 
 ## 4. Технологии
 
-- Frontend: React 19, React Router, Context API, CSS, Create React App.
+- Frontend: React 19, React Router 7, Context API, CSS, Vite 7, Vitest и Playwright.
 - Backend: Java 17, Spring Boot, Spring Security, Spring Data JPA.
 - Gateway: Spring Cloud Gateway/WebFlux.
 - Данные: PostgreSQL 16, Liquibase.

@@ -14,9 +14,11 @@ Dev-сервер Vite по умолчанию доступен на `http://loca
 ```bash
 npm test
 npm run build
+npm run test:e2e
 ```
 
 Production-сборка создаётся в каталоге `dist`; контейнер копирует её в Caddy.
+E2E-набор Playwright проверяет Chromium в настольном и мобильном режимах. Перед первым локальным запуском установите браузер командой `npx playwright install chromium`.
 
 ## Проверка зависимостей
 

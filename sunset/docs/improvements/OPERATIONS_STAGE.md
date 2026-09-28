@@ -31,7 +31,7 @@ sudo ./scripts/backup-postgres.sh /home/defuziq/sunset /home/defuziq/backups
 
 ## Что ещё требуется по большому плану
 
-- интеграционные тесты PostgreSQL/Testcontainers и браузерные E2E;
+- интеграционные тесты PostgreSQL/Testcontainers и полный транзакционный E2E заказа; базовый Playwright-контур уже включён в CI;
 - дашборды, alert rules и OpenTelemetry trace ID;
 - реальный платёжный webhook и реальный логистический провайдер;
 - transactional outbox для уведомлений;
