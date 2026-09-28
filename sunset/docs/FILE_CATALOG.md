@@ -234,7 +234,10 @@
 | `.../db/changelog/changelog-master.xml` | Порядок миграций заказов |
 | `V1__init.sql` | Заказы, позиции, платежи и доставки |
 | `V2__loyalty_promotions.sql` | Суммы заказа, промокоды, бонусы, транзакции и акции |
+| `V3__commerce_platform.sql` | Идемпотентность заказа, платёжные данные, резервы, возвраты и события |
 | `.../OrderServiceApplicationTests.java` | Smoke-тест контекста |
+| `.../OrderPostgresIntegrationTest.java` | PostgreSQL 16/Testcontainers: полный цикл заказа, компенсации, идемпотентность и откат |
+| `src/test/resources/db/test-support.sql` | Минимальные контракты таблиц Auth/Product для изолированного теста Order Service |
 
 ## Notification Service
 

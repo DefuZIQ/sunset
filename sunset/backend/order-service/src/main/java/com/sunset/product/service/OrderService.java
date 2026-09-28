@@ -150,7 +150,10 @@ public class OrderService {
     public Map<String, Object> cancel(UUID userId, UUID orderId) {
         Map<String, Object> order = myOrder(userId, orderId);
         String status = String.valueOf(order.get("status"));
-        if (Set.of("SHIPPED", "DELIVERED", "CANCELLED").contains(status)) throw new IllegalArgumentException("Этот заказ уже нельзя отменить");
+        // A repeated client request may arrive after a timeout or a double click.
+        // Treat an already cancelled order as success so compensation is never applied twice.
+        if ("CANCELLED".equals(status)) return order;
+        if (Set.of("SHIPPED", "DELIVERED").contains(status)) throw new IllegalArgumentException("Этот заказ уже нельзя отменить");
         jdbc.update("UPDATE orders SET status='CANCELLED',updated_at=NOW() WHERE id=? AND user_id=?", orderId, userId);
         releaseStock(orderId);
         refundPayment(orderId);
@@ -304,7 +307,7 @@ public class OrderService {
         if (alreadyCredited != null && alreadyCredited > 0) return;
         UUID userId = (UUID) order.get("user_id");
         jdbc.update("INSERT INTO loyalty_accounts(user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", userId);
-        jdbc.update("UPDATE loyalty_accounts SET balance=balance+?,lifetime_earned=lifetime_earned+?,tier=CASE WHEN lifetime_earned+?>=10000 THEN 'SUNSET' WHEN lifetime_earned+?>=3000 THEN 'GOLDEN HOUR' ELSE 'SUNRISE' END,updated_at=NOW() WHERE user_id=?", earned, earned, earned, earned, earned, userId);
+        jdbc.update("UPDATE loyalty_accounts SET balance=balance+?,lifetime_earned=lifetime_earned+?,tier=CASE WHEN lifetime_earned+?>=10000 THEN 'SUNSET' WHEN lifetime_earned+?>=3000 THEN 'GOLDEN HOUR' ELSE 'SUNRISE' END,updated_at=NOW() WHERE user_id=?", earned, earned, earned, earned, userId);
         jdbc.update("INSERT INTO loyalty_transactions(user_id,order_id,amount,type,description) VALUES (?,?,?,'EARN','Бонусы за подтвержденный заказ')", userId, orderId, earned);
     }
 

@@ -9,6 +9,7 @@
 - Подробные DEBUG-логи Gateway и Auth отключены в production-конфигурации.
 - Скрипт PostgreSQL backup создаёт сжатую копию атомарно, проверяет gzip, сохраняет SHA-256 и удаляет копии старше заданного срока.
 - Отдельный скрипт проверяет размер, gzip, checksum и сигнатуру PostgreSQL dump.
+- Testcontainers поднимает временную PostgreSQL 16, применяет Liquibase и проверяет полный транзакционный цикл заказа без доступа к production-данным.
 
 ## Включение наблюдаемости
 
@@ -31,7 +32,7 @@ sudo ./scripts/backup-postgres.sh /home/defuziq/sunset /home/defuziq/backups
 
 ## Что ещё требуется по большому плану
 
-- интеграционные тесты PostgreSQL/Testcontainers и полный транзакционный E2E заказа; базовый Playwright-контур уже включён в CI;
+- PostgreSQL-интеграции Auth/Product, конкурентный тест последнего остатка и HTTP E2E заказа через Gateway;
 - дашборды, alert rules и OpenTelemetry trace ID;
 - реальный платёжный webhook и реальный логистический провайдер;
 - transactional outbox для уведомлений;
