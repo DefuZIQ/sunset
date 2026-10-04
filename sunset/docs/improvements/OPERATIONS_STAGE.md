@@ -32,7 +32,7 @@ sudo ./scripts/backup-postgres.sh /home/defuziq/sunset /home/defuziq/backups
 
 ## Что ещё требуется по большому плану
 
-- PostgreSQL-интеграции Auth/Product, конкурентный тест последнего остатка и HTTP E2E заказа через Gateway;
+- Запуск подготовленных PostgreSQL-интеграций Auth/Product, конкурентный тест последнего остатка и HTTP E2E заказа через Gateway;
 - дашборды, alert rules и OpenTelemetry trace ID;
 - реальный платёжный webhook и реальный логистический провайдер;
 - transactional outbox для уведомлений;

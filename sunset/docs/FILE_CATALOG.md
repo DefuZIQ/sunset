@@ -154,6 +154,7 @@
 | `.../db/migrations/V2__add_user_phone.sql` | Телефон пользователя |
 | `.../db/migrations/V3__add_user_role.sql` | Поле роли CUSTOMER/ADMIN |
 | `.../AuthServiceApplicationTests.java` | Smoke-тест контекста |
+| `.../AuthPostgresIntegrationTest.java` | PostgreSQL/Testcontainers: миграции, регистрация, JWT, профиль и смена пароля |
 
 ## Product Service: web и бизнес-слой
 
@@ -216,6 +217,8 @@
 | `V12__complete_variant_dictionary.sql` | Полные справочники цветов/размеров и остатки |
 | `V13__category_subtrees.sql` | Дополнительные подкатегории |
 | `.../ProductServiceApplicationTests.java` | Smoke-тест контекста |
+| `.../ProductPostgresIntegrationTest.java` | PostgreSQL/Testcontainers: миграции, каталог, категории, остатки и отзывы |
+| `backend/product-service/src/test/resources/db/test-support.sql` | Минимальная таблица пользователей для изолированного запуска миграции отзывов |
 
 ## Order Service
 
