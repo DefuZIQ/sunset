@@ -37,7 +37,8 @@ class GatewayHttpContractTest {
                     .flatMap(body -> {
                         REQUEST_COUNT.incrementAndGet();
                         FORWARDED.set(new ForwardedRequest(request.method().name(), request.uri(),
-                                request.requestHeaders().get("user-id"), body));
+                                request.requestHeaders().get("user-id"),
+                                request.requestHeaders().get("X-Request-Id"), body));
                         String result = request.uri().startsWith("/auth/register")
                                 ? "{\"token\":\"registered\"}"
                                 : request.method().name().equals("POST")
@@ -124,16 +125,33 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void serverGeneratedRequestIdReplacesClientValueAndReachesDownstream() {
+        var result = client.get().uri("/order/my")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header("X-Request-Id", "forged-client-value")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().returnResult();
+
+        String requestId = result.getResponseHeaders().getFirst("X-Request-Id");
+        assertThat(requestId).isNotEqualTo("forged-client-value");
+        assertThat(UUID.fromString(requestId).toString()).isEqualTo(requestId);
+        assertThat(FORWARDED.get().requestId()).isEqualTo(requestId);
+    }
+
+    @Test
     void missingOrInvalidJwtNeverReachesOrderService() {
         client.get().uri("/order/my")
                 .header("user-id", "forged-admin")
                 .exchange()
                 .expectStatus().isUnauthorized()
+                .expectHeader().exists("X-Request-Id")
                 .expectHeader().doesNotExist(HttpHeaders.WWW_AUTHENTICATE);
         client.get().uri("/order/my")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token")
                 .exchange()
-                .expectStatus().isUnauthorized();
+                .expectStatus().isUnauthorized()
+                .expectHeader().exists("X-Request-Id");
 
         assertThat(REQUEST_COUNT.get()).isZero();
     }
@@ -144,5 +162,5 @@ class GatewayHttpContractTest {
                 .compact();
     }
 
-    private record ForwardedRequest(String method, String path, String userId, String body) {}
+    private record ForwardedRequest(String method, String path, String userId, String requestId, String body) {}
 }

@@ -164,6 +164,9 @@ class CommerceHttpJourneyIT {
         HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
         assertThat(response.statusCode()).as(method + " " + path + ": " + response.body())
                 .isEqualTo(expectedStatus);
+        String requestId = response.headers().firstValue("X-Request-Id")
+                .orElseThrow(() -> new AssertionError(method + " " + path + " has no X-Request-Id"));
+        assertThat(UUID.fromString(requestId).toString()).isEqualTo(requestId);
         return response.body().isBlank() ? json.nullNode() : json.readTree(response.body());
     }
 
