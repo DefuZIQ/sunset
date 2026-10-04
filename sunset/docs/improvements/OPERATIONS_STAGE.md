@@ -32,7 +32,7 @@ sudo ./scripts/backup-postgres.sh /home/defuziq/sunset /home/defuziq/backups
 
 ## Что ещё требуется по большому плану
 
-- HTTP E2E заказа через Gateway;
+- подтверждение нового HTTP E2E заказа в GitHub Actions и браузерный checkout доставки;
 - дашборды, alert rules и OpenTelemetry trace ID;
 - реальный платёжный webhook и реальный логистический провайдер;
 - transactional outbox для уведомлений;
