@@ -16,6 +16,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class OrderPostgresIntegrationTest {
     private static final UUID CUSTOMER_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID ADMIN_ID = UUID.fromString("10000000-0000-0000-0000-000000000002");
+    private static final UUID SECOND_CUSTOMER_ID = UUID.fromString("10000000-0000-0000-0000-000000000003");
     private static final UUID PRODUCT_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
     private static final UUID COLOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
     private static final UUID SIZE_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
@@ -133,6 +139,46 @@ class OrderPostgresIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM stock_reservations", Integer.class)).isZero();
         assertThat(stock()).isEqualTo(5);
         assertThat(balance()).isEqualTo(1000);
+    }
+
+    @Test
+    void concurrentCustomersCannotBuyTheLastItemTwice() throws Exception {
+        jdbc.update("UPDATE product_stock SET quantity=1 WHERE product_id=? AND size_id=? AND color_id=?",
+                PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("INSERT INTO users(id,email,password,first_name,last_name,phone,role) VALUES (?,?,?,?,?,?,?)",
+                SECOND_CUSTOMER_ID, "second@sunset.test", "hash", "Мария", "Соколова", "+79990000003", "CUSTOMER");
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> first = executor.submit(() -> attemptLastItemCheckout(CUSTOMER_ID, "last-item-first", ready, start));
+            Future<Boolean> second = executor.submit(() -> attemptLastItemCheckout(SECOND_CUSTOMER_ID, "last-item-second", ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            assertThat(List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(true, false);
+            assertThat(stock()).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM stock_reservations WHERE status='RESERVED'", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT MIN(quantity) FROM product_stock", Integer.class)).isZero();
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private boolean attemptLastItemCheckout(UUID customerId, String key, CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent checkouts did not start together");
+        try {
+            service.create(customerId, order(key, null, 0, 1, "CARD"));
+            return true;
+        } catch (IllegalArgumentException exception) {
+            if (!exception.getMessage().contains("недостаточно")) throw exception;
+            return false;
+        }
     }
 
     private CreateOrderRequest order(String key, String promoCode, int bonuses, int quantity, String paymentMethod) {
