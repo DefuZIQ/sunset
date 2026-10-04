@@ -22,7 +22,7 @@ jobs:
           java-version: "17"
           cache: maven
           cache-dependency-path: sunset/pom.xml
-      - run: ./mvnw --batch-mode test
+      - run: mvn --batch-mode test
 
   frontend:
     runs-on: ubuntu-latest
@@ -78,7 +78,7 @@ jobs:
           cache: maven
           cache-dependency-path: sunset/pom.xml
       - name: Build real services
-        run: ./mvnw --batch-mode -q package -DskipTests
+        run: mvn --batch-mode -q package -DskipTests
       - name: Run isolated HTTP journey
         run: bash scripts/test-commerce-e2e.sh
 

@@ -27,7 +27,7 @@
 После сборки JAR-файлов и запуска отдельной PostgreSQL:
 
 ```sh
-./mvnw --batch-mode -q package -DskipTests
+mvn --batch-mode -q package -DskipTests
 E2E_JDBC_URL=jdbc:postgresql://127.0.0.1:5432/sunset_e2e \
 E2E_DB_USER=sunset E2E_DB_PASSWORD=sunset-e2e-only \
 bash scripts/test-commerce-e2e.sh
