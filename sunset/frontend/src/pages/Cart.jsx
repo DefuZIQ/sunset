@@ -129,7 +129,7 @@ export default function Cart({ user }) {
       setState({ loading: false, error: "Заполните город, улицу и дом" });
       return;
     }
-    if (!mapConfirmed && !addressDraft.lat) {
+    if (!mapConfirmed) {
       setState({ loading: false, error: "Проверьте точку адреса на карте" });
       return;
     }
@@ -541,12 +541,15 @@ export default function Cart({ user }) {
                                   : undefined
                             }
                             value={addressDraft[key]}
-                            onChange={(e) =>
+                            onChange={(e) => {
                               setAddressDraft({
                                 ...addressDraft,
                                 [key]: e.target.value,
-                              })
-                            }
+                              });
+                              if (["city", "street", "house"].includes(key)) {
+                                setMapConfirmed(false);
+                              }
+                            }}
                             placeholder={hint}
                           />
                         </label>

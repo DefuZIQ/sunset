@@ -84,3 +84,98 @@ test('redirects an unauthenticated visitor away from administration', async ({ p
   await expect(page).toHaveURL(/#\/profile$/);
   await expect(page.getByText('Личный кабинет').first()).toBeVisible();
 });
+
+async function openCheckout(page) {
+  const user = {
+    id: '33333333-3333-3333-3333-333333333333',
+    uuid: '33333333-3333-3333-3333-333333333333',
+    firstName: 'Анна',
+    lastName: 'Тестовая',
+    email: 'anna@example.test',
+    phone: '+79990001122',
+    role: 'USER',
+  };
+  await page.route('**/auth/profile', (route) => route.fulfill({ json: user }));
+  await page.route('**/order/loyalty', (route) => route.fulfill({ json: { balance: 0 } }));
+  await page.route('**/order/delivery/quote', (route) => route.fulfill({ json: { cost: 390, estimatedDays: 3 } }));
+  await page.route('**/order/my', (route) => route.fulfill({ json: [] }));
+  await page.route('**/notifications?*', (route) => route.fulfill({ json: [] }));
+  await page.route('**/subscriptions/status', (route) => route.fulfill({ json: { active: false } }));
+  await page.addInitScript(({ account, product }) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(account));
+    localStorage.setItem('cartItems', JSON.stringify({
+      [product.id]: { product: { ...product, selectedSizeId: 'women-m', selectedSizeName: 'M', selectedColorId: 'white', selectedColorName: 'Белый' }, quantity: 1 },
+    }));
+  }, { account: user, product: products[0] });
+  await page.goto('/#/profile/basket');
+  await expect(page.getByRole('heading', { name: 'Оформление' })).toBeVisible();
+  return user;
+}
+
+test('saves and selects a delivery address before checkout', async ({ page }) => {
+  const user = await openCheckout(page);
+  let submittedOrder;
+  await page.route('**/order', async (route) => {
+    submittedOrder = route.request().postDataJSON();
+    await route.fulfill({ json: { orderNumber: 'SUN-101' } });
+  });
+
+  await page.getByRole('button', { name: 'Новый адрес' }).click();
+  const addressDialog = page.getByRole('dialog');
+  await addressDialog.locator('.address-grid label').filter({ hasText: 'Город' }).locator('input').fill('Нижний Новгород');
+  await addressDialog.locator('.address-grid label').filter({ hasText: 'Улица' }).locator('input').fill('Большая Покровская');
+  await addressDialog.getByRole('textbox', { name: 'Дом Номер дома' }).fill('34');
+  await addressDialog.getByRole('button', { name: 'Сохранить адрес' }).click();
+  await expect(addressDialog.getByText('Проверьте точку адреса на карте')).toBeVisible();
+  await addressDialog.getByRole('checkbox', { name: 'Точка на карте соответствует адресу' }).check();
+  await addressDialog.getByRole('button', { name: 'Сохранить адрес' }).click();
+
+  await expect(addressDialog).toHaveCount(0);
+  await expect(page.locator('.saved-address-row').filter({ hasText: 'Большая Покровская' })).toBeVisible();
+  await page.getByRole('button', { name: 'Оформить заказ' }).click();
+  await expect(page).toHaveURL(/#\/profile\/orders$/);
+  expect(submittedOrder).toMatchObject({
+    customerPhone: user.phone,
+    deliveryMethod: 'courier',
+    address: 'Нижний Новгород, ул. Большая Покровская, д. 34',
+    items: [{ productId: products[0].id, colorId: 'white', sizeId: 'women-m', quantity: 1 }],
+  });
+  const saved = await page.evaluate((id) => JSON.parse(localStorage.getItem(`sunsetAddresses:${id}`)), user.id);
+  expect(saved).toHaveLength(1);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('cartItems')))).toEqual({});
+});
+
+test('pickup checkout needs no delivery address', async ({ page }) => {
+  await openCheckout(page);
+  let submittedOrder;
+  await page.route('**/order', async (route) => {
+    submittedOrder = route.request().postDataJSON();
+    await route.fulfill({ json: { orderNumber: 'SUN-102' } });
+  });
+
+  await page.getByRole('button', { name: 'Самовывоз', exact: true }).click();
+  await page.getByRole('button', { name: /SUNSET в ТРЦ НЕБО/ }).click();
+  await page.getByRole('button', { name: 'Оформить заказ' }).click();
+  await expect(page).toHaveURL(/#\/profile\/orders$/);
+  expect(submittedOrder.deliveryMethod).toBe('pickup');
+  expect(submittedOrder.address).toContain('Большая Покровская, 82');
+});
+
+test('checkout blocks an empty phone number', async ({ page }) => {
+  await openCheckout(page);
+  let orderRequests = 0;
+  await page.route('**/order', (route) => {
+    orderRequests += 1;
+    return route.fulfill({ json: { orderNumber: 'SHOULD-NOT-HAPPEN' } });
+  });
+
+  await page.getByRole('button', { name: 'Самовывоз', exact: true }).click();
+  await page.getByRole('button', { name: 'Изменить телефон' }).click();
+  await page.locator('.checkout-phone input').fill('');
+  await page.getByRole('button', { name: 'Оформить заказ' }).click();
+
+  await expect(page.getByText('Укажите корректный номер телефона')).toBeVisible();
+  await expect(page.locator('.checkout-phone input')).toHaveClass(/field-invalid/);
+  expect(orderRequests).toBe(0);
+});
