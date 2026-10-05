@@ -17,7 +17,7 @@
 {"code":"UNAUTHORIZED","message":"Необходим вход в аккаунт","fieldErrors":{},"requestId":"4cf50b33-44c4-4b34-adc8-1de3970ce8f8","timestamp":"2026-10-05T06:00:00Z"}
 ```
 
-Для неверного JWT используется `INVALID_TOKEN`, для запрета доступа — `FORBIDDEN`. Текст внутренних ошибок и сам токен в ответ не включаются. Числа, регистрация, товары и остальные ошибки ещё не переведены на эту схему.
+Для неверного JWT используется `INVALID_TOKEN`, для запрета доступа — `FORBIDDEN`. Текст внутренних ошибок и сам токен в ответ не включаются. Регистрация, товары, заказы и остальные ошибки сервисов ещё не переведены на эту схему.
 
 ## Публичные операции
 
@@ -30,10 +30,7 @@
 | `GET /products/reviews/{id}` | Отзывы |
 | `GET /products/categories/tree` | Категории |
 | `GET /order/promotions` | Акции |
-| `POST /order/promo/validate` | Проверка промокода (сейчас требует JWT в Gateway) |
-| `GET /order/stores` | Магазины (сейчас требует JWT в Gateway) |
 | `POST /subscriptions` | Подписка |
-| `GET /subscriptions/status` | Статус подписки |
 | `POST /assistant/chat` | AI-консультант |
 
 ## Защищённые клиентские операции
@@ -48,13 +45,16 @@
 | `GET/PUT /order/my/{id}` | Детали/редактирование заказа |
 | `POST /order/my/{id}/cancel` | Отмена |
 | `GET /order/loyalty` | Бонусы |
+| `POST /order/promo/validate` | Проверка промокода (сейчас требует JWT в Gateway) |
+| `GET /order/stores` | Магазины (сейчас требует JWT в Gateway) |
 | `GET /notifications` | Уведомления |
 | `PATCH /notifications/{id}/read` | Прочтение |
 | `DELETE /subscriptions` | Отписка |
+| `GET /subscriptions/status` | Статус подписки |
 
 ## Административные операции
 
-Пути `/products/admin/**` и `/order/admin/**` предназначены только для роли `ADMIN`. Проверка должна выполняться Gateway и самим владельцем ресурса. Полный список приведён в спеках Product и Order.
+Пути `/products/admin/**` и `/order/admin/**` предназначены только для роли `ADMIN`. Сейчас Gateway проверяет наличие действительного JWT, а роль перепроверяет владеющий ресурсом сервис. Ролевая проверка на самом Gateway и её контрактные тесты остаются отдельным усилением защиты. Полный список приведён в спеках Product и Order.
 
 ## Идемпотентность
 
