@@ -4,6 +4,7 @@ import { useCart } from "../components/HeaderParts/CartContext";
 import "../App.css"; // Для .container
 import "../components/Main/ProductCard.css"; // Переиспользуем стили
 import "./ProductPage.css"; // Подключаем стили для страницы товара
+import { ApiHttpError, getProductById } from "../api/client";
 
 export default function ProductPage() {
   const { id } = useParams();
@@ -29,20 +30,7 @@ export default function ProductPage() {
     setLoading(true);
     setError(null);
 
-    fetch("/products/by-uuid", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id }),
-    })
-      .then((res) => {
-        if (!res.ok) {
-          if (res.status === 404) throw new Error("Товар не найден");
-          throw new Error("Ошибка загрузки товара");
-        }
-        return res.json();
-      })
+    getProductById(id)
       .then((data) => {
         setProduct(data);
         setLoading(false);
@@ -60,7 +48,7 @@ export default function ProductPage() {
         }
       })
       .catch((err) => {
-        setError(err.message);
+        setError(err instanceof ApiHttpError && err.status === 404 ? "Товар не найден" : "Ошибка загрузки товара");
         setLoading(false);
       });
   }, [id, requestedColorId, requestedSizeId]);

@@ -12,17 +12,22 @@
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
+    "api:types": "openapi-typescript ../docs/openapi.json -o src/api/generated.ts",
+    "api:types:check": "openapi-typescript ../docs/openapi.json -o src/api/generated.ts --check",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.3",
-    "@playwright/test": "1.63.0",
     "@vitejs/plugin-react": "5.1.4",
     "jsdom": "27.4.0",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3",
     "vite": "7.3.6",
     "vitest": "4.1.11"
   },

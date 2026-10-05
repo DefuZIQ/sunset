@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { products as fallbackProducts } from "../data/products";
+import { listProducts } from "../api/client";
 
 const StoreContext = createContext(null);
 
@@ -28,11 +29,7 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/products/all", { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error("Каталог временно недоступен");
-        return response.json();
-      })
+    listProducts(controller.signal)
       .then((data) => {
         if (Array.isArray(data) && data.length) setProducts(data.map(normalizeProduct));
       })
