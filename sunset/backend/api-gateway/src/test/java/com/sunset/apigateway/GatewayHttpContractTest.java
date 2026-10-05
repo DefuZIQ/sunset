@@ -48,6 +48,7 @@ class GatewayHttpContractTest {
                             response.status(201);
                         }
                         return response.header("Content-Type", "application/json")
+                                .header("X-Request-Id", request.requestHeaders().get("X-Request-Id"))
                                 .sendString(Mono.just(result)).then();
                     }))
             .bindNow();
@@ -93,6 +94,21 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void versionedRegistrationUsesTheSamePublicRoute() {
+        client.post().uri("/api/v1/auth/register")
+                .header("user-id", "forged-admin")
+                .bodyValue("{\"email\":\"versioned@sunset.test\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.token").isEqualTo("registered");
+
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().path()).isEqualTo("/auth/register");
+        assertThat(FORWARDED.get().userId()).isNull();
+        assertThat(FORWARDED.get().body()).contains("versioned@sunset.test");
+    }
+
+    @Test
     void validJwtReplacesForgedIdentityBeforeForwardingOrderRequest() {
         client.get().uri("/order/my")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
@@ -103,6 +119,20 @@ class GatewayHttpContractTest {
 
         assertThat(REQUEST_COUNT.get()).isEqualTo(1);
         assertThat(FORWARDED.get().path()).isEqualTo("/order/my");
+        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+    }
+
+    @Test
+    void versionedProtectedRouteKeepsQueryAndTrustedIdentity() {
+        client.get().uri("/api/v1/order/my?limit=2")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header("user-id", "forged-admin")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$[0].id").exists();
+
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().path()).isEqualTo("/order/my?limit=2");
         assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
     }
 
@@ -136,7 +166,18 @@ class GatewayHttpContractTest {
         String requestId = result.getResponseHeaders().getFirst("X-Request-Id");
         assertThat(requestId).isNotEqualTo("forged-client-value");
         assertThat(UUID.fromString(requestId).toString()).isEqualTo(requestId);
+        assertThat(result.getResponseHeaders().get("X-Request-Id")).containsExactly(requestId);
         assertThat(FORWARDED.get().requestId()).isEqualTo(requestId);
+    }
+
+    @Test
+    void versionedProtectedRouteRejectsAnonymousCallerBeforeForwarding() {
+        client.get().uri("/api/v1/order/my")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectHeader().exists("X-Request-Id");
+
+        assertThat(REQUEST_COUNT.get()).isZero();
     }
 
     @Test

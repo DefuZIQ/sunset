@@ -51,6 +51,10 @@ $products = if ($catalog.Status -eq 200) { @($catalog.Content | ConvertFrom-Json
 Assert-Check "Catalog returns products" ($catalog.Status -eq 200 -and $products.Count -gt 0) "HTTP $($catalog.Status), products $($products.Count)"
 Assert-Check "Catalog contains 100+ products" ($products.Count -ge 100) "products $($products.Count)"
 
+$versionedCatalog = Invoke-Status GET "/api/v1/products/all"
+$versionedProducts = if ($versionedCatalog.Status -eq 200) { @($versionedCatalog.Content | ConvertFrom-Json) } else { @() }
+Assert-Check "Versioned catalog returns products" ($versionedCatalog.Status -eq 200 -and $versionedProducts.Count -eq $products.Count) "HTTP $($versionedCatalog.Status), products $($versionedProducts.Count)"
+
 $tree = Invoke-Status GET "/products/categories/tree"
 $categories = if ($tree.Status -eq 200) { @($tree.Content | ConvertFrom-Json) } else { @() }
 Assert-Check "Category tree is available" ($tree.Status -eq 200 -and $categories.Count -gt 0) "HTTP $($tree.Status)"
@@ -66,6 +70,9 @@ Assert-Check "Public promotions are available" ($promotions.Status -eq 200) "HTT
 
 $protected = Invoke-Status GET "/order/my"
 Assert-Check "Protected API rejects anonymous requests" ($protected.Status -eq 401) "expected 401, got $($protected.Status)"
+
+$versionedProtected = Invoke-Status GET "/api/v1/order/my"
+Assert-Check "Versioned protected API rejects anonymous requests" ($versionedProtected.Status -eq 401) "expected 401, got $($versionedProtected.Status)"
 
 Write-Host "`nResult: $passed passed, $failed failed"
 if ($failed -gt 0) { exit 1 }

@@ -28,7 +28,10 @@ public class RequestCorrelationFilter implements WebFilter {
         ServerHttpRequest request = exchange.getRequest().mutate()
                 .headers(headers -> headers.set(HEADER, requestId))
                 .build();
-        exchange.getResponse().getHeaders().set(HEADER, requestId);
+        exchange.getResponse().beforeCommit(() -> {
+            exchange.getResponse().getHeaders().set(HEADER, requestId);
+            return Mono.empty();
+        });
         ServerWebExchange traced = exchange.mutate().request(request).build();
         return chain.filter(traced).doFinally(signal -> {
             String path = request.getPath().value();

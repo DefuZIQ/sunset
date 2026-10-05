@@ -2,6 +2,10 @@
 
 Дата последнего полного backend-прогона: 4 октября 2026 года.
 
+## Этап API v1 от 5 октября 2026 года
+
+Добавлен совместимый префикс `/api/v1` на Gateway и в Caddy. Старые пути сохранены. Локально прошли 8/8 HTTP-контрактных тестов Gateway, 6/6 Vitest и 14/14 Playwright. Контракты подтвердили сохранение JWT-защиты, `user-id`, query string и одного `X-Request-Id` в ответе даже при отражении заголовка downstream-сервисом. Полный Maven reactor на Windows остановился на тестах Testcontainers из-за отсутствия локального Docker; полноценная проверка с PostgreSQL запланирована в GitHub Actions до публикации.
+
 ## Дополнение от 4 октября 2026 года
 
 Добавлен доверенный `X-Request-Id`: Gateway создаёт его для каждого запроса, возвращает клиенту и передаёт сервисам; Auth, Product, Order и Notification включают ID в логи. Пять HTTP-контрактных сценариев Gateway, два модульных теста фильтра Order и отдельный HTTP E2E проверены в [GitHub Actions](https://github.com/DefuZIQ/sunset/actions/runs/37222302839). Полный workflow, включая backend, frontend, HTTP E2E и сборку образов, завершился успешно. Это корреляция запросов, не полноценная распределённая трассировка OpenTelemetry. После восстановления доступа пять backend-контейнеров установлены на `192.168.1.186`: все healthy, production smoke прошёл 8/8. Резервная копия исходников сохранена в `/home/defuziq/sunset-backup-request-correlation-20261004.tar.gz`.
