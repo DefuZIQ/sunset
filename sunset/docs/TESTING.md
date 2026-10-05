@@ -8,6 +8,12 @@
 .\scripts\test-all.ps1
 ```
 
+Проверка машиночитаемого контракта API (синтаксис JSON, ссылки, уникальность операций, права доступа и соответствие выбранных маршрутов Java-контроллерам):
+
+```powershell
+.\scripts\verify-openapi.ps1
+```
+
 С браузерными E2E в desktop/mobile Chromium:
 
 ```powershell

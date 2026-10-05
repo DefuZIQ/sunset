@@ -1,0 +1,260 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SUNSET Store API — core client operations",
+    "version": "1.0.0",
+    "description": "Подтверждённое по контроллерам ядро клиентского API. Это не полный перечень административных и вспомогательных маршрутов. Старые пути без /api/v1 пока сохранены."
+  },
+  "servers": [{ "url": "/api/v1", "description": "Версионированный путь через Caddy и Gateway" }],
+  "tags": [
+    { "name": "Auth" }, { "name": "Products" }, { "name": "Orders" }, { "name": "Promotions" }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"], "operationId": "registerCustomer", "summary": "Регистрация клиента",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } } },
+        "responses": { "200": { "description": "Создан аккаунт; JWT выдаётся при последующем входе", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } } }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"], "operationId": "loginCustomer", "summary": "Вход",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
+        "responses": { "200": { "description": "Выдан JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } } }
+      }
+    },
+    "/auth/profile": {
+      "get": {
+        "tags": ["Auth"], "operationId": "getProfile", "summary": "Профиль текущего клиента", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Профиль", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserProfile" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "put": {
+        "tags": ["Auth"], "operationId": "updateProfile", "summary": "Изменить профиль", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateProfileRequest" } } } },
+        "responses": { "200": { "description": "Обновлённый профиль", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserProfile" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/profile/password": {
+      "put": {
+        "tags": ["Auth"], "operationId": "changePassword", "summary": "Сменить пароль", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangePasswordRequest" } } } },
+        "responses": { "200": { "description": "Пароль изменён", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Message" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/products/all": {
+      "get": {
+        "tags": ["Products"], "operationId": "listProducts", "summary": "Каталог",
+        "responses": { "200": { "description": "Список товаров", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } } } } } }
+      }
+    },
+    "/products/by-uuid": {
+      "post": {
+        "tags": ["Products"], "operationId": "getProductByUuid", "summary": "Карточка товара по UUID",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductUuidRequest" } } } },
+        "responses": {
+          "200": { "description": "Товар", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Product" } } } },
+          "400": { "description": "UUID отсутствует; тело ответа пустое" },
+          "404": { "description": "Товар не найден; тело ответа пустое" }
+        }
+      }
+    },
+    "/products/categories/tree": {
+      "get": {
+        "tags": ["Products"], "operationId": "getCategoryTree", "summary": "Дерево категорий",
+        "responses": { "200": { "description": "Дерево категорий", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "additionalProperties": true } } } } } }
+      }
+    },
+    "/order": {
+      "post": {
+        "tags": ["Orders"], "operationId": "createOrder", "summary": "Оформить заказ", "security": [{ "bearerAuth": [] }],
+        "description": "Повтор с тем же непустым idempotencyKey для клиента возвращает прежний заказ. Цена и остаток проверяются сервером.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateOrderRequest" } } } },
+        "responses": {
+          "201": { "description": "Заказ создан", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
+          "400": { "description": "Некорректные данные заказа; формат ошибки сервиса ещё не стандартизирован" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/order/my": {
+      "get": {
+        "tags": ["Orders"], "operationId": "listMyOrders", "summary": "Мои заказы", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Заказы клиента", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/my/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "get": {
+        "tags": ["Orders"], "operationId": "getMyOrder", "summary": "Подробности заказа", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Заказ, состав, получение, оплата и события", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "put": {
+        "tags": ["Orders"], "operationId": "updatePendingOrder", "summary": "Изменить получателя или получение до подтверждения", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdatePendingOrderRequest" } } } },
+        "responses": { "200": { "description": "Обновлённый заказ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/my/{id}/cancel": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "post": {
+        "tags": ["Orders"], "operationId": "cancelMyOrder", "summary": "Отменить заказ", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Отменённый заказ; повторная отмена безопасна", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/promotions": {
+      "get": {
+        "tags": ["Promotions"], "operationId": "listPromotions", "summary": "Активные акции",
+        "responses": { "200": { "description": "Акции", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Promotion" } } } } } }
+      }
+    },
+    "/order/promo/validate": {
+      "post": {
+        "tags": ["Promotions"], "operationId": "validatePromo", "summary": "Проверить промокод", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ValidatePromoRequest" } } } },
+        "responses": { "200": { "description": "Данные применимого промокода", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" } },
+    "parameters": { "OrderId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } },
+    "responses": {
+      "Unauthorized": {
+        "description": "Нет токена или JWT неверен; ответ сформирован Gateway",
+        "headers": { "X-Request-Id": { "description": "Доверенный ID запроса", "schema": { "type": "string", "format": "uuid" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GatewayError" } } }
+      }
+    },
+    "schemas": {
+      "Message": { "type": "object", "properties": { "message": { "type": "string" } } },
+      "GatewayError": {
+        "type": "object", "required": ["code", "message", "fieldErrors", "requestId", "timestamp"],
+        "properties": {
+          "code": { "type": "string", "enum": ["UNAUTHORIZED", "INVALID_TOKEN", "FORBIDDEN"] },
+          "message": { "type": "string" }, "fieldErrors": { "type": "object", "additionalProperties": true },
+          "requestId": { "type": "string", "format": "uuid" }, "timestamp": { "type": "string", "format": "date-time" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object", "required": ["email", "password"],
+        "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string", "format": "password" }, "firstName": { "type": "string" }, "lastName": { "type": "string" } }
+      },
+      "LoginRequest": {
+        "type": "object", "required": ["email", "password"],
+        "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string", "format": "password" } }
+      },
+      "AuthResponse": {
+        "type": "object", "required": ["uuid", "email", "role", "token"],
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" }, "email": { "type": "string", "format": "email" },
+          "firstName": { "type": "string" }, "lastName": { "type": "string" }, "phone": { "type": "string", "nullable": true },
+          "role": { "type": "string" }, "token": { "type": "string", "nullable": true, "description": "JWT после входа; null при регистрации" }
+        }
+      },
+      "UserProfile": {
+        "type": "object", "required": ["id", "email", "role"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" }, "email": { "type": "string", "format": "email" },
+          "firstName": { "type": "string" }, "lastName": { "type": "string" }, "phone": { "type": "string", "nullable": true },
+          "birthday": { "type": "string", "format": "date", "nullable": true }, "avatar": { "type": "string", "nullable": true }, "role": { "type": "string" }
+        }
+      },
+      "UpdateProfileRequest": {
+        "type": "object", "required": ["email", "firstName", "lastName"], "properties": {
+          "email": { "type": "string", "format": "email" }, "firstName": { "type": "string" }, "lastName": { "type": "string" },
+          "phone": { "type": "string" }, "birthday": { "type": "string", "format": "date" }, "avatar": { "type": "string" }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object", "required": ["currentPassword", "newPassword"],
+        "properties": { "currentPassword": { "type": "string", "format": "password" }, "newPassword": { "type": "string", "format": "password" } }
+      },
+      "ProductUuidRequest": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "format": "uuid" } } },
+      "Product": {
+        "type": "object", "required": ["id", "name", "price"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "description": { "type": "string", "nullable": true },
+          "price": { "type": "number" }, "gender": { "type": "string", "nullable": true }, "imageUrl": { "type": "string", "nullable": true },
+          "rating": { "type": "number" }, "reviewCount": { "type": "integer" },
+          "categories": { "type": "array", "items": { "type": "string" } },
+          "colors": { "type": "array", "items": { "$ref": "#/components/schemas/ProductColor" } },
+          "stock": { "type": "array", "items": { "$ref": "#/components/schemas/ProductStock" } }
+        }
+      },
+      "ProductColor": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "hexCode": { "type": "string" } } },
+      "ProductStock": {
+        "type": "object", "properties": {
+          "sizeId": { "type": "string", "format": "uuid" }, "sizeName": { "type": "string" }, "sizeType": { "type": "string" },
+          "sizeGender": { "type": "string" }, "sizeDescription": { "type": "string" },
+          "colorId": { "type": "string", "format": "uuid" }, "colorName": { "type": "string" }, "quantity": { "type": "integer" }
+        }
+      },
+      "OrderItemRequest": {
+        "type": "object", "required": ["productId", "colorId", "sizeId", "quantity"],
+        "properties": {
+          "productId": { "type": "string", "format": "uuid" }, "colorId": { "type": "string", "format": "uuid" },
+          "sizeId": { "type": "string", "format": "uuid" }, "quantity": { "type": "integer", "minimum": 1, "maximum": 20 }
+        }
+      },
+      "CreateOrderRequest": {
+        "type": "object", "required": ["address", "items"],
+        "properties": {
+          "customerName": { "type": "string" }, "customerEmail": { "type": "string", "format": "email" }, "customerPhone": { "type": "string", "description": "Если не передан, сервер берёт телефон из профиля; в итоге телефон обязателен" },
+          "address": { "type": "string", "description": "Адрес доставки или название/адрес магазина самовывоза" },
+          "deliveryMethod": { "type": "string", "enum": ["courier", "pickup"] },
+          "paymentMethod": { "type": "string", "enum": ["CARD", "SBP", "ON_RECEIPT"] },
+          "idempotencyKey": { "type": "string", "description": "Ключ идемпотентности передаётся в JSON-теле, не в HTTP-заголовке" },
+          "promoCode": { "type": "string" }, "bonusesToUse": { "type": "integer", "minimum": 0 },
+          "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/components/schemas/OrderItemRequest" } }
+        }
+      },
+      "Order": {
+        "type": "object", "required": ["id", "orderNumber", "status", "totalAmount"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" }, "orderNumber": { "type": "string" }, "userId": { "type": "string", "format": "uuid" },
+          "customerName": { "type": "string" }, "customerEmail": { "type": "string" }, "customerPhone": { "type": "string" },
+          "status": { "type": "string", "enum": ["PENDING", "CONFIRMED", "ASSEMBLING", "SHIPPED", "DELIVERED", "CANCELLED"] },
+          "subtotal": { "type": "number" }, "discountAmount": { "type": "number" },
+          "bonusesUsed": { "type": "integer" }, "bonusesEarned": { "type": "integer" }, "promoCode": { "type": "string", "nullable": true },
+          "totalAmount": { "type": "number" }, "createdAt": { "type": "string", "format": "date-time" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/OrderItem" } }
+        }
+      },
+      "OrderDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Order" },
+          { "type": "object", "properties": {
+            "delivery": { "type": "object", "nullable": true, "additionalProperties": true },
+            "payment": { "type": "object", "nullable": true, "additionalProperties": true },
+            "returns": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+            "events": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+          } }
+        ]
+      },
+      "OrderItem": {
+        "type": "object", "properties": {
+          "productId": { "type": "string", "format": "uuid" }, "colorId": { "type": "string", "format": "uuid" },
+          "colorName": { "type": "string", "nullable": true }, "sizeId": { "type": "string", "format": "uuid" },
+          "sizeName": { "type": "string", "nullable": true }, "name": { "type": "string" },
+          "imageUrl": { "type": "string" }, "quantity": { "type": "integer" }, "price": { "type": "number" }
+        }
+      },
+      "UpdatePendingOrderRequest": {
+        "type": "object", "properties": {
+          "customerName": { "type": "string" }, "customerEmail": { "type": "string", "format": "email" },
+          "customerPhone": { "type": "string" }, "address": { "type": "string" },
+          "deliveryMethod": { "type": "string", "enum": ["courier", "pickup"] }
+        }
+      },
+      "Promotion": {
+        "type": "object", "properties": {
+          "id": { "type": "string", "format": "uuid" }, "code": { "type": "string" }, "title": { "type": "string" },
+          "description": { "type": "string" }, "discountPercent": { "type": "integer" }, "bonusMultiplier": { "type": "number" },
+          "minOrder": { "type": "number" }, "birthdayOnly": { "type": "boolean" }, "validUntil": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "ValidatePromoRequest": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "subtotal": { "type": "number" } } }
+    }
+  }
+}
