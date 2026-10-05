@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -33,12 +34,14 @@ public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final WhitelistConfig whitelistConfig;
+    private final ApiErrorWriter apiErrorWriter;
 
     @Value("${jwt.secret}")
     private String secretKey;
 
-    public SecurityConfig(WhitelistConfig whitelistConfig) {
+    public SecurityConfig(WhitelistConfig whitelistConfig, ApiErrorWriter apiErrorWriter) {
         this.whitelistConfig = whitelistConfig;
+        this.apiErrorWriter = apiErrorWriter;
         log.info(">>> SecurityConfig инициализирован");
     }
 
@@ -70,6 +73,9 @@ public class SecurityConfig {
             return Mono.just(new UsernamePasswordAuthenticationToken(token, token));
         });
         jwtAuthenticationFilter.setSecurityContextRepository(NoOpServerSecurityContextRepository.getInstance());
+        jwtAuthenticationFilter.setAuthenticationFailureHandler((filterExchange, exception) ->
+                apiErrorWriter.write(filterExchange.getExchange(), HttpStatus.UNAUTHORIZED,
+                        "INVALID_TOKEN", "Недействительный токен"));
 
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
@@ -78,10 +84,11 @@ public class SecurityConfig {
                 // JWT is the only authentication mechanism for the API. Do not let
                 // Spring Security advertise HTTP Basic, otherwise browsers show a
                 // native username/password dialog for an ordinary 401 response.
-                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint((exchange, exception) -> {
-                    exchange.getResponse().setStatusCode(org.springframework.http.HttpStatus.UNAUTHORIZED);
-                    return exchange.getResponse().setComplete();
-                }))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((exchange, exception) -> apiErrorWriter.write(
+                                exchange, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Необходим вход в аккаунт"))
+                        .accessDeniedHandler((exchange, exception) -> apiErrorWriter.write(
+                                exchange, HttpStatus.FORBIDDEN, "FORBIDDEN", "Доступ запрещён")))
                 .authorizeExchange(auth -> {
                     auth.pathMatchers(HttpMethod.OPTIONS).permitAll();
                     auth.pathMatchers(HttpMethod.POST, "/subscriptions").permitAll();

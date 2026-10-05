@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -172,10 +173,23 @@ class GatewayHttpContractTest {
 
     @Test
     void versionedProtectedRouteRejectsAnonymousCallerBeforeForwarding() {
-        client.get().uri("/api/v1/order/my")
+        var result = client.get().uri("/api/v1/order/my")
+                .header("X-Request-Id", "untrusted-client-id")
                 .exchange()
                 .expectStatus().isUnauthorized()
-                .expectHeader().exists("X-Request-Id");
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectHeader().doesNotExist(HttpHeaders.WWW_AUTHENTICATE)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("UNAUTHORIZED")
+                .jsonPath("$.message").isEqualTo("Необходим вход в аккаунт")
+                .jsonPath("$.timestamp").exists()
+                .returnResult();
+
+        String requestId = result.getResponseHeaders().getFirst("X-Request-Id");
+        assertThat(requestId).isNotEqualTo("untrusted-client-id");
+        assertThat(UUID.fromString(requestId).toString()).isEqualTo(requestId);
+        assertThat(new String(result.getResponseBody(), StandardCharsets.UTF_8))
+                .contains("\"requestId\":\"" + requestId + "\"");
 
         assertThat(REQUEST_COUNT.get()).isZero();
     }
@@ -192,7 +206,12 @@ class GatewayHttpContractTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token")
                 .exchange()
                 .expectStatus().isUnauthorized()
-                .expectHeader().exists("X-Request-Id");
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectHeader().doesNotExist(HttpHeaders.WWW_AUTHENTICATE)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("INVALID_TOKEN")
+                .jsonPath("$.message").isEqualTo("Недействительный токен")
+                .jsonPath("$.requestId").exists();
 
         assertThat(REQUEST_COUNT.get()).isZero();
     }
