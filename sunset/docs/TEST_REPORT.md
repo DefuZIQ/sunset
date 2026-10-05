@@ -1,10 +1,12 @@
 # Отчёт о тестировании
 
-Дата последнего полного backend-прогона: 4 октября 2026 года.
+Дата последнего полного backend-прогона: 5 октября 2026 года.
 
 ## Этап API v1 от 5 октября 2026 года
 
-Добавлен совместимый префикс `/api/v1` на Gateway и в Caddy. Старые пути сохранены. Локально прошли 8/8 HTTP-контрактных тестов Gateway, 6/6 Vitest и 14/14 Playwright. Контракты подтвердили сохранение JWT-защиты, `user-id`, query string и одного `X-Request-Id` в ответе даже при отражении заголовка downstream-сервисом. Полный Maven reactor на Windows остановился на тестах Testcontainers из-за отсутствия локального Docker; полноценная проверка с PostgreSQL запланирована в GitHub Actions до публикации.
+Добавлен совместимый префикс `/api/v1` на Gateway и в Caddy. Старые пути сохранены. Локально прошли 8/8 HTTP-контрактных тестов Gateway, 6/6 Vitest и 14/14 Playwright. Контракты подтвердили сохранение JWT-защиты, `user-id`, query string и одного `X-Request-Id` в ответе даже при отражении заголовка downstream-сервисом. Полный Maven reactor на Windows остановился на тестах Testcontainers из-за отсутствия локального Docker; [GitHub Actions](https://github.com/DefuZIQ/sunset/actions/runs/37269732315) выполнил полный прогон с PostgreSQL, HTTP E2E и сборкой образов успешно.
+
+Версия установлена на `192.168.1.186` после проверки Caddyfile и создания резервной копии `/home/defuziq/sunset-backup-api-v1-20261005.tar.gz`. Gateway и web перезапущены по очереди; production smoke прошёл 10/10. Публичный `/api/v1/products/categories/tree` вернул один новый `X-Request-Id` вместо подставленного клиентом.
 
 ## Дополнение от 4 октября 2026 года
 
@@ -22,17 +24,17 @@
 
 | Контур | Результат |
 |---|---|
-| Backend Maven reactor | 50/50 успешно, включая 8 PostgreSQL/Testcontainers-сценариев и 5 HTTP-контрактных сценариев Gateway |
+| Backend Maven reactor | 53/53 успешно в CI, включая 8 PostgreSQL/Testcontainers-сценариев и 8 HTTP-контрактных сценариев Gateway |
 | Изолированный HTTP E2E | 1/1 успешно с реальными сервисами и временной PostgreSQL |
 | Frontend Vitest | 6/6 успешно |
 | Frontend Playwright E2E | 14/14 успешно: desktop и mobile Chromium, включая оформление доставки и самовывоза |
 | Frontend production build | Успешно |
 | Production Compose | Основной и observability-конфиги валидны |
-| Smoke backend-релиза | 8/8 после установки корреляции запросов |
+| Smoke API v1 | 10/10 после установки Gateway и Caddy |
 | Миграции БД | `codex-product:118` и `codex-order:201` применены |
 | Резервная копия | Контрольная сумма и чтение SQL успешно проверены |
 | Мониторинг | Prometheus видит 5/5 сервисов, Grafana отвечает `database: ok` |
-| Автотесты | 71 локально успешно, 0 ошибок; обновлённый полный CI запускается после отправки новой ветки |
+| Автотесты | 74 успешно, 0 ошибок в полном CI 5 октября |
 
 Проверены все пять Maven-модулей: API Gateway, Auth, Order, Product и Notification. Order Service дополнительно проверен на временной PostgreSQL 16 с применением всех его Liquibase-миграций. Сценарии доказывают атомарность оформления, подтверждения, бонусов, отмены, возврата оплаты и восстановления остатка. Интеграционный тест обнаружил и позволил исправить лишний SQL-параметр при начислении бонусов. Commerce/operations-релиз установлен на `http://192.168.1.186` и прошёл восемь безопасных smoke-сценариев.
 
