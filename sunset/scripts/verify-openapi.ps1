@@ -61,6 +61,13 @@ foreach ($routePath in $spec.paths.Keys) {
 
 function Assert-References($value) {
     if ($value -is [System.Collections.IDictionary]) {
+        if ($value.Contains('required') -and $value.Contains('properties')) {
+            foreach ($requiredField in $value.required) {
+                if (-not $value.properties.Contains($requiredField)) {
+                    throw "Required field is not declared in properties: $requiredField"
+                }
+            }
+        }
         foreach ($key in $value.Keys) {
             if ($key -eq '$ref') {
                 if ($value[$key] -notmatch '^#/components/(schemas|parameters|responses)/[^/]+$') {

@@ -137,7 +137,7 @@
         }
       },
       "RegisterRequest": {
-        "type": "object", "required": ["email", "password"],
+        "type": "object", "required": ["email", "password", "firstName", "lastName"],
         "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string", "format": "password" }, "firstName": { "type": "string" }, "lastName": { "type": "string" } }
       },
       "LoginRequest": {
@@ -241,7 +241,7 @@
         }
       },
       "UpdatePendingOrderRequest": {
-        "type": "object", "properties": {
+        "type": "object", "required": ["address"], "properties": {
           "customerName": { "type": "string" }, "customerEmail": { "type": "string", "format": "email" },
           "customerPhone": { "type": "string" }, "address": { "type": "string" },
           "deliveryMethod": { "type": "string", "enum": ["courier", "pickup"] }
