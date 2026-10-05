@@ -2,6 +2,12 @@
 
 Дата последнего полного backend-прогона: 5 октября 2026 года.
 
+## JSON-ошибки авторизации Gateway от 5 октября 2026 года
+
+Gateway теперь возвращает одинаковый JSON-контракт для отсутствующего или неверного JWT на старых и `/api/v1`-путях: `code`, `message`, `fieldErrors`, `requestId`, `timestamp`. Номер запроса совпадает с `X-Request-Id` и не берётся из клиентского заголовка; HTTP Basic не предлагается. Локально прошли 14/14 тестов модуля Gateway, включая восемь HTTP-контрактов. [Полный CI](https://github.com/DefuZIQ/sunset/actions/runs/37272046829) завершился успешно: backend, frontend, commerce HTTP E2E и сборка образов.
+
+На `192.168.1.186` обновлён только API Gateway. До установки сохранена резервная копия `/home/defuziq/sunset-backup-gateway-errors-20261005.tar.gz`, контрольная сумма релиза проверена. Контейнер стал healthy, production smoke прошёл 10/10. Реальные ответы 401 подтвердили коды `UNAUTHORIZED` и `INVALID_TOKEN`, совпадение `requestId` с заголовком и отсутствие `WWW-Authenticate`. OpenAPI, сгенерированные клиентские типы и единые ошибки downstream-сервисов остаются следующими частями этапа API v1.
+
 ## Этап API v1 от 5 октября 2026 года
 
 Добавлен совместимый префикс `/api/v1` на Gateway и в Caddy. Старые пути сохранены. Локально прошли 8/8 HTTP-контрактных тестов Gateway, 6/6 Vitest и 14/14 Playwright. Контракты подтвердили сохранение JWT-защиты, `user-id`, query string и одного `X-Request-Id` в ответе даже при отражении заголовка downstream-сервисом. Полный Maven reactor на Windows остановился на тестах Testcontainers из-за отсутствия локального Docker; [GitHub Actions](https://github.com/DefuZIQ/sunset/actions/runs/37269732315) выполнил полный прогон с PostgreSQL, HTTP E2E и сборкой образов успешно.
