@@ -241,9 +241,9 @@ export interface components {
         Message: {
             message?: string;
         };
-        GatewayError: {
-            /** @enum {string} */
-            code: "UNAUTHORIZED" | "INVALID_TOKEN" | "FORBIDDEN";
+        ApiError: {
+            /** @description Стабильный машинный код, например BAD_REQUEST, NOT_FOUND или INVALID_TOKEN */
+            code: string;
             message: string;
             fieldErrors: {
                 [key: string]: unknown;
@@ -448,7 +448,7 @@ export interface components {
         };
     };
     responses: {
-        /** @description Нет токена или JWT неверен; ответ сформирован Gateway */
+        /** @description Нет токена, JWT неверен или указаны неверные учётные данные */
         Unauthorized: {
             headers: {
                 /** @description Доверенный ID запроса */
@@ -456,7 +456,25 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["GatewayError"];
+                "application/json": components["schemas"]["ApiError"];
+            };
+        };
+        /** @description Некорректный запрос */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ApiError"];
+            };
+        };
+        /** @description Ресурс не найден */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ApiError"];
             };
         };
     };
@@ -491,6 +509,7 @@ export interface operations {
                     "application/json": components["schemas"]["AuthResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
         };
     };
     loginCustomer: {
@@ -515,6 +534,9 @@ export interface operations {
                     "application/json": components["schemas"]["AuthResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     getProfile: {
@@ -630,20 +652,8 @@ export interface operations {
                     "application/json": components["schemas"]["Product"];
                 };
             };
-            /** @description UUID отсутствует; тело ответа пустое */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Товар не найден; тело ответа пустое */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
         };
     };
     getCategoryTree: {
@@ -690,13 +700,7 @@ export interface operations {
                     "application/json": components["schemas"]["Order"];
                 };
             };
-            /** @description Некорректные данные заказа; формат ошибки сервиса ещё не стандартизирован */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };

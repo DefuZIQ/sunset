@@ -14,14 +14,14 @@
       "post": {
         "tags": ["Auth"], "operationId": "registerCustomer", "summary": "Регистрация клиента",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } } },
-        "responses": { "200": { "description": "Создан аккаунт; JWT выдаётся при последующем входе", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } } }
+        "responses": { "200": { "description": "Создан аккаунт; JWT выдаётся при последующем входе", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "400": { "$ref": "#/components/responses/BadRequest" } }
       }
     },
     "/auth/login": {
       "post": {
         "tags": ["Auth"], "operationId": "loginCustomer", "summary": "Вход",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
-        "responses": { "200": { "description": "Выдан JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } } }
+        "responses": { "200": { "description": "Выдан JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
     "/auth/profile": {
@@ -54,8 +54,8 @@
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductUuidRequest" } } } },
         "responses": {
           "200": { "description": "Товар", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Product" } } } },
-          "400": { "description": "UUID отсутствует; тело ответа пустое" },
-          "404": { "description": "Товар не найден; тело ответа пустое" }
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
@@ -72,7 +72,7 @@
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateOrderRequest" } } } },
         "responses": {
           "201": { "description": "Заказ создан", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
-          "400": { "description": "Некорректные данные заказа; формат ошибки сервиса ещё не стандартизирован" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
@@ -121,17 +121,19 @@
     "parameters": { "OrderId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } },
     "responses": {
       "Unauthorized": {
-        "description": "Нет токена или JWT неверен; ответ сформирован Gateway",
+        "description": "Нет токена, JWT неверен или указаны неверные учётные данные",
         "headers": { "X-Request-Id": { "description": "Доверенный ID запроса", "schema": { "type": "string", "format": "uuid" } } },
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GatewayError" } } }
-      }
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } }
+      },
+      "BadRequest": { "description": "Некорректный запрос", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "NotFound": { "description": "Ресурс не найден", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
     },
     "schemas": {
       "Message": { "type": "object", "properties": { "message": { "type": "string" } } },
-      "GatewayError": {
+      "ApiError": {
         "type": "object", "required": ["code", "message", "fieldErrors", "requestId", "timestamp"],
         "properties": {
-          "code": { "type": "string", "enum": ["UNAUTHORIZED", "INVALID_TOKEN", "FORBIDDEN"] },
+          "code": { "type": "string", "description": "Стабильный машинный код, например BAD_REQUEST, NOT_FOUND или INVALID_TOKEN" },
           "message": { "type": "string" }, "fieldErrors": { "type": "object", "additionalProperties": true },
           "requestId": { "type": "string", "format": "uuid" }, "timestamp": { "type": "string", "format": "date-time" }
         }

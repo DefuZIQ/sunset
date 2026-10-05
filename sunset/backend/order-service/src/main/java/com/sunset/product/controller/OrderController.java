@@ -42,6 +42,4 @@ public class OrderController {
     @PatchMapping("/admin/returns/{id}") public Object returnStatus(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody ReturnStatusRequest request) { return service.updateReturn(userId,id,request); }
     @GetMapping("/admin/analytics") public Object analytics(@RequestHeader("user-id") UUID userId) { return service.adminAnalytics(userId); }
 
-    @ExceptionHandler(IllegalArgumentException.class) ResponseEntity<?> badRequest(IllegalArgumentException e) { return ResponseEntity.badRequest().body(Map.of("message",e.getMessage())); }
-    @ExceptionHandler(SecurityException.class) ResponseEntity<?> forbidden(SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message",e.getMessage())); }
 }

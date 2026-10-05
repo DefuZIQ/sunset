@@ -17,6 +17,7 @@
     </properties>
 
     <modules>
+        <module>backend/api-contract</module>
         <module>backend/api-gateway</module>
         <module>backend/auth-service</module>
         <module>backend/order-service</module>

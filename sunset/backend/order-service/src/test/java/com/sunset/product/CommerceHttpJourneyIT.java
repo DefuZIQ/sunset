@@ -63,6 +63,15 @@ class CommerceHttpJourneyIT {
             String adminToken = login(base, adminEmail);
             assertThat(request(base, "POST", "/auth/login", null,
                     loginBody(adminEmail), 200).path("role").asText()).isEqualTo("ADMIN");
+            assertThat(request(base, "POST", "/auth/login", null,
+                    loginBody(customerEmail).put("password", "incorrect"), 401)
+                    .path("code").asText()).isEqualTo("INVALID_CREDENTIALS");
+            assertThat(request(base, "POST", "/products/by-uuid", null,
+                    json.createObjectNode().put("id", UUID.randomUUID().toString()), 404)
+                    .path("code").asText()).isEqualTo("NOT_FOUND");
+            assertThat(request(base, "POST", "/order", customerToken,
+                    json.createObjectNode().set("items", json.createArrayNode()), 400)
+                    .path("code").asText()).isEqualTo("BAD_REQUEST");
 
             JsonNode catalog = request(base, "GET", "/products/all", null, null, 200);
             JsonNode product = null;
@@ -131,7 +140,8 @@ class CommerceHttpJourneyIT {
                 }
             }
             assertThat(restoredStock).isEqualTo(originalStock);
-            request(base, "GET", "/order/my", null, null, 401);
+            assertThat(request(base, "GET", "/order/my", null, null, 401)
+                    .path("code").asText()).isEqualTo("UNAUTHORIZED");
             System.out.println("Commerce HTTP E2E passed: registration, catalog, checkout, idempotency, "
                     + "admin confirmation, loyalty compensation, stock restoration and access control");
         }
@@ -167,7 +177,15 @@ class CommerceHttpJourneyIT {
         String requestId = response.headers().firstValue("X-Request-Id")
                 .orElseThrow(() -> new AssertionError(method + " " + path + " has no X-Request-Id"));
         assertThat(UUID.fromString(requestId).toString()).isEqualTo(requestId);
-        return response.body().isBlank() ? json.nullNode() : json.readTree(response.body());
+        JsonNode result = response.body().isBlank() ? json.nullNode() : json.readTree(response.body());
+        if (expectedStatus >= 400) {
+            assertThat(result.path("code").asText()).as(method + " " + path + " error code").isNotBlank();
+            assertThat(result.path("message").asText()).as(method + " " + path + " error message").isNotBlank();
+            assertThat(result.path("fieldErrors").isObject()).as(method + " " + path + " field errors").isTrue();
+            assertThat(result.path("requestId").asText()).isEqualTo(requestId);
+            assertThat(result.path("timestamp").asText()).isNotBlank();
+        }
+        return result;
     }
 
     private String required(String name) {

@@ -33,7 +33,7 @@ public class AuthService {
     public AuthResponse registerUser(RegisterRequest request) {
         // Проверка на существующего пользователя
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already in use");
+            throw new IllegalArgumentException("Этот email уже используется");
         }
 
         User user = new User();
@@ -76,12 +76,12 @@ public class AuthService {
         String lastName = cleanRequired(request.getLastName(), "Фамилия");
 
         if (!email.equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(email)) {
-            throw new RuntimeException("Этот email уже используется");
+            throw new IllegalArgumentException("Этот email уже используется");
         }
 
         String phone = request.getPhone() == null ? null : request.getPhone().trim();
         if (phone != null && phone.length() > 30) {
-            throw new RuntimeException("Номер телефона слишком длинный");
+            throw new IllegalArgumentException("Номер телефона слишком длинный");
         }
 
         user.setEmail(email);
@@ -90,12 +90,12 @@ public class AuthService {
         user.setPhone(phone == null || phone.isBlank() ? null : phone);
         LocalDate birthday = request.getBirthday();
         if (birthday != null && (birthday.isAfter(LocalDate.now()) || birthday.isBefore(LocalDate.now().minusYears(120)))) {
-            throw new RuntimeException("Проверьте дату рождения");
+            throw new IllegalArgumentException("Проверьте дату рождения");
         }
         user.setBirthday(birthday);
         String avatar = request.getAvatar();
-        if (avatar != null && avatar.length() > 700_000) throw new RuntimeException("Файл аватара слишком большой");
-        if (avatar != null && !avatar.isBlank() && !avatar.startsWith("data:image/")) throw new RuntimeException("Некорректный формат аватара");
+        if (avatar != null && avatar.length() > 700_000) throw new IllegalArgumentException("Файл аватара слишком большой");
+        if (avatar != null && !avatar.isBlank() && !avatar.startsWith("data:image/")) throw new IllegalArgumentException("Некорректный формат аватара");
         user.setAvatar(avatar == null || avatar.isBlank() ? null : avatar);
         return UserDTO.fromUser(userRepository.save(user));
     }
@@ -106,19 +106,19 @@ public class AuthService {
         String newPassword = request == null ? null : request.getNewPassword();
 
         if (currentPassword == null || currentPassword.isEmpty()) {
-            throw new RuntimeException("Введите текущий пароль");
+            throw new IllegalArgumentException("Введите текущий пароль");
         }
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw new InvalidPasswordException("Текущий пароль указан неверно");
         }
         if (newPassword == null || newPassword.length() < 8) {
-            throw new RuntimeException("Новый пароль должен содержать не менее 8 символов");
+            throw new IllegalArgumentException("Новый пароль должен содержать не менее 8 символов");
         }
         if (newPassword.length() > 72) {
-            throw new RuntimeException("Новый пароль должен содержать не более 72 символов");
+            throw new IllegalArgumentException("Новый пароль должен содержать не более 72 символов");
         }
         if (passwordEncoder.matches(newPassword, user.getPassword())) {
-            throw new RuntimeException("Новый пароль должен отличаться от текущего");
+            throw new IllegalArgumentException("Новый пароль должен отличаться от текущего");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -132,7 +132,7 @@ public class AuthService {
 
     private String cleanRequired(String value, String fieldName) {
         if (value == null || value.trim().isEmpty()) {
-            throw new RuntimeException(fieldName + " не может быть пустым");
+            throw new IllegalArgumentException(fieldName + " не может быть пустым");
         }
         return value.trim();
     }

@@ -6,6 +6,7 @@ import com.sunset.product.dto.ProductUuidRequest;
 import com.sunset.product.service.AdminProductService;
 import com.sunset.product.service.ProductService;
 import com.sunset.product.service.ReviewService;
+import org.springframework.web.server.ResponseStatusException;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -19,8 +20,8 @@ class ProductControllerTest {
     private final ProductController controller = new ProductController(products, mock(AdminProductService.class), mock(ReviewService.class));
 
     @Test void rejectsMissingProductId() {
-        assertEquals(400, controller.getProductByUuid(null).getStatusCode().value());
-        assertEquals(400, controller.getProductByUuid(new ProductUuidRequest()).getStatusCode().value());
+        assertThrows(IllegalArgumentException.class, () -> controller.getProductByUuid(null));
+        assertThrows(IllegalArgumentException.class, () -> controller.getProductByUuid(new ProductUuidRequest()));
     }
 
     @Test void returnsNotFoundForUnknownProduct() {
@@ -28,7 +29,8 @@ class ProductControllerTest {
         ProductUuidRequest request = new ProductUuidRequest();
         request.setId(id);
         when(products.getProductById(id)).thenReturn(Optional.empty());
-        assertEquals(404, controller.getProductByUuid(request).getStatusCode().value());
+        ResponseStatusException error = assertThrows(ResponseStatusException.class, () -> controller.getProductByUuid(request));
+        assertEquals(404, error.getStatusCode().value());
     }
 
     @Test void returnsExistingProduct() {

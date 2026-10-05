@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -44,12 +44,12 @@ public class ProductController {
     @PostMapping("/by-uuid")
     public ResponseEntity<ProductDTO> getProductByUuid(@RequestBody ProductUuidRequest request) {
         if (request == null || request.getId() == null) {
-            return ResponseEntity.badRequest().build();
+            throw new IllegalArgumentException("Укажите UUID товара");
         }
 
         return productService.getProductById(request.getId())
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Товар не найден"));
 
     }
 
@@ -88,6 +88,4 @@ public class ProductController {
     @GetMapping("/categories/tree")
     public Object categoryTree() { return reviewService.categoryTree(); }
 
-    @ExceptionHandler(IllegalArgumentException.class) ResponseEntity<?> badRequest(IllegalArgumentException e) { return ResponseEntity.badRequest().body(Map.of("message",e.getMessage())); }
-    @ExceptionHandler(SecurityException.class) ResponseEntity<?> forbidden(SecurityException e) { return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message",e.getMessage())); }
 }
