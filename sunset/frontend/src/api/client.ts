@@ -6,6 +6,9 @@ export type Promotion = components["schemas"]["Promotion"];
 export type ProductReview = components["schemas"]["ProductReview"];
 export type LoyaltyAccount = components["schemas"]["LoyaltyAccount"];
 export type DeliveryQuote = components["schemas"]["DeliveryQuote"];
+export type Order = components["schemas"]["Order"];
+export type OrderDetail = components["schemas"]["OrderDetail"];
+export type OrderReturn = components["schemas"]["OrderReturn"];
 export type Notification = components["schemas"]["Notification"];
 export type SubscriptionStatus = components["schemas"]["SubscriptionStatus"];
 export type UnreadNotificationCount = components["schemas"]["UnreadNotificationCount"];
@@ -13,6 +16,10 @@ type ProductUuidRequest = paths["/products/by-uuid"]["post"]["requestBody"]["con
 type SubscribeRequest = paths["/subscriptions"]["post"]["requestBody"]["content"]["application/json"];
 type SaveReviewRequest = paths["/products/review/{id}"]["post"]["requestBody"]["content"]["application/json"];
 type DeliveryQuoteRequest = paths["/order/delivery/quote"]["post"]["requestBody"]["content"]["application/json"];
+type CreateOrderRequest = paths["/order"]["post"]["requestBody"]["content"]["application/json"];
+type UpdatePendingOrderRequest = paths["/order/my/{id}"]["put"]["requestBody"]["content"]["application/json"];
+type CreateReturnRequest = paths["/order/my/{id}/returns"]["post"]["requestBody"]["content"]["application/json"];
+type ValidatePromoRequest = paths["/order/promo/validate"]["post"]["requestBody"]["content"]["application/json"];
 
 export class ApiHttpError extends Error {
   constructor(public readonly status: number, message?: string) {
@@ -83,6 +90,44 @@ export async function quoteDelivery(token: string, quote: DeliveryQuoteRequest):
     method: "POST",
     headers: { "Content-Type": "application/json", ...bearer(token) },
     body: JSON.stringify(quote),
+  }));
+}
+
+export async function listMyOrders(token: string): Promise<Order[]> {
+  return readJson<Order[]>(await fetch("/api/v1/order/my", { headers: bearer(token) }));
+}
+
+export async function getMyOrder(token: string, id: string): Promise<OrderDetail> {
+  return readJson<OrderDetail>(await fetch(`/api/v1/order/my/${encodeURIComponent(id)}`, { headers: bearer(token) }));
+}
+
+export async function updatePendingOrder(token: string, id: string, changes: UpdatePendingOrderRequest): Promise<OrderDetail> {
+  return readJson<OrderDetail>(await fetch(`/api/v1/order/my/${encodeURIComponent(id)}`, {
+    method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(changes),
+  }));
+}
+
+export async function cancelMyOrder(token: string, id: string): Promise<OrderDetail> {
+  return readJson<OrderDetail>(await fetch(`/api/v1/order/my/${encodeURIComponent(id)}/cancel`, {
+    method: "POST", headers: bearer(token),
+  }));
+}
+
+export async function createOrderReturn(token: string, id: string, request: CreateReturnRequest): Promise<OrderReturn> {
+  return readJson<OrderReturn>(await fetch(`/api/v1/order/my/${encodeURIComponent(id)}/returns`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
+}
+
+export async function validatePromoCode(token: string, request: ValidatePromoRequest): Promise<Record<string, unknown>> {
+  return readJson<Record<string, unknown>>(await fetch("/api/v1/order/promo/validate", {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
+}
+
+export async function createOrder(token: string, request: CreateOrderRequest): Promise<Order> {
+  return readJson<Order>(await fetch("/api/v1/order", {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
   }));
 }
 

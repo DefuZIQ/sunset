@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../components/HeaderParts/CartContext";
-import { getLoyaltyAccount, quoteDelivery } from "../api/client";
+import { createOrder, getLoyaltyAccount, quoteDelivery, validatePromoCode } from "../api/client";
 import "./ContentPages.css";
 
 const stores = [
@@ -167,16 +167,7 @@ export default function Cart({ user }) {
   const validatePromo = async () => {
     setState({ loading: true, error: "" });
     try {
-      const response = await fetch("/order/promo/validate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-        body: JSON.stringify({ code: form.promoCode, subtotal }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Промокод не применён");
+      const data = await validatePromoCode(localStorage.getItem("authToken"), { code: form.promoCode, subtotal });
       setPromo(data);
       setState({ loading: false, error: "" });
     } catch (error) {
@@ -207,13 +198,7 @@ export default function Cart({ user }) {
     }
     setState({ loading: true, error: "" });
     try {
-      const response = await fetch("/order", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-        body: JSON.stringify({
+      const data = await createOrder(localStorage.getItem("authToken"), {
           customerName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
           customerEmail: user.email,
           customerPhone: form.phone,
@@ -229,11 +214,7 @@ export default function Cart({ user }) {
             sizeId: product.selectedSizeId || null,
             quantity,
           })),
-        }),
       });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.message || "Не удалось оформить заказ");
       setCheckoutKey(window.crypto?.randomUUID?.() || `checkout-${Date.now()}-${Math.random()}`);
       clearCart();
       navigate("/profile/orders", { state: { orderNumber: data.orderNumber } });

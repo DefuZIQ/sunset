@@ -90,5 +90,5 @@ function Assert-References($value) {
     }
 }
 Assert-References $spec
-if ($count -lt 26) { throw "Too few documented operations: $count" }
+if ($count -lt 27) { throw "Too few documented operations: $count" }
 Write-Host "PASS OpenAPI: $count operations, unique IDs, controller mappings, access rules and references"

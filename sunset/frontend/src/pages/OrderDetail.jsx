@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ApiHttpError, cancelMyOrder, createOrderReturn, getMyOrder, updatePendingOrder } from "../api/client";
 import "./ContentPages.css";
 
 const statusLabels = { PENDING:"Ожидает подтверждения", CONFIRMED:"Подтверждён", ASSEMBLING:"Собирается", SHIPPED:"Передан в доставку", DELIVERED:"Доставлен", CANCELLED:"Отменён" };
@@ -10,6 +11,7 @@ export default function OrderDetail({ user }) {
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(null);
   const [returnOpen, setReturnOpen] = useState(false);
@@ -18,20 +20,38 @@ export default function OrderDetail({ user }) {
   const [editForm, setEditForm] = useState({ customerName:"", customerEmail:"", customerPhone:"", deliveryMethod:"courier", address:"" });
   const load = useCallback(() => {
     setError("");
-    return fetch(`/order/my/${id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
-      .then((r) => r.ok ? r.json() : r.json().then((d) => Promise.reject(new Error(d.message || "Заказ не найден"))))
-      .then(setOrder).catch((e) => setError(e.message)).finally(() => setLoading(false));
+    return getMyOrder(localStorage.getItem("authToken"), id)
+      .then(setOrder)
+      .catch((e) => setError(e instanceof ApiHttpError && e.status === 404 ? "Заказ не найден" : e.message))
+      .finally(() => setLoading(false));
   }, [id]);
   useEffect(() => { if (user) load(); else navigate("/login"); }, [user, load, navigate]);
   useEffect(() => { if (order) setEditForm({ customerName:order.customerName || "", customerEmail:order.customerEmail || "", customerPhone:order.customerPhone || "", deliveryMethod:order.delivery?.deliveryMethod || "courier", address:order.delivery?.address || "" }); }, [order]);
-  const cancel = async () => { if (!window.confirm("Отменить заказ? Начисленные бонусы будут компенсированы.")) return; const r = await fetch(`/order/my/${id}/cancel`, { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } }); if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.message || "Не удалось отменить заказ"); return; } load(); };
-  const saveChanges = async () => { const r = await fetch(`/order/my/${id}`, { method:"PUT", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${localStorage.getItem("authToken")}` }, body:JSON.stringify(editForm) }); const data = await r.json().catch(() => ({})); if (!r.ok) { setError(data.message || "Не удалось сохранить изменения"); return; } setOrder(data); setEditMode(null); };
-  const createReturn = async () => { setReturnState({loading:true,error:"",message:""}); const response = await fetch(`/order/my/${id}/returns`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${localStorage.getItem("authToken")}`},body:JSON.stringify(returnForm)}); const data=await response.json().catch(()=>({})); if(!response.ok){setReturnState({loading:false,error:data.message||"Не удалось создать заявку",message:""});return;} setReturnState({loading:false,error:"",message:"Заявка принята. Мы сообщим о следующем шаге."}); setReturnOpen(false); load(); };
+  const cancel = async () => {
+    if (!window.confirm("Отменить заказ? Начисленные бонусы будут компенсированы.")) return;
+    setActionError("");
+    try { await cancelMyOrder(localStorage.getItem("authToken"), id); await load(); }
+    catch (e) { setActionError(e.message || "Не удалось отменить заказ"); }
+  };
+  const saveChanges = async () => {
+    setActionError("");
+    try { setOrder(await updatePendingOrder(localStorage.getItem("authToken"), id, editForm)); setEditMode(null); }
+    catch (e) { setActionError(e.message || "Не удалось сохранить изменения"); }
+  };
+  const createReturn = async () => {
+    setReturnState({loading:true,error:"",message:""});
+    try {
+      await createOrderReturn(localStorage.getItem("authToken"), id, returnForm);
+      setReturnState({loading:false,error:"",message:"Заявка принята. Мы сообщим о следующем шаге."});
+      setReturnOpen(false); await load();
+    } catch (e) { setReturnState({loading:false,error:e.message || "Не удалось создать заявку",message:""}); }
+  };
   if (loading) return <div className="page-shell container"><div className="order-loading">Загружаем детали заказа…</div></div>;
   if (error || !order) return <div className="page-shell container"><div className="empty-state"><h2>{error || "Заказ не найден"}</h2><Link className="text-link" to="/profile/orders">Вернуться к заказам</Link></div></div>;
   const currentStep = statusSteps.indexOf(order.status);
   return <div className="page-shell container order-detail">
     <Link className="text-link order-detail__back" to="/profile/orders">← Все заказы</Link>
+    {actionError && <p className="checkout-error" role="alert">{actionError}</p>}
     <header className="order-detail__hero"><div><p className="page-kicker">Заказ от {new Date(order.createdAt).toLocaleDateString("ru-RU")}</p><h1>{order.orderNumber}</h1><span className={`order-detail__status order-detail__status--${order.status.toLowerCase()}`}>{statusLabels[order.status] || order.status}</span></div><div className="order-detail__hero-total"><span>Сумма заказа</span><strong>{Number(order.totalAmount).toLocaleString("ru-RU")} ₽</strong></div></header>
     {order.status !== "CANCELLED" && <div className="order-timeline">{statusSteps.map((step, index) => <div className={index <= currentStep ? "active" : ""} key={step}><i>{index < currentStep ? "✓" : index + 1}</i><span>{statusLabels[step]}</span></div>)}</div>}
     {order.status === "CANCELLED" && <div className="order-cancelled-note"><strong>Заказ отменён</strong><span>Начисленные бонусы списаны компенсационной операцией, использованные — возвращены.</span></div>}
@@ -48,4 +68,3 @@ export default function OrderDetail({ user }) {
     <div className="order-detail__actions">{order.status !== "CANCELLED" && !["SHIPPED","DELIVERED"].includes(order.status) && <><button className="link-button order-cancel" onClick={cancel}>Отменить заказ</button><span>Отменить можно до передачи заказа в доставку.</span></>}{order.status === "DELIVERED" && !order.returns?.some((item)=>!["REJECTED","REFUNDED"].includes(item.status)) && <button className="link-button" onClick={()=>setReturnOpen(true)}>Оформить возврат</button>}</div>
   </div>;
 }
-

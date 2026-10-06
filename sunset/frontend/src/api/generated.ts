@@ -238,6 +238,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/order/my/{id}/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Создать заявку на возврат доставленного заказа */
+        post: operations["createOrderReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/order/promotions": {
         parameters: {
             query?: never;
@@ -544,7 +563,7 @@ export interface components {
             paymentMethod?: "CARD" | "SBP" | "ON_RECEIPT";
             /** @description Ключ идемпотентности передаётся в JSON-теле, не в HTTP-заголовке */
             idempotencyKey?: string;
-            promoCode?: string;
+            promoCode?: string | null;
             bonusesToUse?: number;
             items: components["schemas"]["OrderItemRequest"][];
         };
@@ -605,6 +624,23 @@ export interface components {
             address: string;
             /** @enum {string} */
             deliveryMethod?: "courier" | "pickup";
+        };
+        CreateReturnRequest: {
+            /** @enum {string} */
+            reason: "SIZE" | "QUALITY" | "WRONG_ITEM" | "OTHER";
+            comment?: string;
+        };
+        OrderReturn: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            orderId: string;
+            reason: string;
+            comment?: string | null;
+            status: string;
+            refundAmount: number;
+            /** Format: date-time */
+            createdAt: string;
         };
         CategoryNode: {
             /** Format: uuid */
@@ -1119,6 +1155,34 @@ export interface operations {
                     "application/json": components["schemas"]["OrderDetail"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createOrderReturn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReturnRequest"];
+            };
+        };
+        responses: {
+            /** @description Заявка создана */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };

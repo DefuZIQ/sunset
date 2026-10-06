@@ -159,6 +159,7 @@ test('saves and selects a delivery address before checkout', async ({ page }) =>
   const user = await openCheckout(page);
   let submittedOrder;
   await page.route('**/order', async (route) => {
+    expect(new URL(route.request().url()).pathname).toBe('/api/v1/order');
     submittedOrder = route.request().postDataJSON();
     await route.fulfill({ json: { orderNumber: 'SUN-101' } });
   });
@@ -192,6 +193,7 @@ test('pickup checkout needs no delivery address', async ({ page }) => {
   await openCheckout(page);
   let submittedOrder;
   await page.route('**/order', async (route) => {
+    expect(new URL(route.request().url()).pathname).toBe('/api/v1/order');
     submittedOrder = route.request().postDataJSON();
     await route.fulfill({ json: { orderNumber: 'SUN-102' } });
   });
@@ -220,4 +222,25 @@ test('checkout blocks an empty phone number', async ({ page }) => {
   await expect(page.getByText('Укажите корректный номер телефона')).toBeVisible();
   await expect(page.locator('.checkout-phone input')).toHaveClass(/field-invalid/);
   expect(orderRequests).toBe(0);
+});
+
+test('order detail stays visible when cancellation fails', async ({ page }) => {
+  await openCheckout(page);
+  const id = '44444444-4444-4444-4444-444444444444';
+  await page.route(`**/api/v1/order/my/${id}`, (route) => route.fulfill({ json: {
+    id, orderNumber: 'SUN-104', status: 'PENDING', createdAt: '2026-10-06T00:00:00Z',
+    customerName: 'Анна Тестовая', customerEmail: 'anna@example.test', customerPhone: '+79990001122',
+    subtotal: 3990, totalAmount: 3990, items: [{ productId: products[0].id, name: products[0].name, quantity: 1, price: 3990 }],
+    delivery: { deliveryMethod: 'pickup', address: 'SUNSET Нижний Новгород' }, payment: { method: 'CARD', status: 'PENDING' },
+  } }));
+  await page.route(`**/api/v1/order/my/${id}/cancel`, (route) => route.fulfill({
+    status: 400, json: { message: 'Заказ уже передан в доставку' },
+  }));
+  page.on('dialog', (dialog) => dialog.accept());
+
+  await page.goto(`/#/profile/orders/${id}`);
+  await expect(page.getByRole('heading', { name: 'SUN-104' })).toBeVisible();
+  await page.getByRole('button', { name: 'Отменить заказ' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Заказ уже передан в доставку' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'SUN-104' })).toBeVisible();
 });

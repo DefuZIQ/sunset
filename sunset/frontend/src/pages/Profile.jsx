@@ -4,7 +4,7 @@ import { useCart } from "../components/HeaderParts/CartContext";
 import ProductCard from "../components/Main/ProductCard";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStore } from "../contexts/StoreContext";
-import { getLoyaltyAccount, getSubscriptionStatus, listNotifications, markNotificationRead as markNotificationReadRequest, unsubscribeNewsletter } from "../api/client";
+import { getLoyaltyAccount, getSubscriptionStatus, listMyOrders, listNotifications, markNotificationRead as markNotificationReadRequest, unsubscribeNewsletter } from "../api/client";
 import "./ContentPages.css";
 import "./Profile.css";
 
@@ -45,9 +45,7 @@ export default function Profile({ user, setUser, section = "overview" }) {
 
   useEffect(() => {
     if (!user) return;
-    const headers = { Authorization: `Bearer ${localStorage.getItem("authToken")}` };
-    fetch("/order/my", { headers })
-      .then((response) => response.ok ? response.json() : [])
+    listMyOrders(localStorage.getItem("authToken"))
       .then(setOrders).catch(() => {});
     getLoyaltyAccount(localStorage.getItem("authToken"))
       .then(setLoyalty).catch(() => {});

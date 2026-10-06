@@ -1,7 +1,9 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { countUnreadNotifications, getCategoryTree, getLoyaltyAccount, getProductById,
-  getSubscriptionStatus, listNotifications, listProductReviews, listProducts, listPromotions,
-  markNotificationRead, quoteDelivery, saveProductReview, subscribeNewsletter, unsubscribeNewsletter } from "./client";
+import { cancelMyOrder, countUnreadNotifications, createOrder, createOrderReturn, getCategoryTree,
+  getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listMyOrders,
+  listNotifications, listProductReviews, listProducts, listPromotions, markNotificationRead,
+  quoteDelivery, saveProductReview, subscribeNewsletter, unsubscribeNewsletter,
+  updatePendingOrder, validatePromoCode } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -132,4 +134,56 @@ test("loyalty and delivery quote use protected versioned routes", async () => {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
     body: JSON.stringify({ method: "pickup", subtotal: 2500 }),
   });
+});
+
+test("customer order list and detail use protected versioned routes", async () => {
+  const order = { id: "order-1", orderNumber: "SUN-1", status: "PENDING", totalAmount: 1200 };
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => [order] })
+    .mockResolvedValueOnce({ ok: true, json: async () => order });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await expect(listMyOrders("jwt")).resolves.toEqual([order]);
+  await expect(getMyOrder("jwt", "order/1")).resolves.toEqual(order);
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/order/my", { headers: { Authorization: "Bearer jwt" } });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/order/my/order%2F1", { headers: { Authorization: "Bearer jwt" } });
+});
+
+test("order update, cancellation and return use protected versioned routes", async () => {
+  const order = { id: "order-1", status: "PENDING" };
+  const returned = { id: "return-1", orderId: "order-1", status: "REQUESTED" };
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => order })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ...order, status: "CANCELLED" }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => returned });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await updatePendingOrder("jwt", "order-1", { address: "Нижний Новгород", deliveryMethod: "courier" });
+  await cancelMyOrder("jwt", "order-1");
+  await expect(createOrderReturn("jwt", "order-1", { reason: "SIZE", comment: "Мал" })).resolves.toEqual(returned);
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/order/my/order-1", {
+    method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
+    body: JSON.stringify({ address: "Нижний Новгород", deliveryMethod: "courier" }),
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/order/my/order-1/cancel", {
+    method: "POST", headers: { Authorization: "Bearer jwt" },
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/v1/order/my/order-1/returns", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
+    body: JSON.stringify({ reason: "SIZE", comment: "Мал" }),
+  });
+});
+
+test("promo validation and checkout send a typed body and preserve server errors", async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ code: "FALL10", discount_percent: 10 }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "order-1", orderNumber: "SUN-1" }) })
+    .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ message: "Промокод недействителен" }) });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await expect(validatePromoCode("jwt", { code: "FALL10", subtotal: 3500 })).resolves.toMatchObject({ discount_percent: 10 });
+  const request = { address: "Магазин SUNSET", items: [{ productId: "product-1", colorId: "color-1", sizeId: "size-1", quantity: 1 }], idempotencyKey: "key-1" };
+  await expect(createOrder("jwt", request)).resolves.toMatchObject({ orderNumber: "SUN-1" });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/order", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
+    body: JSON.stringify(request),
+  });
+  await expect(validatePromoCode("jwt", { code: "BAD", subtotal: 3500 })).rejects.toMatchObject({ status: 400, message: "Промокод недействителен" });
 });

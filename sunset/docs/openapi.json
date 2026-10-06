@@ -118,6 +118,14 @@
         "responses": { "200": { "description": "Отменённый заказ; повторная отмена безопасна", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
+    "/order/my/{id}/returns": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "post": {
+        "tags": ["Orders"], "operationId": "createOrderReturn", "summary": "Создать заявку на возврат доставленного заказа", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReturnRequest" } } } },
+        "responses": { "201": { "description": "Заявка создана", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderReturn" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
     "/order/promotions": {
       "get": {
         "tags": ["Promotions"], "operationId": "listPromotions", "summary": "Активные акции",
@@ -282,7 +290,7 @@
           "deliveryMethod": { "type": "string", "enum": ["courier", "pickup"] },
           "paymentMethod": { "type": "string", "enum": ["CARD", "SBP", "ON_RECEIPT"] },
           "idempotencyKey": { "type": "string", "description": "Ключ идемпотентности передаётся в JSON-теле, не в HTTP-заголовке" },
-          "promoCode": { "type": "string" }, "bonusesToUse": { "type": "integer", "minimum": 0 },
+          "promoCode": { "type": "string", "nullable": true }, "bonusesToUse": { "type": "integer", "minimum": 0 },
           "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/components/schemas/OrderItemRequest" } }
         }
       },
@@ -324,6 +332,8 @@
           "deliveryMethod": { "type": "string", "enum": ["courier", "pickup"] }
         }
       },
+      "CreateReturnRequest": { "type": "object", "required": ["reason"], "properties": { "reason": { "type": "string", "enum": ["SIZE", "QUALITY", "WRONG_ITEM", "OTHER"] }, "comment": { "type": "string" } } },
+      "OrderReturn": { "type": "object", "required": ["id", "orderId", "reason", "status", "refundAmount", "createdAt"], "properties": { "id": { "type": "string", "format": "uuid" }, "orderId": { "type": "string", "format": "uuid" }, "reason": { "type": "string" }, "comment": { "type": "string", "nullable": true }, "status": { "type": "string" }, "refundAmount": { "type": "number" }, "createdAt": { "type": "string", "format": "date-time" } } },
       "CategoryNode": { "type": "object", "required": ["id", "name", "children"], "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "parentId": { "type": "string", "format": "uuid", "nullable": true }, "children": { "type": "array", "items": { "$ref": "#/components/schemas/CategoryNode" } } } },
       "Promotion": {
         "type": "object", "properties": {
