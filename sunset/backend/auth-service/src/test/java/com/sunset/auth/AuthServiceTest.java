@@ -46,8 +46,9 @@ class AuthServiceTest {
 
     @Test void rejectsDuplicateEmail() {
         when(repository.existsByEmail("client@example.com")).thenReturn(true);
-        assertThrows(RuntimeException.class,
+        var error = assertThrows(IllegalArgumentException.class,
                 () -> service.registerUser(new RegisterRequest("client@example.com", "secret123", "Иван", "Иванов")));
+        assertEquals("Этот email уже используется", error.getMessage());
         verify(repository, never()).save(any());
     }
 

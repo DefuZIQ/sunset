@@ -64,7 +64,8 @@ class AuthPostgresIntegrationTest {
         var login = service.loginUser(new LoginRequest("client@sunset.test", "initial-pass-123"));
         assertThat(jwt.extractUserId(login.getToken())).isEqualTo(userId);
         assertThatThrownBy(() -> service.registerUser(new RegisterRequest("client@sunset.test", "another-pass", "Иван", "Соколов")))
-                .hasMessageContaining("Email already in use");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Этот email уже используется");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class)).isEqualTo(1);
     }
 

@@ -71,4 +71,4 @@ bash scripts/test-commerce-e2e.sh
 
 ## Текущее количество
 
-Обычный backend-прогон: 56 тестов, включая 8 PostgreSQL/Testcontainers-сценариев и 8 HTTP-контрактных сценариев Gateway. Отдельно: 1 HTTP E2E с реальными сервисами. Frontend Vitest: 9 тестов. Playwright: 14 сценариев. Итого: 80 автотестов; дополнительно production smoke содержит 10 безопасных проверок.
+Обычный backend-прогон: 58 тестов, включая 8 PostgreSQL/Testcontainers-сценариев и 8 HTTP-контрактных сценариев Gateway. Отдельно: 1 HTTP E2E с реальными сервисами. Frontend Vitest: 9 тестов. Playwright: 14 сценариев. Итого: 82 автотеста; дополнительно production smoke содержит 10 безопасных проверок.
