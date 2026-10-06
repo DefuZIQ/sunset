@@ -7,7 +7,8 @@
   },
   "servers": [{ "url": "/api/v1", "description": "Версионированный путь через Caddy и Gateway" }],
   "tags": [
-    { "name": "Auth" }, { "name": "Products" }, { "name": "Orders" }, { "name": "Promotions" }
+    { "name": "Auth" }, { "name": "Products" }, { "name": "Orders" }, { "name": "Promotions" },
+    { "name": "Reviews" }, { "name": "Notifications" }, { "name": "Subscriptions" }
   ],
   "paths": {
     "/auth/register": {
@@ -65,6 +66,21 @@
         "responses": { "200": { "description": "Дерево категорий", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "additionalProperties": true } } } } } }
       }
     },
+    "/products/reviews/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Reviews"], "operationId": "listProductReviews", "summary": "Отзывы о товаре",
+        "responses": { "200": { "description": "Отзывы", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ProductReview" } } } } } }
+      }
+    },
+    "/products/review/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "post": {
+        "tags": ["Reviews"], "operationId": "saveProductReview", "summary": "Создать или обновить свой отзыв", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SaveReviewRequest" } } } },
+        "responses": { "200": { "description": "Сохранённый отзыв", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductReview" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
     "/order": {
       "post": {
         "tags": ["Orders"], "operationId": "createOrder", "summary": "Оформить заказ", "security": [{ "bearerAuth": [] }],
@@ -114,11 +130,70 @@
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ValidatePromoRequest" } } } },
         "responses": { "200": { "description": "Данные применимого промокода", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
+    },
+    "/order/loyalty": {
+      "get": {
+        "tags": ["Orders"], "operationId": "getLoyaltyAccount", "summary": "Баланс и история бонусов", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Программа лояльности клиента", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoyaltyAccount" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/delivery/quote": {
+      "post": {
+        "tags": ["Orders"], "operationId": "quoteDelivery", "summary": "Рассчитать получение", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeliveryQuoteRequest" } } } },
+        "responses": { "200": { "description": "Стоимость и срок; сейчас используется заглушка доставки", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeliveryQuote" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/stores": {
+      "get": {
+        "tags": ["Orders"], "operationId": "listPickupStores", "summary": "Доступные магазины для самовывоза", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Активные магазины", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PickupStore" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": ["Notifications"], "operationId": "listNotifications", "summary": "Уведомления клиента", "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 30 } }],
+        "responses": { "200": { "description": "Последние уведомления", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Notification" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "tags": ["Notifications"], "operationId": "countUnreadNotifications", "summary": "Число непрочитанных уведомлений", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Число непрочитанных", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UnreadNotificationCount" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/notifications/{id}/read": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "patch": {
+        "tags": ["Notifications"], "operationId": "markNotificationRead", "summary": "Пометить своё уведомление прочитанным", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Уведомление прочитано", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MarkNotificationReadResult" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/subscriptions": {
+      "post": {
+        "tags": ["Subscriptions"], "operationId": "subscribeNewsletter", "summary": "Подписаться на новости; вход необязателен",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscribeRequest" } } } },
+        "responses": { "200": { "description": "Подписка активна", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionStatus" } } } }, "400": { "$ref": "#/components/responses/BadRequest" } }
+      },
+      "delete": {
+        "tags": ["Subscriptions"], "operationId": "unsubscribeNewsletter", "summary": "Отписаться от новостей", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Подписка отключена", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionStatus" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/subscriptions/status": {
+      "get": {
+        "tags": ["Subscriptions"], "operationId": "getSubscriptionStatus", "summary": "Статус подписки клиента", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Текущий статус", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionStatus" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
     }
   },
   "components": {
     "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" } },
-    "parameters": { "OrderId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } },
+    "parameters": {
+      "OrderId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "ResourceId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
     "responses": {
       "Unauthorized": {
         "description": "Нет токена, JWT неверен или указаны неверные учётные данные",
@@ -256,7 +331,19 @@
           "minOrder": { "type": "number" }, "birthdayOnly": { "type": "boolean" }, "validUntil": { "type": "string", "format": "date-time", "nullable": true }
         }
       },
-      "ValidatePromoRequest": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "subtotal": { "type": "number" } } }
+      "ValidatePromoRequest": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "subtotal": { "type": "number" } } },
+      "SaveReviewRequest": { "type": "object", "required": ["rating", "body"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5 }, "qualityRating": { "type": "integer", "minimum": 1, "maximum": 5 }, "fit": { "type": "string", "enum": ["SMALL", "AS_EXPECTED", "LARGE"] }, "photoUrl": { "type": "string", "maxLength": 1000 }, "body": { "type": "string", "minLength": 3, "maxLength": 1500 } } },
+      "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "body": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "LoyaltyAccount": { "type": "object", "properties": { "balance": { "type": "integer" }, "lifetimeEarned": { "type": "integer" }, "tier": { "type": "string" }, "updatedAt": { "type": "string", "format": "date-time" }, "birthdayToday": { "type": "boolean" }, "birthdayBenefit": { "type": "string" }, "transactions": { "type": "array", "items": { "$ref": "#/components/schemas/LoyaltyTransaction" } } } },
+      "LoyaltyTransaction": { "type": "object", "properties": { "amount": { "type": "integer" }, "type": { "type": "string" }, "description": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "DeliveryQuoteRequest": { "type": "object", "properties": { "method": { "type": "string", "enum": ["courier", "pickup"] }, "subtotal": { "type": "number" } } },
+      "DeliveryQuote": { "type": "object", "properties": { "method": { "type": "string", "enum": ["courier", "pickup"] }, "cost": { "type": "number" }, "estimatedDays": { "type": "integer" }, "provider": { "type": "string" } } },
+      "PickupStore": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "city": { "type": "string" }, "address": { "type": "string" }, "phone": { "type": "string", "nullable": true }, "hours": { "type": "string", "nullable": true }, "latitude": { "type": "number", "nullable": true }, "longitude": { "type": "number", "nullable": true }, "active": { "type": "boolean" } } },
+      "Notification": { "type": "object", "required": ["id", "type", "title", "message", "read", "createdAt"], "properties": { "id": { "type": "string", "format": "uuid" }, "recipientUuid": { "type": "string" }, "type": { "type": "string" }, "title": { "type": "string" }, "message": { "type": "string" }, "read": { "type": "boolean" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "UnreadNotificationCount": { "type": "object", "required": ["count"], "properties": { "count": { "type": "integer" } } },
+      "MarkNotificationReadResult": { "type": "object", "required": ["read"], "properties": { "read": { "type": "boolean" } } },
+      "SubscribeRequest": { "type": "object", "required": ["email"], "properties": { "email": { "type": "string", "format": "email" } } },
+      "SubscriptionStatus": { "type": "object", "required": ["active"], "properties": { "active": { "type": "boolean" }, "email": { "type": "string", "format": "email" } } }
     }
   }
 }

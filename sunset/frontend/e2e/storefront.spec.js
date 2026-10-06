@@ -41,6 +41,23 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.clear());
 });
 
+test('guest newsletter signup uses the versioned API and shows confirmation', async ({ page }) => {
+  let submitted = false;
+  await page.route('**/api/v1/subscriptions', async (route) => {
+    submitted = true;
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers().authorization).toBeUndefined();
+    expect(route.request().postDataJSON()).toEqual({ email: 'guest@sunset.test' });
+    await route.fulfill({ json: { active: true, email: 'guest@sunset.test' } });
+  });
+
+  await page.goto('/#/');
+  await page.getByPlaceholder('Ваш e-mail').fill('guest@sunset.test');
+  await page.getByRole('button', { name: 'Подписаться' }).click();
+  await expect(page.getByText('Готово! Скидка и новости уже ваши.')).toBeVisible();
+  expect(submitted).toBe(true);
+});
+
 test('opens the catalog and filters products by audience', async ({ page }) => {
   await page.goto('/#/catalog');
   await expect(page).toHaveTitle(/SUNSET/);

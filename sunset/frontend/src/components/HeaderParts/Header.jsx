@@ -5,6 +5,7 @@ import LikesButton from "./LikesButton";
 import BasketButton from "./BasketButton";
 import AvatarMenu from "./AvatarMenu";
 import BrandLogo from "../BrandLogo";
+import { countUnreadNotifications } from "../../api/client";
 import "./Header.css";
 
 export default function Header({ isAuthenticated, user, onLogout, isPopupOpen }) {
@@ -34,8 +35,8 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
 
   useEffect(() => {
     if (!user) { setUnreadNotifications(0); return; }
-    fetch("/notifications/unread-count", { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
-      .then((response) => response.ok ? response.json() : { count: 0 }).then((data) => setUnreadNotifications(data.count || 0)).catch(() => {});
+    countUnreadNotifications(localStorage.getItem("authToken"))
+      .then((data) => setUnreadNotifications(data.count || 0)).catch(() => {});
   }, [user]);
 
   const toggleMobileMenu = () => {

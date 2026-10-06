@@ -63,6 +63,12 @@ class GatewayHttpContractTest {
         registry.add("spring.cloud.gateway.routes[1].id", () -> "order-test");
         registry.add("spring.cloud.gateway.routes[1].uri", () -> "http://localhost:" + DOWNSTREAM.port());
         registry.add("spring.cloud.gateway.routes[1].predicates[0]", () -> "Path=/order/**");
+        registry.add("spring.cloud.gateway.routes[2].id", () -> "notifications-test");
+        registry.add("spring.cloud.gateway.routes[2].uri", () -> "http://localhost:" + DOWNSTREAM.port());
+        registry.add("spring.cloud.gateway.routes[2].predicates[0]", () -> "Path=/notifications/**");
+        registry.add("spring.cloud.gateway.routes[3].id", () -> "subscriptions-test");
+        registry.add("spring.cloud.gateway.routes[3].uri", () -> "http://localhost:" + DOWNSTREAM.port());
+        registry.add("spring.cloud.gateway.routes[3].predicates[0]", () -> "Path=/subscriptions/**");
     }
 
     @AfterAll
@@ -107,6 +113,39 @@ class GatewayHttpContractTest {
         assertThat(FORWARDED.get().path()).isEqualTo("/auth/register");
         assertThat(FORWARDED.get().userId()).isNull();
         assertThat(FORWARDED.get().body()).contains("versioned@sunset.test");
+    }
+
+    @Test
+    void versionedNewsletterSignupIsPublicWithoutForwardingForgedIdentity() {
+        client.post().uri("/api/v1/subscriptions")
+                .header("user-id", "forged-admin")
+                .bodyValue("{\"email\":\"guest@sunset.test\"}")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().path()).isEqualTo("/subscriptions");
+        assertThat(FORWARDED.get().userId()).isNull();
+        assertThat(FORWARDED.get().body()).contains("guest@sunset.test");
+    }
+
+    @Test
+    void versionedNotificationsRequireJwtAndForwardTrustedIdentity() {
+        client.get().uri("/api/v1/notifications?limit=50")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectBody().jsonPath("$.code").isEqualTo("UNAUTHORIZED");
+        assertThat(REQUEST_COUNT.get()).isZero();
+
+        client.get().uri("/api/v1/notifications?limit=50")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header("user-id", "forged-admin")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().path()).isEqualTo("/notifications?limit=50");
+        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
     }
 
     @Test

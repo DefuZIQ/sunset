@@ -13,11 +13,15 @@ $controllerSources = @{
     '/auth' = 'backend/auth-service/src/main/java/com/sunset/auth/controller/AuthController.java'
     '/products' = 'backend/product-service/src/main/java/com/sunset/product/controller/ProductController.java'
     '/order' = 'backend/order-service/src/main/java/com/sunset/product/controller/OrderController.java'
+    '/order/stores' = 'backend/order-service/src/main/java/com/sunset/product/controller/StoreController.java'
+    '/notifications' = 'backend/notification-service/src/main/java/com/sunset/notification/NotificationController.java'
+    '/subscriptions' = 'backend/notification-service/src/main/java/com/sunset/notification/NewsletterController.java'
 }
 $publicRoutes = @(
     'POST /auth/register', 'POST /auth/login',
     'GET /products/all', 'POST /products/by-uuid',
-    'GET /products/categories/tree', 'GET /order/promotions'
+    'GET /products/categories/tree', 'GET /products/reviews/{id}',
+    'GET /order/promotions', 'POST /subscriptions'
 )
 $operationIds = [System.Collections.Generic.HashSet[string]]::new()
 $count = 0
@@ -52,7 +56,9 @@ foreach ($routePath in $spec.paths.Keys) {
             throw "Protected operation lacks Bearer security: $key"
         }
         if ($routePath -match '\{id\}' -and
-            -not (@($spec.paths[$routePath].parameters | Where-Object { $_['$ref'] -eq '#/components/parameters/OrderId' }).Count)) {
+            -not (@($spec.paths[$routePath].parameters | Where-Object {
+                $_['$ref'] -in @('#/components/parameters/OrderId', '#/components/parameters/ResourceId')
+            }).Count)) {
             throw "Missing path parameter: $key"
         }
         $count++
@@ -84,5 +90,5 @@ function Assert-References($value) {
     }
 }
 Assert-References $spec
-if ($count -lt 15) { throw "Too few documented operations: $count" }
+if ($count -lt 26) { throw "Too few documented operations: $count" }
 Write-Host "PASS OpenAPI: $count operations, unique IDs, controller mappings, access rules and references"

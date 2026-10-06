@@ -124,6 +124,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/reviews/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /** Отзывы о товаре */
+        get: operations["listProductReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/review/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Создать или обновить свой отзыв */
+        post: operations["saveProductReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/order": {
         parameters: {
             query?: never;
@@ -228,6 +266,145 @@ export interface paths {
         put?: never;
         /** Проверить промокод */
         post: operations["validatePromo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/order/loyalty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Баланс и история бонусов */
+        get: operations["getLoyaltyAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/order/delivery/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Рассчитать получение */
+        post: operations["quoteDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/order/stores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Доступные магазины для самовывоза */
+        get: operations["listPickupStores"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Уведомления клиента */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Число непрочитанных уведомлений */
+        get: operations["countUnreadNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Пометить своё уведомление прочитанным */
+        patch: operations["markNotificationRead"];
+        trace?: never;
+    };
+    "/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Подписаться на новости; вход необязателен */
+        post: operations["subscribeNewsletter"];
+        /** Отписаться от новостей */
+        delete: operations["unsubscribeNewsletter"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/subscriptions/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Статус подписки клиента */
+        get: operations["getSubscriptionStatus"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -446,6 +623,96 @@ export interface components {
             code: string;
             subtotal?: number;
         };
+        SaveReviewRequest: {
+            rating: number;
+            qualityRating?: number;
+            /** @enum {string} */
+            fit?: "SMALL" | "AS_EXPECTED" | "LARGE";
+            photoUrl?: string;
+            body: string;
+        };
+        ProductReview: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            userId?: string;
+            authorName?: string;
+            rating?: number;
+            qualityRating?: number;
+            fit?: string;
+            photoUrl?: string | null;
+            verifiedPurchase?: boolean;
+            body?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        LoyaltyAccount: {
+            balance?: number;
+            lifetimeEarned?: number;
+            tier?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            birthdayToday?: boolean;
+            birthdayBenefit?: string;
+            transactions?: components["schemas"]["LoyaltyTransaction"][];
+        };
+        LoyaltyTransaction: {
+            amount?: number;
+            type?: string;
+            description?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        DeliveryQuoteRequest: {
+            /** @enum {string} */
+            method?: "courier" | "pickup";
+            subtotal?: number;
+        };
+        DeliveryQuote: {
+            /** @enum {string} */
+            method?: "courier" | "pickup";
+            cost?: number;
+            estimatedDays?: number;
+            provider?: string;
+        };
+        PickupStore: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            city?: string;
+            address?: string;
+            phone?: string | null;
+            hours?: string | null;
+            latitude?: number | null;
+            longitude?: number | null;
+            active?: boolean;
+        };
+        Notification: {
+            /** Format: uuid */
+            id: string;
+            recipientUuid?: string;
+            type: string;
+            title: string;
+            message: string;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        UnreadNotificationCount: {
+            count: number;
+        };
+        MarkNotificationReadResult: {
+            read: boolean;
+        };
+        SubscribeRequest: {
+            /** Format: email */
+            email: string;
+        };
+        SubscriptionStatus: {
+            active: boolean;
+            /** Format: email */
+            email?: string;
+        };
     };
     responses: {
         /** @description Нет токена, JWT неверен или указаны неверные учётные данные */
@@ -480,6 +747,7 @@ export interface components {
     };
     parameters: {
         OrderId: string;
+        ResourceId: string;
     };
     requestBodies: never;
     headers: never;
@@ -678,6 +946,56 @@ export interface operations {
             };
         };
     };
+    listProductReviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Отзывы */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductReview"][];
+                };
+            };
+        };
+    };
+    saveProductReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Сохранённый отзыв */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductReview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     createOrder: {
         parameters: {
             query?: never;
@@ -840,6 +1158,208 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getLoyaltyAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Программа лояльности клиента */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoyaltyAccount"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    quoteDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryQuoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Стоимость и срок; сейчас используется заглушка доставки */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryQuote"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listPickupStores: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Активные магазины */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickupStore"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Последние уведомления */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    countUnreadNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Число непрочитанных */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadNotificationCount"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    markNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Уведомление прочитано */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkNotificationReadResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    subscribeNewsletter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscribeRequest"];
+            };
+        };
+        responses: {
+            /** @description Подписка активна */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    unsubscribeNewsletter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Подписка отключена */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getSubscriptionStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Текущий статус */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionStatus"];
                 };
             };
             401: components["responses"]["Unauthorized"];
