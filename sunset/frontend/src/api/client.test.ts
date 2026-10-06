@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { countUnreadNotifications, getProductById, getSubscriptionStatus, listNotifications,
-  listProducts, markNotificationRead, subscribeNewsletter, unsubscribeNewsletter } from "./client";
+import { countUnreadNotifications, getCategoryTree, getLoyaltyAccount, getProductById,
+  getSubscriptionStatus, listNotifications, listProductReviews, listProducts, listPromotions,
+  markNotificationRead, quoteDelivery, saveProductReview, subscribeNewsletter, unsubscribeNewsletter } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -83,5 +84,52 @@ test("subscription status and unsubscribe use authenticated paths", async () => 
   });
   expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/subscriptions", {
     method: "DELETE", headers: { Authorization: "Bearer jwt" },
+  });
+});
+
+test("category tree and promotions use public versioned paths", async () => {
+  const tree = [{ id: "category-1", name: "Одежда", parentId: null, children: [] }];
+  const promotions = [{ id: "promotion-1", title: "Осень", code: "AUTUMN" }];
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => tree })
+    .mockResolvedValueOnce({ ok: true, json: async () => promotions });
+  vi.stubGlobal("fetch", fetchMock);
+  const controller = new AbortController();
+
+  await expect(getCategoryTree(controller.signal)).resolves.toEqual(tree);
+  await expect(listPromotions()).resolves.toEqual(promotions);
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/products/categories/tree", { signal: controller.signal });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/order/promotions");
+});
+
+test("reviews use a public list and a protected write with encoded product ID", async () => {
+  const reviews = [{ id: "review-1", rating: 5, body: "Отлично" }];
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => reviews })
+    .mockResolvedValueOnce({ ok: true, json: async () => reviews[0] });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await expect(listProductReviews("product/1")).resolves.toEqual(reviews);
+  await expect(saveProductReview("jwt", "product/1", { rating: 5, body: "Отлично" })).resolves.toEqual(reviews[0]);
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/products/reviews/product%2F1");
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/products/review/product%2F1", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
+    body: JSON.stringify({ rating: 5, body: "Отлично" }),
+  });
+});
+
+test("loyalty and delivery quote use protected versioned routes", async () => {
+  const loyalty = { balance: 100 };
+  const quote = { method: "pickup", cost: 0, estimatedDays: 1 };
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => loyalty })
+    .mockResolvedValueOnce({ ok: true, json: async () => quote });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await expect(getLoyaltyAccount("jwt")).resolves.toEqual(loyalty);
+  await expect(quoteDelivery("jwt", { method: "pickup", subtotal: 2500 })).resolves.toEqual(quote);
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/order/loyalty", {
+    headers: { Authorization: "Bearer jwt" },
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/order/delivery/quote", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
+    body: JSON.stringify({ method: "pickup", subtotal: 2500 }),
   });
 });

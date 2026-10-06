@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../components/HeaderParts/CartContext";
+import { getLoyaltyAccount, quoteDelivery } from "../api/client";
 import "./ContentPages.css";
 
 const stores = [
@@ -78,10 +79,7 @@ export default function Cart({ user }) {
 
   useEffect(() => {
     if (!user) return;
-    fetch("/order/loyalty", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-    })
-      .then((r) => (r.ok ? r.json() : null))
+    getLoyaltyAccount(localStorage.getItem("authToken"))
       .then(setLoyalty)
       .catch(() => {});
   }, [user]);
@@ -91,12 +89,7 @@ export default function Cart({ user }) {
   }, [user?.phone]);
   useEffect(() => {
     if (!user) return;
-    fetch("/order/delivery/quote", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      body: JSON.stringify({ method: deliveryMode === "pickup" ? "pickup" : "courier", subtotal }),
-    })
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("quote")))
+    quoteDelivery(localStorage.getItem("authToken"), { method: deliveryMode === "pickup" ? "pickup" : "courier", subtotal })
       .then(setDeliveryQuote)
       .catch(() => setDeliveryQuote({ cost: deliveryMode === "pickup" || subtotal >= 7000 ? 0 : 390, estimatedDays: deliveryMode === "pickup" ? 1 : 3 }));
   }, [deliveryMode, subtotal, user]);

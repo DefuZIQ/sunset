@@ -63,7 +63,7 @@
     "/products/categories/tree": {
       "get": {
         "tags": ["Products"], "operationId": "getCategoryTree", "summary": "Дерево категорий",
-        "responses": { "200": { "description": "Дерево категорий", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object", "additionalProperties": true } } } } } }
+        "responses": { "200": { "description": "Дерево категорий", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CategoryNode" } } } } } }
       }
     },
     "/products/reviews/{id}": {
@@ -324,6 +324,7 @@
           "deliveryMethod": { "type": "string", "enum": ["courier", "pickup"] }
         }
       },
+      "CategoryNode": { "type": "object", "required": ["id", "name", "children"], "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "parentId": { "type": "string", "format": "uuid", "nullable": true }, "children": { "type": "array", "items": { "$ref": "#/components/schemas/CategoryNode" } } } },
       "Promotion": {
         "type": "object", "properties": {
           "id": { "type": "string", "format": "uuid" }, "code": { "type": "string" }, "title": { "type": "string" },

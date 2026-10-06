@@ -606,6 +606,14 @@ export interface components {
             /** @enum {string} */
             deliveryMethod?: "courier" | "pickup";
         };
+        CategoryNode: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            parentId?: string | null;
+            children: components["schemas"]["CategoryNode"][];
+        };
         Promotion: {
             /** Format: uuid */
             id?: string;
@@ -939,9 +947,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["CategoryNode"][];
                 };
             };
         };

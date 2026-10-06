@@ -4,7 +4,7 @@ import { useCart } from "../components/HeaderParts/CartContext";
 import "../App.css"; // Для .container
 import "../components/Main/ProductCard.css"; // Переиспользуем стили
 import "./ProductPage.css"; // Подключаем стили для страницы товара
-import { ApiHttpError, getProductById } from "../api/client";
+import { ApiHttpError, getProductById, listProductReviews, saveProductReview } from "../api/client";
 
 export default function ProductPage() {
   const { id } = useParams();
@@ -53,15 +53,17 @@ export default function ProductPage() {
       });
   }, [id, requestedColorId, requestedSizeId]);
 
-  const loadReviews = useCallback(() => fetch(`/products/reviews/${id}`).then((response) => response.ok ? response.json() : []).then(setReviews).catch(() => setReviews([])), [id]);
+  const loadReviews = useCallback(() => listProductReviews(id).then(setReviews).catch(() => setReviews([])), [id]);
   useEffect(() => { if (id) loadReviews(); }, [id, loadReviews]);
 
   const submitReview = async (event) => {
     event.preventDefault();
-    const response = await fetch(`/products/review/${id}`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify(review) });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) { setReviewMessage(response.status === 401 ? "Сначала войдите в аккаунт" : data.message || "Не удалось сохранить отзыв"); return; }
-    setReview({ rating: 5, qualityRating: 5, fit: "AS_EXPECTED", photoUrl: "", body: "" }); setReviewMessage("Спасибо! Отзыв опубликован."); loadReviews();
+    try {
+      await saveProductReview(localStorage.getItem("authToken"), id, review);
+      setReview({ rating: 5, qualityRating: 5, fit: "AS_EXPECTED", photoUrl: "", body: "" }); setReviewMessage("Спасибо! Отзыв опубликован."); loadReviews();
+    } catch (error) {
+      setReviewMessage(error instanceof ApiHttpError && error.status === 401 ? "Сначала войдите в аккаунт" : error.message || "Не удалось сохранить отзыв");
+    }
   };
 
   // Обновляем доступное количество при изменении выбора цвета или размера

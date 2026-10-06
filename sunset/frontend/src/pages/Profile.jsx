@@ -4,7 +4,7 @@ import { useCart } from "../components/HeaderParts/CartContext";
 import ProductCard from "../components/Main/ProductCard";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStore } from "../contexts/StoreContext";
-import { getSubscriptionStatus, listNotifications, markNotificationRead as markNotificationReadRequest, unsubscribeNewsletter } from "../api/client";
+import { getLoyaltyAccount, getSubscriptionStatus, listNotifications, markNotificationRead as markNotificationReadRequest, unsubscribeNewsletter } from "../api/client";
 import "./ContentPages.css";
 import "./Profile.css";
 
@@ -46,11 +46,11 @@ export default function Profile({ user, setUser, section = "overview" }) {
   useEffect(() => {
     if (!user) return;
     const headers = { Authorization: `Bearer ${localStorage.getItem("authToken")}` };
-    Promise.all([fetch("/order/my", { headers }), fetch("/order/loyalty", { headers })])
-      .then(async ([ordersResponse, loyaltyResponse]) => {
-        if (ordersResponse.ok) setOrders(await ordersResponse.json());
-        if (loyaltyResponse.ok) setLoyalty(await loyaltyResponse.json());
-      }).catch(() => {});
+    fetch("/order/my", { headers })
+      .then((response) => response.ok ? response.json() : [])
+      .then(setOrders).catch(() => {});
+    getLoyaltyAccount(localStorage.getItem("authToken"))
+      .then(setLoyalty).catch(() => {});
   }, [user]);
 
   useEffect(() => {

@@ -58,6 +58,31 @@ test('guest newsletter signup uses the versioned API and shows confirmation', as
   expect(submitted).toBe(true);
 });
 
+test('promotions page loads the versioned public API', async ({ page }) => {
+  let requested = false;
+  await page.route('**/api/v1/order/promotions', async (route) => {
+    requested = true;
+    await route.fulfill({ json: [{ id: 'promotion-1', code: 'FALL10', title: 'Осенняя скидка', description: 'На любимые вещи', discountPercent: 10, bonusMultiplier: 1, minOrder: 0 }] });
+  });
+
+  await page.goto('/#/promotions');
+  await expect(page.getByRole('heading', { name: 'Осенняя скидка' })).toBeVisible();
+  expect(requested).toBe(true);
+});
+
+test('product page loads reviews from the versioned public API', async ({ page }) => {
+  let requested = false;
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', async (route) => {
+    requested = true;
+    await route.fulfill({ json: [{ id: 'review-1', authorName: 'Анна', rating: 5, qualityRating: 5, fit: 'AS_EXPECTED', body: 'Прекрасная рубашка', verifiedPurchase: true, createdAt: '2026-10-06T00:00:00Z' }] });
+  });
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await expect(page.getByText('Прекрасная рубашка')).toBeVisible();
+  expect(requested).toBe(true);
+});
+
 test('opens the catalog and filters products by audience', async ({ page }) => {
   await page.goto('/#/catalog');
   await expect(page).toHaveTitle(/SUNSET/);

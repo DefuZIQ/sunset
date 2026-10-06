@@ -1,11 +1,18 @@
 import type { components, paths } from "./generated";
 
 export type Product = components["schemas"]["Product"];
+export type CategoryNode = components["schemas"]["CategoryNode"];
+export type Promotion = components["schemas"]["Promotion"];
+export type ProductReview = components["schemas"]["ProductReview"];
+export type LoyaltyAccount = components["schemas"]["LoyaltyAccount"];
+export type DeliveryQuote = components["schemas"]["DeliveryQuote"];
 export type Notification = components["schemas"]["Notification"];
 export type SubscriptionStatus = components["schemas"]["SubscriptionStatus"];
 export type UnreadNotificationCount = components["schemas"]["UnreadNotificationCount"];
 type ProductUuidRequest = paths["/products/by-uuid"]["post"]["requestBody"]["content"]["application/json"];
 type SubscribeRequest = paths["/subscriptions"]["post"]["requestBody"]["content"]["application/json"];
+type SaveReviewRequest = paths["/products/review/{id}"]["post"]["requestBody"]["content"]["application/json"];
+type DeliveryQuoteRequest = paths["/order/delivery/quote"]["post"]["requestBody"]["content"]["application/json"];
 
 export class ApiHttpError extends Error {
   constructor(public readonly status: number, message?: string) {
@@ -45,6 +52,38 @@ export async function getProductById(id: string): Promise<Product> {
     body: JSON.stringify(body),
   });
   return readJson<Product>(response);
+}
+
+export async function getCategoryTree(signal?: AbortSignal): Promise<CategoryNode[]> {
+  return readJson<CategoryNode[]>(await fetch("/api/v1/products/categories/tree", { signal }));
+}
+
+export async function listPromotions(): Promise<Promotion[]> {
+  return readJson<Promotion[]>(await fetch("/api/v1/order/promotions"));
+}
+
+export async function listProductReviews(id: string): Promise<ProductReview[]> {
+  return readJson<ProductReview[]>(await fetch(`/api/v1/products/reviews/${encodeURIComponent(id)}`));
+}
+
+export async function saveProductReview(token: string, id: string, review: SaveReviewRequest): Promise<ProductReview> {
+  return readJson<ProductReview>(await fetch(`/api/v1/products/review/${encodeURIComponent(id)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...bearer(token) },
+    body: JSON.stringify(review),
+  }));
+}
+
+export async function getLoyaltyAccount(token: string): Promise<LoyaltyAccount> {
+  return readJson<LoyaltyAccount>(await fetch("/api/v1/order/loyalty", { headers: bearer(token) }));
+}
+
+export async function quoteDelivery(token: string, quote: DeliveryQuoteRequest): Promise<DeliveryQuote> {
+  return readJson<DeliveryQuote>(await fetch("/api/v1/order/delivery/quote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...bearer(token) },
+    body: JSON.stringify(quote),
+  }));
 }
 
 export async function listNotifications(token: string, limit = 30): Promise<Notification[]> {

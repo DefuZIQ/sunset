@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { products as fallbackProducts } from "../data/products";
-import { listProducts } from "../api/client";
+import { getCategoryTree, listProducts } from "../api/client";
 
 const StoreContext = createContext(null);
 
@@ -41,10 +41,11 @@ export function StoreProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    fetch("/products/categories/tree")
-      .then((response) => response.ok ? response.json() : [])
+    const controller = new AbortController();
+    getCategoryTree(controller.signal)
       .then((data) => setCategoryTree(Array.isArray(data) ? data : []))
-      .catch(() => setCategoryTree([]));
+      .catch((error) => { if (error.name !== "AbortError") setCategoryTree([]); });
+    return () => controller.abort();
   }, []);
 
   const value = useMemo(() => ({ products, loading, categoryTree }), [products, loading, categoryTree]);
