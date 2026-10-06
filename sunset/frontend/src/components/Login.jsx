@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { loginCustomer } from "../api/client";
 import "./Auth.css";
 
 export default function Login({ setUser }) {
@@ -12,18 +13,8 @@ export default function Login({ setUser }) {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    fetch("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(errorText || "Ошибка при входе");
-        }
-        return res.json();
-      })
+    setError(null);
+    loginCustomer({ email, password })
       .then((data) => {
         const { uuid, email, firstName, lastName, phone, birthday, avatar, role, token } = data;
 
@@ -48,8 +39,7 @@ export default function Login({ setUser }) {
         navigate("/");
       })
       .catch((err) => {
-        console.error("Ошибка авторизации:", err);
-        setError(err.message);
+        setError(err.message || "Ошибка при входе");
       });
   };
 

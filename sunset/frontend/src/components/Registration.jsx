@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { loginCustomer, registerCustomer } from "../api/client";
 import "./Auth.css";
 
 export default function Registration({ setUser }) {
@@ -12,23 +13,16 @@ export default function Registration({ setUser }) {
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [alreadySignedIn] = useState(() => Boolean(localStorage.getItem("authToken")));
+
+  useEffect(() => {
+    if (alreadySignedIn) navigate("/", { replace: true });
+  }, [alreadySignedIn, navigate]);
 
   const handleLogin = async (email, password) => {
     try {
-      const response = await fetch("/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(data.message || "Ошибка при входе после регистрации");
-        return false;
-      }
-
-      const data = await response.json();
+      const data = await loginCustomer({ email, password });
+      if (!data.token || !data.uuid) throw new Error("Ответ от сервера некорректен");
       const user = {
         uuid: data.uuid,
         email: data.email,
@@ -43,10 +37,10 @@ export default function Registration({ setUser }) {
       localStorage.setItem("user", JSON.stringify(user));
       setUser(user);
       setSuccess("Регистрация и вход прошли успешно!");
-      navigate("/profile");
+      navigate("/profile", { replace: true });
       return true;
-    } catch {
-      setError("Ошибка сети при входе после регистрации");
+    } catch (error) {
+      setError(error.message || "Ошибка при входе после регистрации");
       return false;
     }
   };
@@ -71,25 +65,7 @@ export default function Registration({ setUser }) {
     };
 
     try {
-      const response = await fetch("/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const contentType = response.headers.get("Content-Type");
-        if (contentType && contentType.includes("application/json")) {
-          const data = await response.json();
-          setError(data.message || "Ошибка при регистрации");
-        } else {
-          const text = await response.text();
-          setError("Ошибка сервера: " + text);
-        }
-        setLoading(false);
-        return;
-      }
+      await registerCustomer(payload);
 
       // После успешной регистрации пробуем сразу войти
       const loginSuccess = await handleLogin(email, password);
@@ -103,7 +79,7 @@ export default function Registration({ setUser }) {
       }
 
     } catch (err) {
-      setError("Ошибка сети или сервера");
+      setError(err.message || "Ошибка сети или сервера");
     } finally {
       setLoading(false);
     }

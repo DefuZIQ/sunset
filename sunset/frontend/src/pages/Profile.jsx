@@ -4,7 +4,7 @@ import { useCart } from "../components/HeaderParts/CartContext";
 import ProductCard from "../components/Main/ProductCard";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStore } from "../contexts/StoreContext";
-import { getLoyaltyAccount, getSubscriptionStatus, listMyOrders, listNotifications, markNotificationRead as markNotificationReadRequest, unsubscribeNewsletter } from "../api/client";
+import { changePassword as changePasswordRequest, getLoyaltyAccount, getSubscriptionStatus, listMyOrders, listNotifications, markNotificationRead as markNotificationReadRequest, unsubscribeNewsletter, updateProfile } from "../api/client";
 import "./ContentPages.css";
 import "./Profile.css";
 
@@ -103,13 +103,7 @@ export default function Profile({ user, setUser, section = "overview" }) {
     event.preventDefault();
     setSaveState({ loading: true, message: "", error: "" });
     try {
-      const response = await fetch("/auth/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-        body: JSON.stringify(form),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || "Не удалось сохранить изменения");
+      const data = await updateProfile(localStorage.getItem("authToken"), form);
       const updatedUser = { ...user, ...data, uuid: data.id || user.uuid };
       localStorage.setItem("user", JSON.stringify(updatedUser));
       setUser(updatedUser);
@@ -134,13 +128,7 @@ export default function Profile({ user, setUser, section = "overview" }) {
     }
     setPasswordState({ loading: true, message: "", error: "" });
     try {
-      const response = await fetch("/auth/profile/password", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-        body: JSON.stringify({ currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.errorMessage || data.message || "Не удалось изменить пароль");
+      const data = await changePasswordRequest(localStorage.getItem("authToken"), { currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword });
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setPasswordState({ loading: false, message: data.message || "Пароль успешно изменён", error: "" });
     } catch (error) {

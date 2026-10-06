@@ -58,6 +58,114 @@ test('guest newsletter signup uses the versioned API and shows confirmation', as
   expect(submitted).toBe(true);
 });
 
+test('customer login uses the versioned API and opens the storefront', async ({ page }) => {
+  let submitted = false;
+  await page.route('**/api/v1/auth/login', async (route) => {
+    submitted = true;
+    expect(route.request().postDataJSON()).toEqual({ email: 'anna@example.test', password: 'correct-password' });
+    await route.fulfill({ json: {
+      uuid: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test',
+      firstName: 'Анна', lastName: 'Тестовая', role: 'USER', token: 'e2e-token',
+    } });
+  });
+
+  await page.goto('/#/login');
+  await page.getByPlaceholder('Email').fill('anna@example.test');
+  await page.getByPlaceholder('Пароль').fill('correct-password');
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  await expect(page).toHaveURL(/#\/$/);
+  expect(await page.evaluate(() => localStorage.getItem('authToken'))).toBe('e2e-token');
+  expect(submitted).toBe(true);
+});
+
+test('registration uses the versioned API then signs the customer in', async ({ page }) => {
+  let registered = false;
+  await page.route('**/api/v1/auth/register', async (route) => {
+    registered = true;
+    expect(route.request().postDataJSON()).toMatchObject({ email: 'new@example.test', firstName: 'Нина', lastName: 'Тестовая' });
+    await route.fulfill({ json: { uuid: '55555555-5555-5555-5555-555555555555', email: 'new@example.test', role: 'USER', token: null } });
+  });
+  await page.route('**/api/v1/auth/login', (route) => route.fulfill({ json: {
+    uuid: '55555555-5555-5555-5555-555555555555', email: 'new@example.test',
+    firstName: 'Нина', lastName: 'Тестовая', role: 'USER', token: 'new-token',
+  } }));
+
+  await page.goto('/#/register');
+  await page.getByPlaceholder('Имя').fill('Нина');
+  await page.getByPlaceholder('Фамилия').fill('Тестовая');
+  await page.getByPlaceholder('Email').fill('new@example.test');
+  await page.getByPlaceholder('Пароль', { exact: true }).fill('correct-password');
+  await page.getByPlaceholder('Подтверждение пароля').fill('correct-password');
+  await page.getByRole('button', { name: 'Зарегистрироваться' }).click();
+  await expect(page).toHaveURL(/#\/profile$/);
+  expect(await page.evaluate(() => localStorage.getItem('authToken'))).toBe('new-token');
+  expect(registered).toBe(true);
+});
+
+test('signed-in customer opening registration returns to the storefront', async ({ page }) => {
+  const account = {
+    id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test',
+    firstName: 'Анна', lastName: 'Тестовая', role: 'USER',
+  };
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+
+  await page.goto('/#/register');
+  await expect(page).toHaveURL(/#\/$/);
+});
+
+test('profile settings save phone and change password via the versioned API', async ({ page }) => {
+  const account = {
+    id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test',
+    firstName: 'Анна', lastName: 'Тестовая', phone: '+79990001122', role: 'USER',
+  };
+  await page.route('**/api/v1/auth/profile', async (route) => {
+    if (route.request().method() === 'PUT') {
+      expect(route.request().headers().authorization).toBe('Bearer e2e-token');
+      expect(route.request().postDataJSON().phone).toBe('+79990003344');
+      await route.fulfill({ json: { ...account, phone: '+79990003344' } });
+    } else await route.fulfill({ json: account });
+  });
+  await page.route('**/api/v1/auth/profile/password', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ currentPassword: 'old-password', newPassword: 'new-password' });
+    await route.fulfill({ json: { message: 'Пароль успешно изменён' } });
+  });
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+
+  await page.goto('/#/profile/settings');
+  await expect(page.getByRole('heading', { name: 'Настройки профиля' })).toBeVisible();
+  await page.getByPlaceholder('+7 999 000-00-00').fill('+79990003344');
+  await page.getByRole('button', { name: 'Сохранить изменения' }).click();
+  await expect(page.getByText('Изменения сохранены')).toBeVisible();
+  const passwordInputs = page.locator('.password-form input');
+  await passwordInputs.nth(0).fill('old-password');
+  await passwordInputs.nth(1).fill('new-password');
+  await passwordInputs.nth(2).fill('new-password');
+  await page.getByRole('button', { name: 'Изменить пароль' }).click();
+  await expect(page.getByText('Пароль успешно изменён')).toBeVisible();
+});
+
+test('expired session is cleared after the versioned profile rejects it', async ({ page }) => {
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({
+    status: 401, json: { code: 'UNAUTHORIZED', message: 'Необходим вход в аккаунт' },
+  }));
+  await page.addInitScript(() => {
+    localStorage.setItem('authToken', 'expired-token');
+    localStorage.setItem('user', JSON.stringify({ uuid: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', firstName: 'Анна' }));
+  });
+
+  await page.goto('/#/profile');
+  await expect(page.getByRole('heading', { name: 'Войдите в аккаунт' })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('authToken'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('user'))).toBeNull();
+});
+
 test('promotions page loads the versioned public API', async ({ page }) => {
   let requested = false;
   await page.route('**/api/v1/order/promotions', async (route) => {

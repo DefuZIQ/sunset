@@ -18,6 +18,7 @@ import Promotions from "./pages/Promotions";
 import Admin from "./pages/Admin";
 import AssistantWidget from "./components/AssistantWidget";
 import OrderDetail from "./pages/OrderDetail";
+import { ApiHttpError, getProfile } from "./api/client";
 
 import { CartProvider } from "./components/HeaderParts/CartContext";
 import { StoreProvider } from "./contexts/StoreContext";
@@ -41,18 +42,14 @@ function App() {
         return;
       }
       setUser(cachedUser);
-      fetch("/auth/profile", { headers: { Authorization: `Bearer ${token}` } })
-        .then((response) => {
-          if (!response.ok) throw new Error(String(response.status));
-          return response.json();
-        })
+      getProfile(token)
         .then((profile) => {
           const currentUser = { ...cachedUser, ...profile, uuid: profile.id || cachedUser.uuid };
           localStorage.setItem("user", JSON.stringify(currentUser));
           setUser(currentUser);
         })
         .catch((error) => {
-          if (error.message === "403") {
+          if (error instanceof ApiHttpError && [401, 403].includes(error.status)) {
             localStorage.removeItem("authToken");
             localStorage.removeItem("user");
             setUser(null);
@@ -109,7 +106,7 @@ function App() {
               />
               <Route
                 path="/register"
-                element={user ? <Navigate to="/" replace /> : <Registration setUser={setUser} />}
+                element={<Registration setUser={setUser} />}
               />
               <Route path="/admin" element={!authReady ? null : user?.role === "ADMIN" ? <Admin /> : <Navigate to="/profile" replace />} />
               <Route path="/admin/products/new" element={<Navigate to="/admin" replace />} />

@@ -1,9 +1,10 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { cancelMyOrder, countUnreadNotifications, createOrder, createOrderReturn, getCategoryTree,
+import { cancelMyOrder, changePassword, countUnreadNotifications, createOrder, createOrderReturn, getCategoryTree,
   getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listMyOrders,
-  listNotifications, listProductReviews, listProducts, listPromotions, markNotificationRead,
-  quoteDelivery, saveProductReview, subscribeNewsletter, unsubscribeNewsletter,
-  updatePendingOrder, validatePromoCode } from "./client";
+  listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer,
+  markNotificationRead, quoteDelivery, registerCustomer, saveProductReview,
+  subscribeNewsletter, unsubscribeNewsletter, updatePendingOrder, updateProfile,
+  validatePromoCode, getProfile } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -186,4 +187,51 @@ test("promo validation and checkout send a typed body and preserve server errors
     body: JSON.stringify(request),
   });
   await expect(validatePromoCode("jwt", { code: "BAD", subtotal: 3500 })).rejects.toMatchObject({ status: 400, message: "Промокод недействителен" });
+});
+
+test("registration and login use versioned public routes without bearer tokens", async () => {
+  const registered = { uuid: "user-1", email: "client@example.test", role: "USER", token: null };
+  const loggedIn = { ...registered, token: "jwt" };
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => registered })
+    .mockResolvedValueOnce({ ok: true, json: async () => loggedIn });
+  vi.stubGlobal("fetch", fetchMock);
+
+  const registration = { email: registered.email, password: "long-password", firstName: "Анна", lastName: "Тестовая" };
+  await expect(registerCustomer(registration)).resolves.toEqual(registered);
+  await expect(loginCustomer({ email: registered.email, password: "long-password" })).resolves.toEqual(loggedIn);
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/auth/register", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(registration),
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/auth/login", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: registered.email, password: "long-password" }),
+  });
+});
+
+test("profile read and update use the bearer token and typed body", async () => {
+  const profile = { id: "user-1", email: "client@example.test", firstName: "Анна", lastName: "Тестовая", role: "USER" };
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => profile })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ...profile, phone: "+79990001122" }) });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await expect(getProfile("jwt")).resolves.toEqual(profile);
+  const changes = { email: profile.email, firstName: profile.firstName, lastName: profile.lastName, phone: "+79990001122" };
+  await expect(updateProfile("jwt", changes)).resolves.toMatchObject({ phone: changes.phone });
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/auth/profile", { headers: { Authorization: "Bearer jwt" } });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/auth/profile", {
+    method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify(changes),
+  });
+});
+
+test("password change uses a protected versioned path and returns server errors", async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ message: "Пароль успешно изменён" }) })
+    .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ message: "Неверный текущий пароль" }) });
+  vi.stubGlobal("fetch", fetchMock);
+
+  const request = { currentPassword: "old-password", newPassword: "new-password" };
+  await expect(changePassword("jwt", request)).resolves.toEqual({ message: "Пароль успешно изменён" });
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/auth/profile/password", {
+    method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify(request),
+  });
+  await expect(changePassword("jwt", request)).rejects.toMatchObject({ status: 400, message: "Неверный текущий пароль" });
 });

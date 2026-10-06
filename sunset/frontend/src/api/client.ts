@@ -9,6 +9,8 @@ export type DeliveryQuote = components["schemas"]["DeliveryQuote"];
 export type Order = components["schemas"]["Order"];
 export type OrderDetail = components["schemas"]["OrderDetail"];
 export type OrderReturn = components["schemas"]["OrderReturn"];
+export type AuthResponse = components["schemas"]["AuthResponse"];
+export type UserProfile = components["schemas"]["UserProfile"];
 export type Notification = components["schemas"]["Notification"];
 export type SubscriptionStatus = components["schemas"]["SubscriptionStatus"];
 export type UnreadNotificationCount = components["schemas"]["UnreadNotificationCount"];
@@ -20,6 +22,10 @@ type CreateOrderRequest = paths["/order"]["post"]["requestBody"]["content"]["app
 type UpdatePendingOrderRequest = paths["/order/my/{id}"]["put"]["requestBody"]["content"]["application/json"];
 type CreateReturnRequest = paths["/order/my/{id}/returns"]["post"]["requestBody"]["content"]["application/json"];
 type ValidatePromoRequest = paths["/order/promo/validate"]["post"]["requestBody"]["content"]["application/json"];
+type RegisterRequest = paths["/auth/register"]["post"]["requestBody"]["content"]["application/json"];
+type LoginRequest = paths["/auth/login"]["post"]["requestBody"]["content"]["application/json"];
+type UpdateProfileRequest = paths["/auth/profile"]["put"]["requestBody"]["content"]["application/json"];
+type ChangePasswordRequest = paths["/auth/profile/password"]["put"]["requestBody"]["content"]["application/json"];
 
 export class ApiHttpError extends Error {
   constructor(public readonly status: number, message?: string) {
@@ -43,6 +49,34 @@ async function readJson<T>(response: Response): Promise<T> {
 
 function bearer(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
+}
+
+export async function registerCustomer(request: RegisterRequest): Promise<AuthResponse> {
+  return readJson<AuthResponse>(await fetch("/api/v1/auth/register", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request),
+  }));
+}
+
+export async function loginCustomer(request: LoginRequest): Promise<AuthResponse> {
+  return readJson<AuthResponse>(await fetch("/api/v1/auth/login", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request),
+  }));
+}
+
+export async function getProfile(token: string): Promise<UserProfile> {
+  return readJson<UserProfile>(await fetch("/api/v1/auth/profile", { headers: bearer(token) }));
+}
+
+export async function updateProfile(token: string, request: UpdateProfileRequest): Promise<UserProfile> {
+  return readJson<UserProfile>(await fetch("/api/v1/auth/profile", {
+    method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
+}
+
+export async function changePassword(token: string, request: ChangePasswordRequest): Promise<components["schemas"]["Message"]> {
+  return readJson<components["schemas"]["Message"]>(await fetch("/api/v1/auth/profile/password", {
+    method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
 }
 
 /** Migrated client operations; other screens still use compatible legacy paths. */
