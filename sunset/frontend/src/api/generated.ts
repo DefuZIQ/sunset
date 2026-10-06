@@ -107,6 +107,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Добавить товар */
+        post: operations["createAdminProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/admin/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Изменить карточку товара */
+        put: operations["updateAdminProduct"];
+        post?: never;
+        /** Удалить товар */
+        delete: operations["deleteAdminProduct"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/admin/{id}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Полностью заменить остатки вариантов товара */
+        put: operations["updateAdminStock"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/by-uuid": {
         parameters: {
             query?: never;
@@ -376,6 +432,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/order/admin/orders/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Изменить статус заказа */
+        patch: operations["updateAdminOrderStatus"];
+        trace?: never;
+    };
     "/order/admin/users": {
         parameters: {
             query?: never;
@@ -393,6 +468,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/order/admin/users/{id}/bonuses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Скорректировать бонусы клиента */
+        post: operations["adjustAdminBonuses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/order/admin/promotions": {
         parameters: {
             query?: never;
@@ -403,7 +497,8 @@ export interface paths {
         /** Все промокоды */
         get: operations["listAdminPromotions"];
         put?: never;
-        post?: never;
+        /** Создать промокод */
+        post: operations["createAdminPromotion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -425,6 +520,25 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/order/admin/returns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Изменить статус возврата */
+        patch: operations["updateAdminReturnStatus"];
         trace?: never;
     };
     "/order/admin/analytics": {
@@ -655,6 +769,40 @@ export interface components {
             region?: string | null;
             description?: string | null;
         };
+        AdminProductRequest: {
+            name: string;
+            description?: string;
+            price: number;
+            /** @description Используется только при создании */
+            quantity?: number;
+            category?: string;
+            /** @enum {string} */
+            gender?: "WOMEN" | "MEN" | "UNISEX";
+            imageUrl?: string;
+        };
+        AdminProductResult: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            price: number;
+            quantity?: number;
+            imageUrl?: string;
+        };
+        AdminStockRequest: {
+            stock: {
+                /** Format: uuid */
+                sizeId: string;
+                /** Format: uuid */
+                colorId: string;
+                quantity: number;
+            }[];
+        };
+        AdminStockResult: {
+            /** Format: uuid */
+            id: string;
+            totalQuantity: number;
+            totalVariants: number;
+        };
         OrderItemRequest: {
             /** Format: uuid */
             productId: string;
@@ -774,6 +922,20 @@ export interface components {
             orderCount: number;
             orderTotal: number;
         };
+        AdminStatusRequest: {
+            /** @enum {string} */
+            status: "PENDING" | "CONFIRMED" | "ASSEMBLING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+        };
+        AdminBonusRequest: {
+            amount: number;
+            reason?: string;
+        };
+        AdminBonusResult: {
+            /** Format: uuid */
+            userId: string;
+            balance: number;
+            applied: number;
+        };
         AdminPromotion: {
             /** Format: uuid */
             id: string;
@@ -787,6 +949,21 @@ export interface components {
             min_order?: number;
             birthday_only?: boolean;
         };
+        AdminPromotionRequest: {
+            code: string;
+            title: string;
+            description?: string;
+            discountPercent?: number;
+            bonusMultiplier?: number;
+            minOrder?: number;
+            birthdayOnly?: boolean;
+            active?: boolean;
+            /** Format: date-time */
+            validFrom?: string;
+            /** Format: date-time */
+            validUntil?: string;
+            usageLimit?: number;
+        };
         AdminReturn: {
             /** Format: uuid */
             id: string;
@@ -799,6 +976,11 @@ export interface components {
             refund_amount: number;
             /** Format: date-time */
             created_at: string;
+        };
+        AdminReturnStatusRequest: {
+            /** @enum {string} */
+            status: "REQUESTED" | "APPROVED" | "REJECTED" | "RECEIVED" | "REFUNDED";
+            comment?: string;
         };
         AdminAnalytics: {
             orders: {
@@ -1146,6 +1328,113 @@ export interface operations {
                     "application/json": components["schemas"]["AdminVariants"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createAdminProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductRequest"];
+            };
+        };
+        responses: {
+            /** @description Товар создан */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateAdminProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductRequest"];
+            };
+        };
+        responses: {
+            /** @description Товар изменён */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteAdminProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Товар удалён; тело ответа отсутствует */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateAdminStock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminStockRequest"];
+            };
+        };
+        responses: {
+            /** @description Остатки сохранены */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStockResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
@@ -1530,6 +1819,35 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    updateAdminOrderStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Заказ с новым статусом */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     listAdminUsers: {
         parameters: {
             query?: never;
@@ -1548,6 +1866,35 @@ export interface operations {
                     "application/json": components["schemas"]["AdminUser"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    adjustAdminBonuses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminBonusRequest"];
+            };
+        };
+        responses: {
+            /** @description Фактически применённая корректировка */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBonusResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
@@ -1574,6 +1921,33 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    createAdminPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPromotionRequest"];
+            };
+        };
+        responses: {
+            /** @description Промокод создан */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPromotion"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     listAdminReturns: {
         parameters: {
             query?: never;
@@ -1592,6 +1966,35 @@ export interface operations {
                     "application/json": components["schemas"]["AdminReturn"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateAdminReturnStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminReturnStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Возврат обновлён */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };

@@ -197,6 +197,23 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void versionedAdminWriteForwardsMethodBodyAndTrustedIdentity() {
+        client.patch().uri("/api/v1/order/admin/orders/20000000-0000-0000-0000-000000000001/status")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header("user-id", "forged-admin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"status\":\"CONFIRMED\"}")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().method()).isEqualTo("PATCH");
+        assertThat(FORWARDED.get().path()).isEqualTo("/order/admin/orders/20000000-0000-0000-0000-000000000001/status");
+        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+        assertThat(FORWARDED.get().body()).contains("\"status\":\"CONFIRMED\"");
+    }
+
+    @Test
     void checkoutForwardsItemsAndPickupMethodWithTrustedIdentity() {
         client.post().uri("/order")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))

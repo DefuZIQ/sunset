@@ -1,13 +1,71 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { cancelMyOrder, changePassword, countUnreadNotifications, createOrder, createOrderReturn, getCategoryTree,
+import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createOrder, createOrderReturn, deleteAdminProduct, getCategoryTree,
   getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
   listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
   listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer,
   markNotificationRead, quoteDelivery, registerCustomer, saveProductReview,
-  subscribeNewsletter, unsubscribeNewsletter, updatePendingOrder, updateProfile,
+  subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
   validatePromoCode, getProfile } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("admin product writes use versioned paths and DELETE accepts an empty 204 response", async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ id: "product-1", name: "Пальто", price: 9000 }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "product-1", name: "Пальто", price: 9500 }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "product-1", totalQuantity: 3, totalVariants: 1 }) })
+    .mockResolvedValueOnce({ ok: true, status: 204, json: async () => { throw new Error("204 must not be parsed"); } });
+  vi.stubGlobal("fetch", fetchMock);
+
+  const product = { name: "Пальто", price: 9000, category: "Пальто", gender: "WOMEN" as const };
+  await createAdminProduct("jwt", product);
+  await updateAdminProduct("jwt", "product/1", { ...product, price: 9500 });
+  await updateAdminStock("jwt", "product/1", { stock: [{ sizeId: "size-1", colorId: "color-1", quantity: 3 }] });
+  await expect(deleteAdminProduct("jwt", "product/1")).resolves.toBeUndefined();
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/products/admin", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify(product),
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/products/admin/product%2F1", {
+    method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify({ ...product, price: 9500 }),
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/v1/products/admin/product%2F1/stock", {
+    method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
+    body: JSON.stringify({ stock: [{ sizeId: "size-1", colorId: "color-1", quantity: 3 }] }),
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/v1/products/admin/product%2F1", {
+    method: "DELETE", headers: { Authorization: "Bearer jwt" },
+  });
+});
+
+test("admin order, bonus, promotion and return writes send typed bodies", async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ id: "order-1", status: "CONFIRMED" }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ userId: "user-1", balance: 200, applied: 100 }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "promo-1", code: "NEW10", title: "Новинка", active: true }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "return-1", status: "APPROVED" }) });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await updateAdminOrderStatus("jwt", "order/1", { status: "CONFIRMED" });
+  await adjustAdminBonuses("jwt", "user/1", { amount: 100, reason: "Корректировка" });
+  await createAdminPromotion("jwt", { code: "NEW10", title: "Новинка", discountPercent: 10 });
+  await updateAdminReturnStatus("jwt", "return/1", { status: "APPROVED" });
+  const expected = [
+    ["/api/v1/order/admin/orders/order%2F1/status", "PATCH", { status: "CONFIRMED" }],
+    ["/api/v1/order/admin/users/user%2F1/bonuses", "POST", { amount: 100, reason: "Корректировка" }],
+    ["/api/v1/order/admin/promotions", "POST", { code: "NEW10", title: "Новинка", discountPercent: 10 }],
+    ["/api/v1/order/admin/returns/return%2F1", "PATCH", { status: "APPROVED" }],
+  ] as const;
+  expected.forEach(([url, method, body], index) => expect(fetchMock).toHaveBeenNthCalledWith(index + 1, url, {
+    method, headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify(body),
+  }));
+});
+
+test("admin product deletion surfaces server errors", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: false, status: 403, json: async () => ({ message: "Требуются права администратора" }),
+  }));
+  await expect(deleteAdminProduct("jwt", "product-1")).rejects.toMatchObject({
+    status: 403, message: "Требуются права администратора",
+  });
+});
 
 test("admin dashboard reads six protected versioned routes", async () => {
   const routes = [

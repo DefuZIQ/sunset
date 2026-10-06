@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminCategoryTree, { categoryMatches, firstLeafCategory } from "../components/AdminCategoryTree";
-import { getAdminAnalytics, getCategoryTree, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts } from "../api/client";
+import { adjustAdminBonuses, createAdminProduct, createAdminPromotion, deleteAdminProduct, getAdminAnalytics, getCategoryTree, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock } from "../api/client";
 import "./Admin.css";
 
-const authHeaders = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` });
+const adminToken = () => localStorage.getItem("authToken") || "";
 const blankProduct = { name:"",description:"",price:"",quantity:10,category:"Женские боди",gender:"WOMEN",imageUrl:"/images/products/1.png" };
 const sizeGroupLabels = { clothing:"Базовая одежда", women_clothing:"Женская одежда", men_clothing:"Мужская одежда", tops:"Международные размеры", women_dress:"Платья", women_trousers:"Женские брюки", men_trousers:"Мужские брюки", waist:"Джинсы · базовая сетка", jeans:"Джинсы · полная сетка", accessory:"Аксессуары", belt:"Ремни", headwear:"Головные уборы", shoes:"Обувь" };
 const leafCategory = (item) => item?.categories?.[item.categories.length-1] || "";
@@ -41,7 +41,7 @@ export default function Admin() {
     if(analyticsResult.status==="fulfilled")setAnalytics(analyticsResult.value);
     const failed=[ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult]
       .find((result)=>result.status==="rejected");
-    setMessage(failed?(failed.reason?.message||"Часть данных магазина не загрузилась"):"");
+    if(failed)setMessage(failed.reason?.message||"Часть данных магазина не загрузилась");
   },[]);
   useEffect(()=>{load();},[load]);
   const stockCategoryProducts=useMemo(()=>products.filter((item)=>categoryMatches(categoryTree,stockCategory,item.categories||[])),[products,categoryTree,stockCategory]);
@@ -54,17 +54,42 @@ export default function Admin() {
   useEffect(()=>{if(stockCategoryProducts.length&&!stockCategoryProducts.some((item)=>String(item.id)===String(stockProductId)))setStockProductId(stockCategoryProducts[0].id);},[stockCategoryProducts,stockProductId]);
   useEffect(()=>{if(allowedStockSizes.length&&!allowedStockSizes.some((size)=>String(size.id)===String(newVariant.sizeId)))setNewVariant((current)=>({...current,sizeId:allowedStockSizes[0].id}));},[allowedStockSizes,newVariant.sizeId]);
   const notify=(value)=>{setMessage(value);window.setTimeout(()=>setMessage(""),3500);};
-  const parse=async(response)=>{const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||"Не удалось выполнить действие");return data;};
-  const changeStatus=async(id,status)=>{try{await parse(await fetch(`/order/admin/orders/${id}/status`,{method:"PATCH",headers:authHeaders(),body:JSON.stringify({status})}));notify("Статус заказа обновлён");load();}catch(error){notify(error.message);}};
-  const createProduct=async(event)=>{event.preventDefault();try{const data=await parse(await fetch("/products/admin",{method:"POST",headers:authHeaders(),body:JSON.stringify(product)}));notify(`Товар «${data.name}» добавлен`);setProduct(blankProduct);load();}catch(error){notify(error.message);}};
-  const saveProduct=async(event)=>{event.preventDefault();try{await parse(await fetch(`/products/admin/${editing.id}`,{method:"PUT",headers:authHeaders(),body:JSON.stringify({...editing,category:leafCategory(editing)})}));notify("Карточка товара обновлена");setEditing(null);load();}catch(error){notify(error.message);}};
-  const deleteProduct=async(item)=>{if(!window.confirm(`Удалить «${item.name}»?`))return;const response=await fetch(`/products/admin/${item.id}`,{method:"DELETE",headers:authHeaders()});if(response.ok){notify("Товар удалён");load();}else notify("Не удалось удалить товар");};
-  const saveStock=async()=>{try{await parse(await fetch(`/products/admin/${stockProductId}/stock`,{method:"PUT",headers:authHeaders(),body:JSON.stringify({stock:stockDraft})}));notify("Остатки сохранены");load();}catch(error){notify(error.message);}};
+  const changeStatus=async(id,status)=>{try{await updateAdminOrderStatus(adminToken(),id,{status});notify("Статус заказа обновлён");load();}catch(error){notify(error.message);}};
+  const createProduct=async(event)=>{event.preventDefault();try{
+    const data=await createAdminProduct(adminToken(),{...product,price:Number(product.price),quantity:Number(product.quantity)});
+    notify(`Товар «${data.name}» добавлен`);setProduct(blankProduct);load();
+  }catch(error){notify(error.message);}};
+  const saveProduct=async(event)=>{event.preventDefault();try{
+    await updateAdminProduct(adminToken(),editing.id,{
+      name:editing.name,description:editing.description||"",price:Number(editing.price),
+      gender:editing.gender||"WOMEN",category:leafCategory(editing),imageUrl:editing.imageUrl||"",
+    });
+    notify("Карточка товара обновлена");setEditing(null);load();
+  }catch(error){notify(error.message);}};
+  const deleteProduct=async(item)=>{if(!window.confirm(`Удалить «${item.name}»?`))return;try{
+    await deleteAdminProduct(adminToken(),item.id);notify("Товар удалён");load();
+  }catch(error){notify(error.message||"Не удалось удалить товар");}};
+  const saveStock=async()=>{try{
+    await updateAdminStock(adminToken(),stockProductId,{stock:stockDraft.map((item)=>({
+      sizeId:item.sizeId,colorId:item.colorId,quantity:Number(item.quantity),
+    }))});
+    notify("Остатки сохранены");load();
+  }catch(error){notify(error.message);}};
   const addStockVariant=()=>{const color=stockOptions.colors.find((item)=>String(item.id)===String(newVariant.colorId));const size=stockOptions.sizes.find((item)=>String(item.id)===String(newVariant.sizeId));if(!color||!size){notify("Выберите цвет и размер");return;}if(stockDraft.some((item)=>String(item.colorId)===String(color.id)&&String(item.sizeId)===String(size.id))){notify("Такая комбинация уже есть");return;}setStockDraft([...stockDraft,{colorId:color.id,colorName:color.name,sizeId:size.id,sizeName:size.name,sizeType:size.type,sizeGender:size.gender,sizeDescription:size.description,quantity:Number(newVariant.quantity)||0}]);};
   const removeStockVariant=(index)=>setStockDraft(stockDraft.filter((_,itemIndex)=>itemIndex!==index));
-  const createPromo=async(event)=>{event.preventDefault();try{await parse(await fetch("/order/admin/promotions",{method:"POST",headers:authHeaders(),body:JSON.stringify(promo)}));notify("Промокод запущен");setPromo({...promo,code:"",title:"",description:""});load();}catch(error){notify(error.message);}};
-  const adjustBonus=async(user)=>{const amount=Number(bonusDraft[user.id]||0);if(!amount)return;try{const data=await parse(await fetch(`/order/admin/users/${user.id}/bonuses`,{method:"POST",headers:authHeaders(),body:JSON.stringify({amount,reason:"Корректировка администратором"})}));notify(`Баланс изменён на ${data.applied > 0 ? "+" : ""}${data.applied}`);setBonusDraft({...bonusDraft,[user.id]:""});load();}catch(error){notify(error.message);}};
-  const changeReturnStatus=async(id,status)=>{try{await parse(await fetch(`/order/admin/returns/${id}`,{method:"PATCH",headers:authHeaders(),body:JSON.stringify({status})}));notify("Статус возврата обновлён");load();}catch(error){notify(error.message);}};
+  const createPromo=async(event)=>{event.preventDefault();try{
+    await createAdminPromotion(adminToken(),{
+      ...promo,discountPercent:Number(promo.discountPercent),bonusMultiplier:Number(promo.bonusMultiplier),minOrder:Number(promo.minOrder),
+    });
+    notify("Промокод запущен");setPromo({...promo,code:"",title:"",description:""});load();
+  }catch(error){notify(error.message);}};
+  const adjustBonus=async(user)=>{const amount=Number(bonusDraft[user.id]||0);if(!amount)return;try{
+    const data=await adjustAdminBonuses(adminToken(),user.id,{amount,reason:"Корректировка администратором"});
+    notify(`Баланс изменён на ${data.applied > 0 ? "+" : ""}${data.applied}`);setBonusDraft({...bonusDraft,[user.id]:""});load();
+  }catch(error){notify(error.message);}};
+  const changeReturnStatus=async(id,status)=>{try{
+    await updateAdminReturnStatus(adminToken(),id,{status});notify("Статус возврата обновлён");load();
+  }catch(error){notify(error.message);}};
 
   return <div className="page-shell container admin-page"><div className="admin-heading"><div><p className="page-kicker">SUNSET CONTROL</p><h1 className="page-title">Управление магазином</h1></div><span>{products.length} товаров · {users.length} клиентов</span></div>
     <div className="admin-tabs">{[["overview","Обзор"],["orders","Заказы"],["returns","Возвраты"],["products","Товары"],["stock","Остатки"],["promos","Акции"],["users","Клиенты"]].map(([key,label])=><button className={tab===key?"active":""} onClick={()=>setTab(key)} key={key}>{label}</button>)}</div>{message&&<p className="admin-message">{message}</p>}

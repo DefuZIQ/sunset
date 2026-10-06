@@ -222,6 +222,127 @@ test('admin dashboard keeps available sections visible if one API call fails', a
   await expect(page.getByText('3 900 ₽')).toBeVisible();
 });
 
+test('admin product forms use versioned writes including empty-body deletion', async ({ page }) => {
+  const account = { id: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN' };
+  const writes = [];
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/order/admin/*', (route) => route.fulfill({ json: route.request().url().endsWith('/analytics')
+    ? { orders: { total: 0, last30Days: 0, revenue: 0 }, returns: { total: 0, requested: 0 }, lowStock: 0, topProducts: [] } : [] }));
+  await page.route('**/api/v1/products/admin', async (route) => {
+    writes.push({ path: new URL(route.request().url()).pathname, method: route.request().method(), body: route.request().postDataJSON() });
+    await route.fulfill({ status: 201, json: { id: 'product-new', name: 'Новое пальто', price: 9000 } });
+  });
+  await page.route('**/api/v1/products/admin/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/variants')) return route.fulfill({ json: {
+      colors: [{ id: 'white', name: 'Белый', hexCode: '#f4f1eb' }],
+      sizes: [{ id: 'women-m', name: 'M', type: 'women_clothing' }],
+    } });
+    writes.push({ path, method: route.request().method(), body: route.request().postDataJSON() });
+    if (route.request().method() === 'DELETE') return route.fulfill({ status: 204, body: '' });
+    await route.fulfill({ json: path.endsWith('/stock')
+      ? { id: products[0].id, totalQuantity: 6, totalVariants: 1 }
+      : { id: products[0].id, name: 'Льняная рубашка', price: 4500 } });
+  });
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'admin-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  page.on('dialog', (dialog) => dialog.accept());
+
+  await page.goto('/#/admin');
+  await expect(page.getByText('2 товаров · 0 клиентов')).toBeVisible();
+  await page.getByRole('button', { name: 'Товары', exact: true }).click();
+  const createForm = page.locator('.admin-products-layout form.admin-form');
+  await createForm.getByLabel('Название').fill('Новое пальто');
+  await createForm.getByLabel('Цена').fill('9000');
+  await createForm.getByRole('button', { name: 'Добавить в каталог' }).click();
+  await expect.poll(() => writes.length).toBe(1);
+
+  await page.locator('.admin-product-list article').first().getByRole('button', { name: 'Изменить' }).click();
+  await page.locator('.admin-modal__body').getByLabel('Цена').fill('4500');
+  await page.getByRole('button', { name: 'Сохранить карточку' }).click();
+  await expect.poll(() => writes.length).toBe(2);
+  await page.locator('.admin-product-list article').first().getByRole('button', { name: 'Удалить' }).click();
+  await expect.poll(() => writes.length).toBe(3);
+
+  await page.getByRole('button', { name: 'Остатки', exact: true }).click();
+  await page.getByRole('tree', { name: 'Сначала выберите категорию' }).getByRole('button', { name: /Рубашки/ }).click();
+  await page.locator('.stock-row input[type="number"]').first().fill('6');
+  await page.getByRole('button', { name: 'Сохранить остатки' }).click();
+  await expect.poll(() => writes.length).toBe(4);
+
+  expect(writes.map((item) => item.method)).toEqual(['POST', 'PUT', 'DELETE', 'PUT']);
+  expect(writes[0].path).toBe('/api/v1/products/admin');
+  expect(writes[0].body).toMatchObject({ name: 'Новое пальто', price: 9000 });
+  expect(writes[1].path).toBe(`/api/v1/products/admin/${products[0].id}`);
+  expect(writes[2].path).toBe(`/api/v1/products/admin/${products[0].id}`);
+  expect(writes[3].path).toBe(`/api/v1/products/admin/${products[0].id}/stock`);
+  expect(writes[3].body.stock[0]).toMatchObject({ quantity: 6 });
+});
+
+test('admin order, return, promotion and bonus actions use versioned writes', async ({ page }) => {
+  const account = { id: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN' };
+  const writes = [];
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/admin/variants', (route) => route.fulfill({ json: { colors: [], sizes: [] } }));
+  await page.route('**/api/v1/order/admin/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const method = route.request().method();
+    if (method !== 'GET') {
+      writes.push({ path, method, body: route.request().postDataJSON() });
+      const response = path.endsWith('/bonuses') ? { userId: 'user-1', balance: 200, applied: 100 }
+        : path.endsWith('/promotions') ? { id: 'promo-1', code: 'NEW10', title: 'Новинка', active: true }
+          : path.includes('/returns/') ? { id: 'return-1', status: 'APPROVED' }
+            : { id: 'order-1', status: 'CONFIRMED' };
+      return route.fulfill({ status: method === 'POST' && path.endsWith('/promotions') ? 201 : 200, json: response });
+    }
+    const response = path.endsWith('/orders')
+      ? [{ id: 'order-1', orderNumber: 'SUN-1', status: 'PENDING', totalAmount: 3900, customerName: 'Анна', customerPhone: '+79990001122', createdAt: '2026-10-06T00:00:00Z' }]
+      : path.endsWith('/users')
+        ? [{ id: 'user-1', firstName: 'Анна', lastName: 'Тестовая', email: 'anna@example.test', role: 'USER', bonusBalance: 100, orderCount: 1, orderTotal: 3900 }]
+        : path.endsWith('/returns')
+          ? [{ id: 'return-1', orderNumber: 'SUN-1', email: 'anna@example.test', reason: 'SIZE', status: 'REQUESTED', refund_amount: 3900, created_at: '2026-10-06T00:00:00Z' }]
+          : path.endsWith('/analytics')
+            ? { orders: { total: 1, last30Days: 1, revenue: 3900 }, returns: { total: 1, requested: 1 }, lowStock: 0, topProducts: [] }
+            : [];
+    await route.fulfill({ json: response });
+  });
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'admin-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+
+  await page.goto('/#/admin');
+  await expect(page.getByText('2 товаров · 1 клиентов')).toBeVisible();
+  await page.getByRole('button', { name: 'Заказы', exact: true }).click();
+  await page.locator('.admin-table select').selectOption('CONFIRMED');
+  await expect.poll(() => writes.length).toBe(1);
+  await page.getByRole('button', { name: 'Возвраты', exact: true }).click();
+  await page.locator('.admin-table select').selectOption('APPROVED');
+  await expect.poll(() => writes.length).toBe(2);
+  await page.getByRole('button', { name: 'Акции', exact: true }).click();
+  await page.locator('form.admin-form').getByLabel('Код').fill('NEW10');
+  await page.locator('form.admin-form').getByLabel('Название').fill('Новинка');
+  await page.getByRole('button', { name: 'Запустить акцию' }).click();
+  await expect.poll(() => writes.length).toBe(3);
+  await page.getByRole('button', { name: 'Клиенты', exact: true }).click();
+  await page.locator('.bonus-control input').fill('100');
+  await page.getByRole('button', { name: 'Применить' }).click();
+  await expect.poll(() => writes.length).toBe(4);
+
+  expect(writes.map((item) => [item.method, item.path])).toEqual([
+    ['PATCH', '/api/v1/order/admin/orders/order-1/status'],
+    ['PATCH', '/api/v1/order/admin/returns/return-1'],
+    ['POST', '/api/v1/order/admin/promotions'],
+    ['POST', '/api/v1/order/admin/users/user-1/bonuses'],
+  ]);
+  expect(writes[0].body).toEqual({ status: 'CONFIRMED' });
+  expect(writes[1].body).toEqual({ status: 'APPROVED' });
+  expect(writes[2].body).toMatchObject({ code: 'NEW10', title: 'Новинка', discountPercent: 10 });
+  expect(writes[3].body).toMatchObject({ amount: 100 });
+});
+
 test('promotions page loads the versioned public API', async ({ page }) => {
   let requested = false;
   await page.route('**/api/v1/order/promotions', async (route) => {

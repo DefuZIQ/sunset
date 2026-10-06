@@ -19,6 +19,9 @@ export type AdminPromotion = components["schemas"]["AdminPromotion"];
 export type AdminReturn = components["schemas"]["AdminReturn"];
 export type AdminAnalytics = components["schemas"]["AdminAnalytics"];
 export type AdminVariants = components["schemas"]["AdminVariants"];
+export type AdminProductResult = components["schemas"]["AdminProductResult"];
+export type AdminStockResult = components["schemas"]["AdminStockResult"];
+export type AdminBonusResult = components["schemas"]["AdminBonusResult"];
 type ProductUuidRequest = paths["/products/by-uuid"]["post"]["requestBody"]["content"]["application/json"];
 type SubscribeRequest = paths["/subscriptions"]["post"]["requestBody"]["content"]["application/json"];
 type SaveReviewRequest = paths["/products/review/{id}"]["post"]["requestBody"]["content"]["application/json"];
@@ -31,6 +34,12 @@ type RegisterRequest = paths["/auth/register"]["post"]["requestBody"]["content"]
 type LoginRequest = paths["/auth/login"]["post"]["requestBody"]["content"]["application/json"];
 type UpdateProfileRequest = paths["/auth/profile"]["put"]["requestBody"]["content"]["application/json"];
 type ChangePasswordRequest = paths["/auth/profile/password"]["put"]["requestBody"]["content"]["application/json"];
+type AdminProductRequest = paths["/products/admin"]["post"]["requestBody"]["content"]["application/json"];
+type AdminStockRequest = paths["/products/admin/{id}/stock"]["put"]["requestBody"]["content"]["application/json"];
+type AdminStatusRequest = paths["/order/admin/orders/{id}/status"]["patch"]["requestBody"]["content"]["application/json"];
+type AdminBonusRequest = paths["/order/admin/users/{id}/bonuses"]["post"]["requestBody"]["content"]["application/json"];
+type AdminPromotionRequest = paths["/order/admin/promotions"]["post"]["requestBody"]["content"]["application/json"];
+type AdminReturnStatusRequest = paths["/order/admin/returns/{id}"]["patch"]["requestBody"]["content"]["application/json"];
 
 export class ApiHttpError extends Error {
   constructor(public readonly status: number, message?: string) {
@@ -106,6 +115,55 @@ export async function getAdminAnalytics(token: string): Promise<AdminAnalytics> 
 
 export async function listAdminVariants(token: string): Promise<AdminVariants> {
   return readJson<AdminVariants>(await fetch("/api/v1/products/admin/variants", { headers: bearer(token) }));
+}
+
+export async function createAdminProduct(token: string, request: AdminProductRequest): Promise<AdminProductResult> {
+  return readJson<AdminProductResult>(await fetch("/api/v1/products/admin", {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
+}
+
+export async function updateAdminProduct(token: string, id: string, request: AdminProductRequest): Promise<AdminProductResult> {
+  return readJson<AdminProductResult>(await fetch(`/api/v1/products/admin/${encodeURIComponent(id)}`, {
+    method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
+}
+
+export async function deleteAdminProduct(token: string, id: string): Promise<void> {
+  const response = await fetch(`/api/v1/products/admin/${encodeURIComponent(id)}`, {
+    method: "DELETE", headers: bearer(token),
+  });
+  if (!response.ok) await readJson<never>(response);
+}
+
+export async function updateAdminStock(token: string, id: string, request: AdminStockRequest): Promise<AdminStockResult> {
+  return readJson<AdminStockResult>(await fetch(`/api/v1/products/admin/${encodeURIComponent(id)}/stock`, {
+    method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
+}
+
+export async function updateAdminOrderStatus(token: string, id: string, request: AdminStatusRequest): Promise<OrderDetail> {
+  return readJson<OrderDetail>(await fetch(`/api/v1/order/admin/orders/${encodeURIComponent(id)}/status`, {
+    method: "PATCH", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
+}
+
+export async function adjustAdminBonuses(token: string, id: string, request: AdminBonusRequest): Promise<AdminBonusResult> {
+  return readJson<AdminBonusResult>(await fetch(`/api/v1/order/admin/users/${encodeURIComponent(id)}/bonuses`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
+}
+
+export async function createAdminPromotion(token: string, request: AdminPromotionRequest): Promise<AdminPromotion> {
+  return readJson<AdminPromotion>(await fetch("/api/v1/order/admin/promotions", {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
+}
+
+export async function updateAdminReturnStatus(token: string, id: string, request: AdminReturnStatusRequest): Promise<OrderReturn> {
+  return readJson<OrderReturn>(await fetch(`/api/v1/order/admin/returns/${encodeURIComponent(id)}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
 }
 
 /** Migrated client operations; other screens still use compatible legacy paths. */
