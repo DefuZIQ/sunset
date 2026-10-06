@@ -90,6 +90,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/admin/variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Справочник цветов и размеров для управления остатками */
+        get: operations["listAdminVariants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/by-uuid": {
         parameters: {
             query?: never;
@@ -342,6 +359,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/order/admin/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Заказы всех клиентов */
+        get: operations["listAdminOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/order/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Клиенты с итогами заказов и бонусами */
+        get: operations["listAdminUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/order/admin/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Все промокоды */
+        get: operations["listAdminPromotions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/order/admin/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Заявки на возврат всех клиентов */
+        get: operations["listAdminReturns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/order/admin/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Показатели магазина */
+        get: operations["getAdminAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/notifications": {
         parameters: {
             query?: never;
@@ -540,6 +642,19 @@ export interface components {
             colorName?: string;
             quantity?: number;
         };
+        AdminVariants: {
+            colors: components["schemas"]["ProductColor"][];
+            sizes: components["schemas"]["AdminSize"][];
+        };
+        AdminSize: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            type: string;
+            gender?: string | null;
+            region?: string | null;
+            description?: string | null;
+        };
         OrderItemRequest: {
             /** Format: uuid */
             productId: string;
@@ -641,6 +756,68 @@ export interface components {
             refundAmount: number;
             /** Format: date-time */
             createdAt: string;
+        };
+        AdminUser: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            firstName?: string | null;
+            lastName?: string | null;
+            phone?: string | null;
+            /** Format: date */
+            birthday?: string | null;
+            role: string;
+            /** Format: date-time */
+            createdAt?: string;
+            bonusBalance: number;
+            orderCount: number;
+            orderTotal: number;
+        };
+        AdminPromotion: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            title: string;
+            description?: string | null;
+            active: boolean;
+            usage_count?: number;
+            discount_percent?: number;
+            bonus_multiplier?: number;
+            min_order?: number;
+            birthday_only?: boolean;
+        };
+        AdminReturn: {
+            /** Format: uuid */
+            id: string;
+            orderNumber: string;
+            /** Format: email */
+            email: string;
+            reason: string;
+            comment?: string | null;
+            status: string;
+            refund_amount: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        AdminAnalytics: {
+            orders: {
+                total: number;
+                last30Days: number;
+                revenue: number;
+            };
+            returns: {
+                total: number;
+                requested: number;
+            };
+            lowStock: number;
+            topProducts: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                quantity: number;
+                revenue: number;
+            }[];
         };
         CategoryNode: {
             /** Format: uuid */
@@ -772,6 +949,15 @@ export interface components {
         };
         /** @description Некорректный запрос */
         BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ApiError"];
+            };
+        };
+        /** @description Нет прав администратора */
+        Forbidden: {
             headers: {
                 [name: string]: unknown;
             };
@@ -940,6 +1126,28 @@ export interface operations {
                     "application/json": components["schemas"]["Product"][];
                 };
             };
+        };
+    };
+    listAdminVariants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Доступные цвета и размеры */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminVariants"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getProductByUuid: {
@@ -1298,6 +1506,116 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listAdminOrders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Заказы */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Order"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listAdminUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Клиенты */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listAdminPromotions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Промокоды */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPromotion"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listAdminReturns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Заявки */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReturn"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getAdminAnalytics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Показатели */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAnalytics"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listNotifications: {

@@ -14,6 +14,11 @@ export type UserProfile = components["schemas"]["UserProfile"];
 export type Notification = components["schemas"]["Notification"];
 export type SubscriptionStatus = components["schemas"]["SubscriptionStatus"];
 export type UnreadNotificationCount = components["schemas"]["UnreadNotificationCount"];
+export type AdminUser = components["schemas"]["AdminUser"];
+export type AdminPromotion = components["schemas"]["AdminPromotion"];
+export type AdminReturn = components["schemas"]["AdminReturn"];
+export type AdminAnalytics = components["schemas"]["AdminAnalytics"];
+export type AdminVariants = components["schemas"]["AdminVariants"];
 type ProductUuidRequest = paths["/products/by-uuid"]["post"]["requestBody"]["content"]["application/json"];
 type SubscribeRequest = paths["/subscriptions"]["post"]["requestBody"]["content"]["application/json"];
 type SaveReviewRequest = paths["/products/review/{id}"]["post"]["requestBody"]["content"]["application/json"];
@@ -77,6 +82,30 @@ export async function changePassword(token: string, request: ChangePasswordReque
   return readJson<components["schemas"]["Message"]>(await fetch("/api/v1/auth/profile/password", {
     method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
   }));
+}
+
+export async function listAdminOrders(token: string): Promise<Order[]> {
+  return readJson<Order[]>(await fetch("/api/v1/order/admin/orders", { headers: bearer(token) }));
+}
+
+export async function listAdminUsers(token: string): Promise<AdminUser[]> {
+  return readJson<AdminUser[]>(await fetch("/api/v1/order/admin/users", { headers: bearer(token) }));
+}
+
+export async function listAdminPromotions(token: string): Promise<AdminPromotion[]> {
+  return readJson<AdminPromotion[]>(await fetch("/api/v1/order/admin/promotions", { headers: bearer(token) }));
+}
+
+export async function listAdminReturns(token: string): Promise<AdminReturn[]> {
+  return readJson<AdminReturn[]>(await fetch("/api/v1/order/admin/returns", { headers: bearer(token) }));
+}
+
+export async function getAdminAnalytics(token: string): Promise<AdminAnalytics> {
+  return readJson<AdminAnalytics>(await fetch("/api/v1/order/admin/analytics", { headers: bearer(token) }));
+}
+
+export async function listAdminVariants(token: string): Promise<AdminVariants> {
+  return readJson<AdminVariants>(await fetch("/api/v1/products/admin/variants", { headers: bearer(token) }));
 }
 
 /** Migrated client operations; other screens still use compatible legacy paths. */

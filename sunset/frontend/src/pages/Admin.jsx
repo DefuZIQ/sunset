@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminCategoryTree, { categoryMatches, firstLeafCategory } from "../components/AdminCategoryTree";
+import { getAdminAnalytics, getCategoryTree, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts } from "../api/client";
 import "./Admin.css";
 
 const authHeaders = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` });
@@ -14,7 +15,34 @@ export default function Admin() {
   const [product,setProduct]=useState(blankProduct); const [editing,setEditing]=useState(null); const [productGender,setProductGender]=useState("ALL"); const [productCategoryFilter,setProductCategoryFilter]=useState(""); const [stockCategory,setStockCategory]=useState(""); const [stockProductId,setStockProductId]=useState(""); const [stockDraft,setStockDraft]=useState([]); const [stockOptions,setStockOptions]=useState({colors:[],sizes:[]}); const [newVariant,setNewVariant]=useState({colorId:"",sizeId:"",quantity:0}); const [bonusDraft,setBonusDraft]=useState({});
   const [promo,setPromo]=useState({code:"",title:"",description:"",discountPercent:10,bonusMultiplier:1,minOrder:0,birthdayOnly:false,active:true});
 
-  const load=useCallback(async()=>{const [o,u,p,c,v,t,r,a]=await Promise.all([fetch("/order/admin/orders",{headers:authHeaders()}),fetch("/order/admin/users",{headers:authHeaders()}),fetch("/order/admin/promotions",{headers:authHeaders()}),fetch("/products/all"),fetch("/products/admin/variants",{headers:authHeaders()}),fetch("/products/categories/tree"),fetch("/order/admin/returns",{headers:authHeaders()}),fetch("/order/admin/analytics",{headers:authHeaders()})]);if(o.ok)setOrders(await o.json());if(u.ok)setUsers(await u.json());if(p.ok)setPromos(await p.json());if(c.ok){const list=await c.json();setProducts(list);setStockProductId((value)=>value||list[0]?.id||"");setStockCategory((value)=>value||leafCategory(list[0]));}if(v.ok){const variants=await v.json();setStockOptions(variants);setNewVariant((current)=>({colorId:current.colorId||variants.colors?.[0]?.id||"",sizeId:current.sizeId||variants.sizes?.[0]?.id||"",quantity:current.quantity}));}if(t.ok)setCategoryTree(await t.json());if(r.ok)setReturns(await r.json());if(a.ok)setAnalytics(await a.json());},[]);
+  const load=useCallback(async()=>{
+    const token=localStorage.getItem("authToken");
+    if(!token){setMessage("Войдите в аккаунт администратора");return;}
+    const [ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult]=await Promise.allSettled([
+      listAdminOrders(token),listAdminUsers(token),listAdminPromotions(token),listProducts(),
+      listAdminVariants(token),getCategoryTree(),listAdminReturns(token),getAdminAnalytics(token),
+    ]);
+    if(ordersResult.status==="fulfilled")setOrders(ordersResult.value);
+    if(usersResult.status==="fulfilled")setUsers(usersResult.value);
+    if(promosResult.status==="fulfilled")setPromos(promosResult.value);
+    if(catalogResult.status==="fulfilled"){
+      const catalog=catalogResult.value;
+      setProducts(catalog);
+      setStockProductId((value)=>value||catalog[0]?.id||"");
+      setStockCategory((value)=>value||leafCategory(catalog[0]));
+    }
+    if(variantsResult.status==="fulfilled"){
+      const variants=variantsResult.value;
+      setStockOptions(variants);
+      setNewVariant((current)=>({colorId:current.colorId||variants.colors?.[0]?.id||"",sizeId:current.sizeId||variants.sizes?.[0]?.id||"",quantity:current.quantity}));
+    }
+    if(treeResult.status==="fulfilled")setCategoryTree(treeResult.value);
+    if(returnsResult.status==="fulfilled")setReturns(returnsResult.value);
+    if(analyticsResult.status==="fulfilled")setAnalytics(analyticsResult.value);
+    const failed=[ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult]
+      .find((result)=>result.status==="rejected");
+    setMessage(failed?(failed.reason?.message||"Часть данных магазина не загрузилась"):"");
+  },[]);
   useEffect(()=>{load();},[load]);
   const stockCategoryProducts=useMemo(()=>products.filter((item)=>categoryMatches(categoryTree,stockCategory,item.categories||[])),[products,categoryTree,stockCategory]);
   const selectedStock=useMemo(()=>stockCategoryProducts.find((item)=>String(item.id)===String(stockProductId)),[stockCategoryProducts,stockProductId]);

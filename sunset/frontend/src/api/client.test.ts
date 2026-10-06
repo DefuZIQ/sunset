@@ -1,12 +1,42 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { cancelMyOrder, changePassword, countUnreadNotifications, createOrder, createOrderReturn, getCategoryTree,
-  getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listMyOrders,
+  getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
+  listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
   listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer,
   markNotificationRead, quoteDelivery, registerCustomer, saveProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updatePendingOrder, updateProfile,
   validatePromoCode, getProfile } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("admin dashboard reads six protected versioned routes", async () => {
+  const routes = [
+    "/api/v1/order/admin/orders", "/api/v1/order/admin/users", "/api/v1/order/admin/promotions",
+    "/api/v1/products/admin/variants", "/api/v1/order/admin/returns", "/api/v1/order/admin/analytics",
+  ];
+  const responses = [[], [], [], { colors: [], sizes: [] }, [], { orders: {}, returns: {}, lowStock: 0, topProducts: [] }];
+  const fetchMock = vi.fn().mockImplementation(async (url: string) => ({
+    ok: true, json: async () => responses[routes.indexOf(url)],
+  }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  await Promise.all([
+    listAdminOrders("admin-jwt"), listAdminUsers("admin-jwt"), listAdminPromotions("admin-jwt"),
+    listAdminVariants("admin-jwt"), listAdminReturns("admin-jwt"), getAdminAnalytics("admin-jwt"),
+  ]);
+  routes.forEach((route, index) => expect(fetchMock).toHaveBeenNthCalledWith(index + 1, route, {
+    headers: { Authorization: "Bearer admin-jwt" },
+  }));
+});
+
+test("admin dashboard preserves forbidden server responses", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: false, status: 403, json: async () => ({ message: "Требуются права администратора" }),
+  }));
+  await expect(listAdminUsers("customer-jwt")).rejects.toMatchObject({
+    status: 403, message: "Требуются права администратора",
+  });
+});
 
 test("catalog uses the versioned path and forwards the abort signal", async () => {
   const products = [{ id: "11111111-1111-1111-1111-111111111111", name: "Пальто", price: 8900 }];

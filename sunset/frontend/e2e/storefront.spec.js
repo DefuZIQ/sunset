@@ -166,6 +166,62 @@ test('expired session is cleared after the versioned profile rejects it', async 
   expect(await page.evaluate(() => localStorage.getItem('user'))).toBeNull();
 });
 
+test('admin dashboard loads protected data from the versioned API', async ({ page }) => {
+  const account = { id: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN' };
+  const requested = new Set();
+  const adminResponses = {
+    '/api/v1/order/admin/orders': [{ id: 'order-1', orderNumber: 'SUN-1', status: 'PENDING', totalAmount: 3900, customerName: 'Анна', customerPhone: '+79990001122', createdAt: '2026-10-06T00:00:00Z' }],
+    '/api/v1/order/admin/users': [{ id: 'user-1', firstName: 'Анна', lastName: 'Тестовая', email: 'anna@example.test', role: 'USER', bonusBalance: 100, orderCount: 1, orderTotal: 3900 }],
+    '/api/v1/order/admin/promotions': [],
+    '/api/v1/products/admin/variants': { colors: [], sizes: [] },
+    '/api/v1/order/admin/returns': [],
+    '/api/v1/order/admin/analytics': { orders: { total: 1, last30Days: 1, revenue: 3900 }, returns: { total: 0, requested: 0 }, lowStock: 0, topProducts: [] },
+  };
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  for (const [path, response] of Object.entries(adminResponses)) {
+    await page.route(`**${path}`, async (route) => {
+      expect(route.request().headers().authorization).toBe('Bearer admin-token');
+      requested.add(path);
+      await route.fulfill({ json: response });
+    });
+  }
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'admin-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+
+  await page.goto('/#/admin');
+  await expect(page.getByRole('heading', { name: 'Управление магазином' })).toBeVisible();
+  await expect(page.getByText('2 товаров · 1 клиентов')).toBeVisible();
+  await page.getByRole('button', { name: 'Заказы', exact: true }).click();
+  await expect(page.getByText('SUN-1')).toBeVisible();
+  expect(requested.size).toBe(Object.keys(adminResponses).length);
+});
+
+test('admin dashboard keeps available sections visible if one API call fails', async ({ page }) => {
+  const account = { id: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN' };
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/order/admin/*', (route) => {
+    if (route.request().url().endsWith('/returns')) {
+      return route.fulfill({ status: 403, json: { code: 'FORBIDDEN', message: 'Требуются права администратора' } });
+    }
+    if (route.request().url().endsWith('/analytics')) {
+      return route.fulfill({ json: { orders: { total: 1, last30Days: 1, revenue: 3900 }, returns: { total: 0, requested: 0 }, lowStock: 0, topProducts: [] } });
+    }
+    return route.fulfill({ json: [] });
+  });
+  await page.route('**/api/v1/products/admin/variants', (route) => route.fulfill({ json: { colors: [], sizes: [] } }));
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'admin-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+
+  await page.goto('/#/admin');
+  await expect(page.getByText('Требуются права администратора')).toBeVisible();
+  await expect(page.getByText('2 товаров · 0 клиентов')).toBeVisible();
+  await expect(page.getByText('3 900 ₽')).toBeVisible();
+});
+
 test('promotions page loads the versioned public API', async ({ page }) => {
   let requested = false;
   await page.route('**/api/v1/order/promotions', async (route) => {

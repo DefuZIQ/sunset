@@ -177,6 +177,26 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void versionedAdminRouteRequiresJwtAndDoesNotTrustClientIdentity() {
+        client.get().uri("/api/v1/order/admin/users")
+                .header("user-id", "forged-admin")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectBody().jsonPath("$.code").isEqualTo("UNAUTHORIZED");
+        assertThat(REQUEST_COUNT.get()).isZero();
+
+        client.get().uri("/api/v1/order/admin/users")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header("user-id", "forged-admin")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().path()).isEqualTo("/order/admin/users");
+        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+    }
+
+    @Test
     void checkoutForwardsItemsAndPickupMethodWithTrustedIdentity() {
         client.post().uri("/order")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
