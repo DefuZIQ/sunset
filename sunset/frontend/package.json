@@ -12,6 +12,7 @@
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
+    "icons:generate": "node scripts/generate-icons.mjs",
     "api:types": "openapi-typescript ../docs/openapi.json -o src/api/generated.ts",
     "api:types:check": "openapi-typescript ../docs/openapi.json -o src/api/generated.ts --check",
     "typecheck": "tsc --noEmit",
