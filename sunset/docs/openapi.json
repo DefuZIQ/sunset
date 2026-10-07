@@ -43,6 +43,29 @@
         "responses": { "200": { "description": "Пароль изменён", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Message" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
+    "/auth/addresses": {
+      "get": {
+        "tags": ["Auth"], "operationId": "listCustomerAddresses", "summary": "Адресная книга текущего клиента", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Сохранённые адреса", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CustomerAddress" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "post": {
+        "tags": ["Auth"], "operationId": "createCustomerAddress", "summary": "Сохранить адрес", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerAddressInput" } } } },
+        "responses": { "201": { "description": "Адрес сохранён", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerAddress" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/addresses/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Auth"], "operationId": "updateCustomerAddress", "summary": "Изменить свой адрес", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerAddressInput" } } } },
+        "responses": { "200": { "description": "Адрес изменён", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerAddress" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "delete": {
+        "tags": ["Auth"], "operationId": "deleteCustomerAddress", "summary": "Удалить свой адрес", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Адрес удалён" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
     "/products/all": {
       "get": {
         "tags": ["Products"], "operationId": "listProducts", "summary": "Каталог",
@@ -321,6 +344,13 @@
       "LoginRequest": {
         "type": "object", "required": ["email", "password"],
         "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string", "format": "password" } }
+      },
+      "CustomerAddressInput": {
+        "type": "object", "required": ["label", "city", "street", "house"],
+        "properties": { "label": { "type": "string", "maxLength": 60 }, "city": { "type": "string", "maxLength": 120 }, "street": { "type": "string", "maxLength": 160 }, "house": { "type": "string", "maxLength": 40 }, "building": { "type": "string", "nullable": true }, "structure": { "type": "string", "nullable": true }, "entrance": { "type": "string", "nullable": true }, "floor": { "type": "string", "nullable": true }, "apartment": { "type": "string", "nullable": true }, "intercom": { "type": "string", "nullable": true }, "postalCode": { "type": "string", "nullable": true }, "comment": { "type": "string", "nullable": true }, "lat": { "type": "number", "nullable": true, "minimum": -90, "maximum": 90 }, "lon": { "type": "number", "nullable": true, "minimum": -180, "maximum": 180 } }
+      },
+      "CustomerAddress": {
+        "allOf": [{ "$ref": "#/components/schemas/CustomerAddressInput" }, { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "format": "uuid" } } }]
       },
       "AuthResponse": {
         "type": "object", "required": ["uuid", "email", "role", "token"],

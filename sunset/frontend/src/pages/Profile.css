@@ -1,4 +1,12 @@
 .account-page { --account-dark: #37302c; }
+.saved-profile-row .address-book__actions { display:flex; flex-direction:row; gap:10px; flex-shrink:0; }
+.address-book__form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:20px; padding-top:20px; border-top:1px solid #e4d9ce; }
+.address-book__form label { display:grid; gap:6px; min-width:0; color:#746860; font-size:12px; }
+.address-book__form input { min-width:0; width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #d6c9be; border-radius:8px; background:#fffdfb; color:#3d3530; font:inherit; }
+.address-book__form input:focus { outline:2px solid #9c6c4c; outline-offset:1px; }
+.address-book__footer { grid-column:1/-1; display:flex; align-items:center; flex-wrap:wrap; gap:16px; }
+.address-book__footer .text-link { margin-top:0; }
+@media(max-width:700px){.address-book__form{grid-template-columns:1fr;}.saved-profile-row .address-book__actions{flex-direction:column;}}
 .account-hero { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.5rem; padding: clamp(1.5rem, 4vw, 3rem); background: #e9e1da; }
 .account-avatar { display: grid; place-items: center; width: clamp(76px, 9vw, 112px); aspect-ratio: 1; border-radius: 50%; background: var(--account-dark); color: #fffdfb; font: 400 clamp(1.4rem, 3vw, 2.3rem) 'Istok Web'; letter-spacing: .05em; }
 .account-avatar.has-image { overflow: hidden; background: #d8cec7; }

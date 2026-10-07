@@ -19,4 +19,8 @@
         <sqlFile path="classpath:/db/migrations/V3__add_user_role.sql"/>
     </changeSet>
 
+    <changeSet id="10" author="codex">
+        <sqlFile path="classpath:/db/migrations/V4__customer_addresses.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

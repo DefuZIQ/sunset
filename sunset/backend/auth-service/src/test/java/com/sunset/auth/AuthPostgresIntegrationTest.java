@@ -1,12 +1,14 @@
 package com.sunset.auth;
 
 import com.sunset.auth.dto.ChangePasswordRequest;
+import com.sunset.auth.dto.CustomerAddress;
 import com.sunset.auth.dto.LoginRequest;
 import com.sunset.auth.dto.RegisterRequest;
 import com.sunset.auth.dto.UpdateProfileRequest;
 import com.sunset.auth.exceptions.InvalidPasswordException;
 import com.sunset.auth.security.JwtUtil;
 import com.sunset.auth.service.AuthService;
+import com.sunset.auth.service.CustomerAddressService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +48,7 @@ class AuthPostgresIntegrationTest {
     @Autowired private AuthService service;
     @Autowired private JwtUtil jwt;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private CustomerAddressService addresses;
 
     @BeforeEach
     void clearUsers() {
@@ -93,5 +96,37 @@ class AuthPostgresIntegrationTest {
                 .isInstanceOf(InvalidPasswordException.class);
         assertThat(jwt.extractUserId(service.loginUser(new LoginRequest("new@sunset.test", "replacement-pass-456")).getToken()))
                 .isEqualTo(userId);
+    }
+
+    @Test
+    void addressesPersistAndStayPrivateToTheirOwner() {
+        UUID owner = UUID.fromString(service.registerUser(new RegisterRequest("owner@sunset.test", "initial-pass-123", "Анна", "Иванова")).getUuid());
+        UUID stranger = UUID.fromString(service.registerUser(new RegisterRequest("stranger@sunset.test", "initial-pass-123", "Иван", "Соколов")).getUuid());
+        CustomerAddress draft = new CustomerAddress(null, "Дом", "Нижний Новгород", "Большая Покровская", "34",
+                "2", null, "1", "3", "12", null, "603000", "Позвонить заранее", 56.3269, 44.0059);
+
+        CustomerAddress saved = addresses.create(owner, draft);
+        assertThat(addresses.list(owner)).containsExactly(saved);
+        assertThat(addresses.list(stranger)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_addresses WHERE user_id=?", Integer.class, owner)).isEqualTo(1);
+
+        CustomerAddress changed = new CustomerAddress(null, "Работа", draft.city(), draft.street(), draft.house(),
+                draft.building(), draft.structure(), draft.entrance(), draft.floor(), "18", draft.intercom(),
+                draft.postalCode(), draft.comment(), draft.lat(), draft.lon());
+        assertThatThrownBy(() -> addresses.update(stranger, saved.id(), changed)).hasMessageContaining("Адрес не найден");
+        assertThatThrownBy(() -> addresses.delete(stranger, saved.id())).hasMessageContaining("Адрес не найден");
+        assertThat(addresses.update(owner, saved.id(), changed).apartment()).isEqualTo("18");
+        assertThat(addresses.list(owner)).singleElement().extracting(CustomerAddress::label).isEqualTo("Работа");
+        addresses.delete(owner, saved.id());
+        assertThat(addresses.list(owner)).isEmpty();
+    }
+
+    @Test
+    void invalidAddressIsNotSaved() {
+        UUID owner = UUID.fromString(service.registerUser(new RegisterRequest("validation@sunset.test", "initial-pass-123", "Анна", "Иванова")).getUuid());
+        CustomerAddress invalid = new CustomerAddress(null, "Дом", "Нижний Новгород", "", "34",
+                null, null, null, null, null, null, null, null, 91.0, 44.0);
+        assertThatThrownBy(() -> addresses.create(owner, invalid)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(addresses.list(owner)).isEmpty();
     }
 }

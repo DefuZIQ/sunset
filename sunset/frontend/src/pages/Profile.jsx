@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../components/HeaderParts/CartContext";
 import ProductCard from "../components/Main/ProductCard";
+import AddressBook from "./AddressBook";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStore } from "../contexts/StoreContext";
 import { changePassword as changePasswordRequest, getLoyaltyAccount, getSubscriptionStatus, listMyOrders, listNotifications, markNotificationRead as markNotificationReadRequest, unsubscribeNewsletter, updateProfile } from "../api/client";
@@ -18,7 +19,6 @@ export default function Profile({ user, setUser, section = "overview" }) {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [passwordState, setPasswordState] = useState({ loading: false, message: "", error: "" });
   const [notifications, setNotifications] = useState([]);
-  const [savedAddresses, setSavedAddresses] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [subscriptionError, setSubscriptionError] = useState("");
@@ -57,9 +57,8 @@ export default function Profile({ user, setUser, section = "overview" }) {
       .then((data) => setNotifications(Array.isArray(data) ? data : []))
       .catch(() => setNotifications([]));
   }, [user, section]);
-  useEffect(() => { if (!user) return; const key = user.uuid || user.id; try { setSavedAddresses(JSON.parse(localStorage.getItem(`sunsetAddresses:${key}`)) || []); setPaymentMethods(JSON.parse(localStorage.getItem(`sunsetPayments:${key}`)) || []); } catch { setSavedAddresses([]); setPaymentMethods([]); } }, [user, section]);
+  useEffect(() => { if (!user) return; const key = user.uuid || user.id; try { setPaymentMethods(JSON.parse(localStorage.getItem(`sunsetPayments:${key}`)) || []); } catch { setPaymentMethods([]); } }, [user, section]);
   useEffect(() => { if (!user) return; getSubscriptionStatus(localStorage.getItem("authToken")).then(setSubscription).catch(()=>{}); },[user,section]);
-  const removeSavedAddress = (id) => { const next = savedAddresses.filter((item) => item.id !== id); setSavedAddresses(next); localStorage.setItem(`sunsetAddresses:${user.uuid || user.id}`, JSON.stringify(next)); };
   const removePayment = (id) => { const next = paymentMethods.filter((item) => item.id !== id); setPaymentMethods(next); localStorage.setItem(`sunsetPayments:${user.uuid || user.id}`, JSON.stringify(next)); };
   const unsubscribe = async () => { setSubscriptionError(""); try { setSubscription(await unsubscribeNewsletter(localStorage.getItem("authToken"))); } catch (error) { setSubscriptionError(error.message || "Не удалось отписаться"); } };
 
@@ -196,7 +195,7 @@ export default function Profile({ user, setUser, section = "overview" }) {
 
           {section === "addresses" && <>
             <div className="account-section-head"><div><p className="page-kicker">Оформление</p><h2>Адреса и оплата</h2></div><p>Сохранённые адреса и привязанные способы оплаты для быстрого заказа.</p></div>
-            <div className="saved-profile-grid"><section className="saved-profile-card"><h3>Мои адреса</h3>{savedAddresses.length ? savedAddresses.map((address) => <div className="saved-profile-row" key={address.id}><div><strong>{address.label || "Адрес"}</strong><span>{[address.city,address.street,address.house,address.apartment && `кв. ${address.apartment}`].filter(Boolean).join(", ")}</span></div><button onClick={() => removeSavedAddress(address.id)}>Удалить</button></div>) : <p className="muted">Адресов пока нет. Добавьте первый при оформлении заказа.</p>}<Link className="text-link" to="/profile/basket">Добавить адрес в оформлении →</Link></section><section className="saved-profile-card"><h3>Способы оплаты</h3>{paymentMethods.length ? paymentMethods.map((method) => <div className="saved-profile-row" key={method.id}><div><strong>{method.brand || "Банковская карта"}</strong><span>•••• {method.last4}</span></div><button onClick={() => removePayment(method.id)}>Удалить</button></div>) : <p className="muted">Привязанных карт пока нет. Способ оплаты можно добавить во время оплаты заказа.</p>}<button className="text-link" onClick={() => alert("Добавление карты подключается на шаге оплаты заказа")}>Добавить способ оплаты →</button></section><section className="saved-profile-card saved-profile-card--subscription"><h3>Рассылка SUNSET</h3>{subscription?.active ? <><p className="subscription-active">Подписка активна</p><p className="muted">Новости и персональная скидка отправляются на {subscription.email || user.email}.</p><button className="subscription-cancel" onClick={unsubscribe}>Отписаться от рассылки</button></> : <><p className="muted">Вы не подписаны на новости и специальные предложения.</p><a className="text-link" href="#subscribe-form">Подписаться →</a></>}{subscriptionError && <p className="account-form__error" role="alert">{subscriptionError}</p>}</section></div>
+            <div className="saved-profile-grid"><AddressBook user={user} /><section className="saved-profile-card"><h3>Способы оплаты</h3>{paymentMethods.length ? paymentMethods.map((method) => <div className="saved-profile-row" key={method.id}><div><strong>{method.brand || "Банковская карта"}</strong><span>•••• {method.last4}</span></div><button onClick={() => removePayment(method.id)}>Удалить</button></div>) : <p className="muted">Привязанных карт пока нет. Способ оплаты можно добавить во время оплаты заказа.</p>}<button className="text-link" onClick={() => alert("Добавление карты подключается на шаге оплаты заказа")}>Добавить способ оплаты →</button></section><section className="saved-profile-card saved-profile-card--subscription"><h3>Рассылка SUNSET</h3>{subscription?.active ? <><p className="subscription-active">Подписка активна</p><p className="muted">Новости и персональная скидка отправляются на {subscription.email || user.email}.</p><button className="subscription-cancel" onClick={unsubscribe}>Отписаться от рассылки</button></> : <><p className="muted">Вы не подписаны на новости и специальные предложения.</p><a className="text-link" href="#subscribe-form">Подписаться →</a></>}{subscriptionError && <p className="account-form__error" role="alert">{subscriptionError}</p>}</section></div>
           </>}
 
           {section === "settings" && <>

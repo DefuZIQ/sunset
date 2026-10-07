@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../components/HeaderParts/CartContext";
-import { createOrder, getLoyaltyAccount, quoteDelivery, validatePromoCode } from "../api/client";
+import { createCustomerAddress, createOrder, deleteCustomerAddress, getLoyaltyAccount, quoteDelivery, syncCustomerAddresses, updateCustomerAddress, validatePromoCode } from "../api/client";
 import "./ContentPages.css";
 
 const stores = [
@@ -84,6 +84,18 @@ export default function Cart({ user }) {
       .catch(() => {});
   }, [user]);
   useEffect(() => {
+    if (!user) return;
+    let active = true;
+    syncCustomerAddresses(localStorage.getItem("authToken"), accountId)
+      .then((saved) => {
+        if (!active) return;
+        setAddresses(saved);
+        setSelectedAddressId((current) => saved.some((item) => item.id === current) ? current : saved[0]?.id || "");
+      })
+      .catch(() => { if (active) setState((current) => ({ ...current, error: "Не удалось загрузить адреса. Попробуйте обновить страницу." })); });
+    return () => { active = false; };
+  }, [accountId, user]);
+  useEffect(() => {
     setForm((current) => ({ ...current, phone: user?.phone || "" }));
     setPhoneEditable(!user?.phone);
   }, [user?.phone]);
@@ -113,7 +125,7 @@ export default function Cart({ user }) {
         : "",
     [selectedAddress],
   );
-  const saveAddress = () => {
+  const saveAddress = async () => {
     if (
       !addressDraft.city.trim() ||
       !addressDraft.street.trim() ||
@@ -126,17 +138,26 @@ export default function Cart({ user }) {
       setState({ loading: false, error: "Проверьте точку адреса на карте" });
       return;
     }
-    const entry = { ...addressDraft, id: editingAddressId || `${Date.now()}` };
-    const next = editingAddressId
-      ? addresses.map((item) => (item.id === editingAddressId ? entry : item))
-      : [...addresses, entry];
-    setAddresses(next);
-    setSelectedAddressId(entry.id);
-    setEditingAddressId(null);
-    setShowAddressForm(false);
-    setMapConfirmed(false);
-    setState({ loading: false, error: "" });
-    localStorage.setItem(`sunsetAddresses:${accountId}`, JSON.stringify(next));
+    setState({ loading: true, error: "" });
+    try {
+      const entry = user
+        ? await (editingAddressId
+          ? updateCustomerAddress(localStorage.getItem("authToken"), editingAddressId, addressDraft)
+          : createCustomerAddress(localStorage.getItem("authToken"), addressDraft))
+        : { ...addressDraft, id: editingAddressId || `${Date.now()}` };
+      const next = editingAddressId
+        ? addresses.map((item) => (item.id === editingAddressId ? entry : item))
+        : [...addresses, entry];
+      setAddresses(next);
+      setSelectedAddressId(entry.id);
+      setEditingAddressId(null);
+      setShowAddressForm(false);
+      setMapConfirmed(false);
+      setState({ loading: false, error: "" });
+      if (!user) localStorage.setItem(`sunsetAddresses:${accountId}`, JSON.stringify(next));
+    } catch (error) {
+      setState({ loading: false, error: error.message || "Не удалось сохранить адрес" });
+    }
   };
   const editAddress = (address) => {
     setAddressDraft({ ...address });
@@ -145,11 +166,16 @@ export default function Cart({ user }) {
     setShowAddressForm(true);
     setState({ loading: false, error: "" });
   };
-  const deleteAddress = (id) => {
-    const next = addresses.filter((item) => item.id !== id);
-    setAddresses(next);
-    if (selectedAddressId === id) setSelectedAddressId(next[0]?.id || "");
-    localStorage.setItem(`sunsetAddresses:${accountId}`, JSON.stringify(next));
+  const deleteAddress = async (id) => {
+    try {
+      if (user) await deleteCustomerAddress(localStorage.getItem("authToken"), id);
+      const next = addresses.filter((item) => item.id !== id);
+      setAddresses(next);
+      if (selectedAddressId === id) setSelectedAddressId(next[0]?.id || "");
+      if (!user) localStorage.setItem(`sunsetAddresses:${accountId}`, JSON.stringify(next));
+    } catch (error) {
+      setState({ loading: false, error: error.message || "Не удалось удалить адрес" });
+    }
   };
   const useLocation = () =>
     navigator.geolocation?.getCurrentPosition(

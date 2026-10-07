@@ -1,13 +1,45 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createOrder, createOrderReturn, deleteAdminProduct, getCategoryTree,
+import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createCustomerAddress, createOrder, createOrderReturn, deleteAdminProduct, deleteCustomerAddress, getCategoryTree,
   getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
   listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
-  listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer,
+  listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer,
   markNotificationRead, quoteDelivery, registerCustomer, saveProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
-  validatePromoCode, getProfile } from "./client";
+  updateCustomerAddress, validatePromoCode, getProfile, syncCustomerAddresses } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("address book CRUD uses protected versioned paths and an empty DELETE response", async () => {
+  const address = { label: "Дом", city: "Нижний Новгород", street: "Большая Покровская", house: "34" };
+  const saved = { ...address, id: "address-1" };
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => [saved] })
+    .mockResolvedValueOnce({ ok: true, json: async () => saved })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ...saved, label: "Работа" }) })
+    .mockResolvedValueOnce({ ok: true, status: 204, json: async () => { throw new Error("204 must not be parsed"); } });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await expect(listCustomerAddresses("jwt")).resolves.toEqual([saved]);
+  await expect(createCustomerAddress("jwt", address)).resolves.toEqual(saved);
+  await expect(updateCustomerAddress("jwt", "address/1", { ...address, label: "Работа" })).resolves.toMatchObject({ label: "Работа" });
+  await expect(deleteCustomerAddress("jwt", "address/1")).resolves.toBeUndefined();
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/auth/addresses", { headers: { Authorization: "Bearer jwt" } });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/auth/addresses", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify(address) });
+  expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/v1/auth/addresses/address%2F1", { method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify({ ...address, label: "Работа" }) });
+  expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/v1/auth/addresses/address%2F1", { method: "DELETE", headers: { Authorization: "Bearer jwt" } });
+});
+
+test("legacy browser addresses migrate once without duplicating server addresses", async () => {
+  const existing = { id: "server-1", label: "Дом", city: "Москва", street: "Тверская", house: "1" };
+  const other = { id: "old-2", label: "Работа", city: "Москва", street: "Арбат", house: "2" };
+  localStorage.setItem("sunsetAddresses:user-1", JSON.stringify([existing, other]));
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => [existing] })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ...other, id: "server-2" }) });
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(syncCustomerAddresses("jwt", "user-1")).resolves.toHaveLength(2);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(localStorage.getItem("sunsetAddresses:user-1")).toBeNull();
+});
 
 test("admin product writes use versioned paths and DELETE accepts an empty 204 response", async () => {
   const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ id: "product-1", name: "Пальто", price: 9000 }) })

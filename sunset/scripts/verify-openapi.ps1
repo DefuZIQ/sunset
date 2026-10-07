@@ -11,6 +11,7 @@ if ($spec.openapi -ne '3.0.3' -or $spec.servers[0].url -ne '/api/v1') {
 
 $controllerSources = @{
     '/auth' = 'backend/auth-service/src/main/java/com/sunset/auth/controller/AuthController.java'
+    '/auth/addresses' = 'backend/auth-service/src/main/java/com/sunset/auth/controller/CustomerAddressController.java'
     '/products' = 'backend/product-service/src/main/java/com/sunset/product/controller/ProductController.java'
     '/order' = 'backend/order-service/src/main/java/com/sunset/product/controller/OrderController.java'
     '/order/stores' = 'backend/order-service/src/main/java/com/sunset/product/controller/StoreController.java'

@@ -22,6 +22,8 @@ export type AdminVariants = components["schemas"]["AdminVariants"];
 export type AdminProductResult = components["schemas"]["AdminProductResult"];
 export type AdminStockResult = components["schemas"]["AdminStockResult"];
 export type AdminBonusResult = components["schemas"]["AdminBonusResult"];
+export type CustomerAddress = components["schemas"]["CustomerAddress"];
+export type CustomerAddressInput = components["schemas"]["CustomerAddressInput"];
 type ProductUuidRequest = paths["/products/by-uuid"]["post"]["requestBody"]["content"]["application/json"];
 type SubscribeRequest = paths["/subscriptions"]["post"]["requestBody"]["content"]["application/json"];
 type SaveReviewRequest = paths["/products/review/{id}"]["post"]["requestBody"]["content"]["application/json"];
@@ -63,6 +65,45 @@ async function readJson<T>(response: Response): Promise<T> {
 
 function bearer(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
+}
+
+export async function listCustomerAddresses(token: string): Promise<CustomerAddress[]> {
+  return readJson<CustomerAddress[]>(await fetch("/api/v1/auth/addresses", { headers: bearer(token) }));
+}
+
+export async function createCustomerAddress(token: string, address: CustomerAddressInput): Promise<CustomerAddress> {
+  return readJson<CustomerAddress>(await fetch("/api/v1/auth/addresses", {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(address),
+  }));
+}
+
+export async function updateCustomerAddress(token: string, id: string, address: CustomerAddressInput): Promise<CustomerAddress> {
+  return readJson<CustomerAddress>(await fetch(`/api/v1/auth/addresses/${encodeURIComponent(id)}`, {
+    method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(address),
+  }));
+}
+
+export async function deleteCustomerAddress(token: string, id: string): Promise<void> {
+  const response = await fetch(`/api/v1/auth/addresses/${encodeURIComponent(id)}`, { method: "DELETE", headers: bearer(token) });
+  if (!response.ok) throw new ApiHttpError(response.status, "Не удалось удалить адрес");
+}
+
+// One-time migration of addresses stored by older versions of the storefront.
+export async function syncCustomerAddresses(token: string, accountId: string): Promise<CustomerAddress[]> {
+  const addresses = await listCustomerAddresses(token);
+  const legacyKey = `sunsetAddresses:${accountId}`;
+  let legacy: CustomerAddress[] = [];
+  try { legacy = JSON.parse(localStorage.getItem(legacyKey) || "[]"); } catch { /* Ignore corrupt old data. */ }
+  if (!Array.isArray(legacy) || legacy.length === 0) return addresses;
+  for (const item of legacy) {
+    if (!item?.city || !item?.street || !item?.house) continue;
+    const same = addresses.some((saved) =>
+      [saved.city, saved.street, saved.house, saved.apartment || ""].join("|").toLowerCase() ===
+      [item.city, item.street, item.house, item.apartment || ""].join("|").toLowerCase());
+    if (!same) addresses.push(await createCustomerAddress(token, item));
+  }
+  localStorage.removeItem(legacyKey);
+  return addresses;
 }
 
 export async function registerCustomer(request: RegisterRequest): Promise<AuthResponse> {

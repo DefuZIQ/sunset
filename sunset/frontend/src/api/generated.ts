@@ -73,6 +73,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Адресная книга текущего клиента */
+        get: operations["listCustomerAddresses"];
+        put?: never;
+        /** Сохранить адрес */
+        post: operations["createCustomerAddress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/addresses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Изменить свой адрес */
+        put: operations["updateCustomerAddress"];
+        post?: never;
+        /** Удалить свой адрес */
+        delete: operations["deleteCustomerAddress"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/all": {
         parameters: {
             query?: never;
@@ -678,6 +716,26 @@ export interface components {
             email: string;
             /** Format: password */
             password: string;
+        };
+        CustomerAddressInput: {
+            label: string;
+            city: string;
+            street: string;
+            house: string;
+            building?: string | null;
+            structure?: string | null;
+            entrance?: string | null;
+            floor?: string | null;
+            apartment?: string | null;
+            intercom?: string | null;
+            postalCode?: string | null;
+            comment?: string | null;
+            lat?: number | null;
+            lon?: number | null;
+        };
+        CustomerAddress: components["schemas"]["CustomerAddressInput"] & {
+            /** Format: uuid */
+            id: string;
         };
         AuthResponse: {
             /** Format: uuid */
@@ -1288,6 +1346,104 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listCustomerAddresses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Сохранённые адреса */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddress"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createCustomerAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAddressInput"];
+            };
+        };
+        responses: {
+            /** @description Адрес сохранён */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddress"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    updateCustomerAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAddressInput"];
+            };
+        };
+        responses: {
+            /** @description Адрес изменён */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddress"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteCustomerAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Адрес удалён */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     listProducts: {
