@@ -41,6 +41,25 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.clear());
 });
 
+test('guest account popup matches the profile style and keeps its actions on screen', async ({ page }) => {
+  await page.goto('/#/');
+  await page.getByRole('button', { name: 'Профиль' }).click();
+
+  const popup = page.getByRole('menu', { name: 'Аккаунт' });
+  await expect(popup).toBeVisible();
+  await expect(popup.getByText('Добро пожаловать')).toBeVisible();
+  await expect(popup.getByRole('menuitem', { name: 'Войти' })).toBeVisible();
+  await expect(popup.getByRole('menuitem', { name: 'Создать аккаунт' })).toBeVisible();
+
+  const bounds = await popup.boundingBox();
+  const viewport = page.viewportSize();
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+
+  await popup.getByRole('menuitem', { name: 'Создать аккаунт' }).click();
+  await expect(page).toHaveURL(/#\/register$/);
+});
+
 test('guest newsletter signup uses the versioned API and shows confirmation', async ({ page }) => {
   let submitted = false;
   await page.route('**/api/v1/subscriptions', async (route) => {

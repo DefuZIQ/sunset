@@ -45,11 +45,25 @@ export default function AvatarMenu({ isAuthenticated, user, onLogout, isPopupOpe
         </div>
       ) : (
         !isPopupOpen && (
-          <div className="dropdown-content" role="menu">
-            <div className="dropdown__background">
-              <Link to="/login" role="menuitem">Войти</Link>
-              <Link to="/register" role="menuitem">Регистрация</Link>
+          <div className="dropdown-content profile-popup--guest" role="menu" aria-label="Аккаунт">
+            <div className="profile-popup__guest-head">
+              <span className="profile-popup__guest-avatar" aria-hidden="true">S</span>
+              <div>
+                <span className="profile-popup__guest-kicker">SUNSET ID</span>
+                <strong>Добро пожаловать</strong>
+                <small>Ваш личный стиль начинается здесь</small>
+              </div>
             </div>
+            <div className="profile-popup__guest-body">
+              <p>Войдите, чтобы сохранять избранное, следить за заказами и получать бонусы.</p>
+              <Link className="profile-popup__guest-primary" to="/login" role="menuitem">
+                Войти <span aria-hidden="true">→</span>
+              </Link>
+              <Link className="profile-popup__guest-secondary" to="/register" role="menuitem">
+                Создать аккаунт <span aria-hidden="true">↗</span>
+              </Link>
+            </div>
+            <div className="profile-popup__guest-foot">Избранное · Заказы · Бонусы</div>
           </div>
         )
       )}
