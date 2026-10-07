@@ -509,6 +509,13 @@ async function openCheckout(page) {
   await page.route('**/order/loyalty', (route) => route.fulfill({ json: { balance: 0 } }));
   await page.route('**/order/delivery/quote', (route) => route.fulfill({ json: { cost: 390, estimatedDays: 3 } }));
   await page.route('**/order/my', (route) => route.fulfill({ json: [] }));
+  const savedAddresses = [];
+  await page.route('**/auth/addresses', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: savedAddresses });
+    const address = { ...route.request().postDataJSON(), id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' };
+    savedAddresses.push(address);
+    return route.fulfill({ status: 201, json: address });
+  });
   await page.route('**/notifications?*', (route) => route.fulfill({ json: [] }));
   await page.route('**/subscriptions/status', (route) => route.fulfill({ json: { active: false } }));
   await page.addInitScript(({ account, product }) => {
@@ -540,7 +547,9 @@ test('saves and selects a delivery address before checkout', async ({ page }) =>
   await addressDialog.getByRole('button', { name: 'Сохранить адрес' }).click();
   await expect(addressDialog.getByText('Проверьте точку адреса на карте')).toBeVisible();
   await addressDialog.getByRole('checkbox', { name: 'Точка на карте соответствует адресу' }).check();
+  const addressSaved = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/auth/addresses' && request.method() === 'POST');
   await addressDialog.getByRole('button', { name: 'Сохранить адрес' }).click();
+  expect((await addressSaved).postDataJSON()).toMatchObject({ city: 'Нижний Новгород', street: 'Большая Покровская', house: '34' });
 
   await expect(addressDialog).toHaveCount(0);
   await expect(page.locator('.saved-address-row').filter({ hasText: 'Большая Покровская' })).toBeVisible();
@@ -552,8 +561,8 @@ test('saves and selects a delivery address before checkout', async ({ page }) =>
     address: 'Нижний Новгород, ул. Большая Покровская, д. 34',
     items: [{ productId: products[0].id, colorId: 'white', sizeId: 'women-m', quantity: 1 }],
   });
-  const saved = await page.evaluate((id) => JSON.parse(localStorage.getItem(`sunsetAddresses:${id}`)), user.id);
-  expect(saved).toHaveLength(1);
+  const saved = await page.evaluate((id) => localStorage.getItem(`sunsetAddresses:${id}`), user.id);
+  expect(saved).toBeNull();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('cartItems')))).toEqual({});
 });
 
