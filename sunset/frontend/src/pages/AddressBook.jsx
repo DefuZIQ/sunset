@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createCustomerAddress, deleteCustomerAddress, syncCustomerAddresses, updateCustomerAddress } from "../api/client";
+import AddressGeocoder from "./AddressGeocoder";
 
 const blank = { label: "Дом", city: "", street: "", house: "", building: "", structure: "", entrance: "", floor: "", apartment: "", intercom: "", postalCode: "", comment: "" };
 const fields = [
@@ -14,6 +15,7 @@ export default function AddressBook({ user }) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [pointConfirmed, setPointConfirmed] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -27,6 +29,10 @@ export default function AddressBook({ user }) {
 
   const save = async (event) => {
     event.preventDefault();
+    if (draft.lat != null && draft.lon != null && !pointConfirmed) {
+      setError("Проверьте точку адреса на карте");
+      return;
+    }
     setError("");
     setBusy(true);
     try {
@@ -66,13 +72,25 @@ export default function AddressBook({ user }) {
     {addresses.length ? addresses.map((address) => <div className="saved-profile-row" key={address.id}>
       <div><strong>{address.label}</strong><span>{[address.city, address.street, address.house, address.apartment && `кв. ${address.apartment}`].filter(Boolean).join(", ")}</span></div>
       <div className="address-book__actions">
-        <button type="button" disabled={busy} onClick={() => { setEditingId(address.id); setDraft({ ...blank, ...address }); setError(""); }}>Изменить</button>
+        <button type="button" disabled={busy} onClick={() => { setEditingId(address.id); setDraft({ ...blank, ...address }); setPointConfirmed(false); setError(""); }}>Изменить</button>
         <button type="button" disabled={busy} onClick={() => remove(address.id)}>Удалить</button>
       </div>
     </div>) : <p className="muted">Адресов пока нет. Добавьте первый для быстрого оформления заказа.</p>}
-    {!draft && <button type="button" className="text-link" onClick={() => { setEditingId(null); setDraft({ ...blank }); setError(""); }}>+ Добавить адрес</button>}
+    {!draft && <button type="button" className="text-link" onClick={() => { setEditingId(null); setDraft({ ...blank }); setPointConfirmed(false); setError(""); }}>+ Добавить адрес</button>}
     {draft && <form className="address-book__form" onSubmit={save}>
-      {fields.map(([key, label]) => <label key={key}><span>{label}</span><input required={["label", "city", "street", "house"].includes(key)} maxLength={key === "comment" ? 500 : 160} value={draft[key] || ""} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))} /></label>)}
+      {fields.map(([key, label]) => <label key={key}><span>{label}</span><input required={["label", "city", "street", "house"].includes(key)} maxLength={key === "comment" ? 500 : 160} value={draft[key] || ""} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value, ...(["city", "street", "house"].includes(key) ? { lat: null, lon: null } : {}) }))} /></label>)}
+      <div className="address-book__map">
+        <AddressGeocoder draft={draft} onChoose={(candidate) => {
+          setDraft((current) => ({ ...current, city: candidate.city, street: candidate.street, house: candidate.house,
+            building: candidate.building || current.building, postalCode: candidate.postalCode || current.postalCode,
+            lat: candidate.lat, lon: candidate.lon }));
+          setPointConfirmed(false);
+        }} />
+        {draft.lat != null && draft.lon != null && <>
+          <iframe title="Точка сохранённого адреса" src={`https://www.openstreetmap.org/export/embed.html?bbox=${draft.lon - 0.02}%2C${draft.lat - 0.01}%2C${draft.lon + 0.02}%2C${draft.lat + 0.01}&layer=mapnik&marker=${draft.lat}%2C${draft.lon}`} />
+          <label className="map-confirm"><input type="checkbox" checked={pointConfirmed} onChange={(event) => setPointConfirmed(event.target.checked)} />Точка на карте соответствует адресу</label>
+        </>}
+      </div>
       <div className="address-book__footer"><button className="primary-action" disabled={busy}>{busy ? "Сохраняем…" : "Сохранить адрес"}</button><button type="button" className="text-link" onClick={() => { setDraft(null); setEditingId(null); setError(""); }}>Отмена</button></div>
     </form>}
     {error && <p className="account-form__error" role="alert">{error}</p>}

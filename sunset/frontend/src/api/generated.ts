@@ -111,6 +111,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/addresses/geocoder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Доступность проверки адреса */
+        get: operations["getAddressGeocoderStatus"];
+        put?: never;
+        /** Найти адрес после явного действия клиента */
+        post: operations["lookupAddress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/all": {
         parameters: {
             query?: never;
@@ -736,6 +754,28 @@ export interface components {
         CustomerAddress: components["schemas"]["CustomerAddressInput"] & {
             /** Format: uuid */
             id: string;
+        };
+        AddressGeocoderStatus: {
+            available: boolean;
+        };
+        AddressLookupRequest: {
+            query: string;
+            selected: boolean;
+        };
+        AddressLookupCandidate: {
+            value?: string | null;
+            query: string;
+            city: string;
+            street: string;
+            house: string;
+            building?: string | null;
+            postalCode?: string | null;
+            lat?: number | null;
+            lon?: number | null;
+        };
+        AddressLookupResult: {
+            available: boolean;
+            suggestions: components["schemas"]["AddressLookupCandidate"][];
         };
         AuthResponse: {
             /** Format: uuid */
@@ -1444,6 +1484,53 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getAddressGeocoderStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Статус */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddressGeocoderStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    lookupAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressLookupRequest"];
+            };
+        };
+        responses: {
+            /** @description Варианты адреса */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddressLookupResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
         };
     };
     listProducts: {

@@ -66,6 +66,17 @@
         "responses": { "204": { "description": "Адрес удалён" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
+    "/auth/addresses/geocoder": {
+      "get": {
+        "tags": ["Auth"], "operationId": "getAddressGeocoderStatus", "summary": "Доступность проверки адреса", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Статус", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddressGeocoderStatus" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "post": {
+        "tags": ["Auth"], "operationId": "lookupAddress", "summary": "Найти адрес после явного действия клиента", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddressLookupRequest" } } } },
+        "responses": { "200": { "description": "Варианты адреса", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddressLookupResult" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
     "/products/all": {
       "get": {
         "tags": ["Products"], "operationId": "listProducts", "summary": "Каталог",
@@ -352,6 +363,10 @@
       "CustomerAddress": {
         "allOf": [{ "$ref": "#/components/schemas/CustomerAddressInput" }, { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "format": "uuid" } } }]
       },
+      "AddressGeocoderStatus": { "type": "object", "required": ["available"], "properties": { "available": { "type": "boolean" } } },
+      "AddressLookupRequest": { "type": "object", "required": ["query", "selected"], "properties": { "query": { "type": "string", "minLength": 5, "maxLength": 300 }, "selected": { "type": "boolean" } } },
+      "AddressLookupCandidate": { "type": "object", "required": ["query", "city", "street", "house"], "properties": { "value": { "type": "string", "nullable": true }, "query": { "type": "string" }, "city": { "type": "string" }, "street": { "type": "string" }, "house": { "type": "string" }, "building": { "type": "string", "nullable": true }, "postalCode": { "type": "string", "nullable": true }, "lat": { "type": "number", "nullable": true }, "lon": { "type": "number", "nullable": true } } },
+      "AddressLookupResult": { "type": "object", "required": ["available", "suggestions"], "properties": { "available": { "type": "boolean" }, "suggestions": { "type": "array", "items": { "$ref": "#/components/schemas/AddressLookupCandidate" } } } },
       "AuthResponse": {
         "type": "object", "required": ["uuid", "email", "role", "token"],
         "properties": {

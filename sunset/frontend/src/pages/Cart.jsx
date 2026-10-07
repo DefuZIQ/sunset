@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import AddressGeocoder from "./AddressGeocoder";
 import { useCart } from "../components/HeaderParts/CartContext";
 import { createCustomerAddress, createOrder, deleteCustomerAddress, getLoyaltyAccount, quoteDelivery, syncCustomerAddresses, updateCustomerAddress, validatePromoCode } from "../api/client";
 import "./ContentPages.css";
@@ -59,8 +60,8 @@ export default function Cart({ user }) {
     apartment: "",
     intercom: "",
     postalCode: "",
-    lat: 55.75,
-    lon: 37.62,
+    lat: null,
+    lon: null,
   });
   const [form, setForm] = useState({
     phone: user?.phone || "",
@@ -135,7 +136,8 @@ export default function Cart({ user }) {
       return;
     }
     if (!mapConfirmed) {
-      setState({ loading: false, error: "Проверьте точку адреса на карте" });
+      setState({ loading: false, error: addressDraft.lat != null && addressDraft.lon != null
+        ? "Проверьте точку адреса на карте" : "Подтвердите адрес, указанный вручную" });
       return;
     }
     setState({ loading: true, error: "" });
@@ -162,7 +164,7 @@ export default function Cart({ user }) {
   const editAddress = (address) => {
     setAddressDraft({ ...address });
     setEditingAddressId(address.id);
-    setMapConfirmed(true);
+    setMapConfirmed(false);
     setShowAddressForm(true);
     setState({ loading: false, error: "" });
   };
@@ -185,7 +187,7 @@ export default function Cart({ user }) {
           lat: coords.latitude,
           lon: coords.longitude,
         }));
-        setMapConfirmed(true);
+        setMapConfirmed(false);
       },
       () =>
         setState({ loading: false, error: "Не удалось определить геопозицию" }),
@@ -274,8 +276,9 @@ export default function Cart({ user }) {
   );
   const deliveryCost = Number(deliveryQuote?.cost || 0);
   const total = Math.max(0, subtotal - discount - bonusUse + deliveryCost);
-  const mapLat = selectedAddress?.lat || addressDraft.lat;
-  const mapLon = selectedAddress?.lon || addressDraft.lon;
+  const mapLat = addressDraft.lat;
+  const mapLon = addressDraft.lon;
+  const hasMapPoint = Number.isFinite(Number(mapLat)) && Number.isFinite(Number(mapLon)) && mapLat != null && mapLon != null;
   return (
     <div className="page-shell container">
       <p className="page-kicker">Ваш заказ</p>
@@ -468,8 +471,8 @@ export default function Cart({ user }) {
                       apartment: "",
                       intercom: "",
                       postalCode: "",
-                      lat: 55.75,
-                      lon: 37.62,
+                      lat: null,
+                      lon: null,
                     });
                     setShowAddressForm(true);
                   }}
@@ -533,18 +536,12 @@ export default function Cart({ user }) {
                           </span>
                           <input
                             title={hint}
-                            list={
-                              key === "city"
-                                ? "city-suggestions"
-                                : key === "street"
-                                  ? "street-suggestions"
-                                  : undefined
-                            }
                             value={addressDraft[key]}
                             onChange={(e) => {
                               setAddressDraft({
                                 ...addressDraft,
                                 [key]: e.target.value,
+                                ...(["city", "street", "house"].includes(key) ? { lat: null, lon: null } : {}),
                               });
                               if (["city", "street", "house"].includes(key)) {
                                 setMapConfirmed(false);
@@ -555,26 +552,20 @@ export default function Cart({ user }) {
                         </label>
                       ))}
                     </div>
-                    <datalist id="city-suggestions">
-                      <option value="Нижний Новгород" />
-                      <option value="Нижний Тагил" />
-                      <option value="Москва" />
-                      <option value="Санкт-Петербург" />
-                      <option value="Казань" />
-                      <option value="Екатеринбург" />
-                    </datalist>
-                    <datalist id="street-suggestions">
-                      <option value="Большая Покровская" />
-                      <option value="Варварская" />
-                      <option value="Рождественская" />
-                      <option value="Ильинская" />
-                      <option value="Минина" />
-                    </datalist>
+                    <AddressGeocoder draft={addressDraft} onChoose={(candidate) => {
+                      setAddressDraft((current) => ({ ...current,
+                        city: candidate.city, street: candidate.street, house: candidate.house,
+                        building: candidate.building || current.building,
+                        postalCode: candidate.postalCode || current.postalCode,
+                        lat: candidate.lat, lon: candidate.lon,
+                      }));
+                      setMapConfirmed(false);
+                    }} />
                     <div className="map-preview">
-                      <iframe
+                      {hasMapPoint ? <iframe
                         title="Проверка точки адреса на карте"
                         src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapLon - 0.02}%2C${mapLat - 0.01}%2C${mapLon + 0.02}%2C${mapLat + 0.01}&layer=mapnik&marker=${mapLat}%2C${mapLon}`}
-                      />
+                      /> : <div className="map-preview__empty">Точка ещё не определена. Найдите адрес или укажите его вручную.</div>}
                       <button type="button" onClick={useLocation}>
                         Определить точку по моей геопозиции
                       </button>
@@ -584,7 +575,7 @@ export default function Cart({ user }) {
                           checked={mapConfirmed}
                           onChange={(e) => setMapConfirmed(e.target.checked)}
                         />{" "}
-                        Точка на карте соответствует адресу
+                        {hasMapPoint ? "Точка на карте соответствует адресу" : "Подтверждаю адрес, указанный вручную"}
                       </label>
                     </div>
                     {state.error && (

@@ -1,6 +1,8 @@
 package com.sunset.auth.controller;
 
 import com.sunset.auth.dto.CustomerAddress;
+import com.sunset.auth.dto.AddressLookup;
+import com.sunset.auth.service.AddressGeocoderService;
 import com.sunset.auth.service.CustomerAddressService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -13,9 +15,11 @@ import java.util.UUID;
 @RequestMapping("/auth/addresses")
 public class CustomerAddressController {
     private final CustomerAddressService addresses;
+    private final AddressGeocoderService geocoder;
 
-    public CustomerAddressController(CustomerAddressService addresses) {
+    public CustomerAddressController(CustomerAddressService addresses, AddressGeocoderService geocoder) {
         this.addresses = addresses;
+        this.geocoder = geocoder;
     }
 
     @GetMapping
@@ -38,6 +42,16 @@ public class CustomerAddressController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(Authentication authentication, @PathVariable UUID id) {
         addresses.delete(userId(authentication), id);
+    }
+
+    @GetMapping("/geocoder")
+    public java.util.Map<String, Boolean> geocoderStatus() {
+        return java.util.Map.of("available", geocoder.available());
+    }
+
+    @PostMapping("/geocoder")
+    public AddressLookup.Result lookup(Authentication authentication, @RequestBody AddressLookup.Request request) {
+        return geocoder.lookup(userId(authentication), request);
     }
 
     private static UUID userId(Authentication authentication) {

@@ -1,13 +1,26 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createCustomerAddress, createOrder, createOrderReturn, deleteAdminProduct, deleteCustomerAddress, getCategoryTree,
-  getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
+  getAddressGeocoderStatus, getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
   listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
-  listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer,
+  listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
   markNotificationRead, quoteDelivery, registerCustomer, saveProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
   updateCustomerAddress, validatePromoCode, getProfile, syncCustomerAddresses } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("address lookup keeps provider credentials on the server", async () => {
+  const suggestions = [{ query: "г Нижний Новгород, ул Большая Покровская, д 34", city: "Нижний Новгород", street: "Большая Покровская", house: "34", lat: 56.3269, lon: 44.0059 }];
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ available: true }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ available: true, suggestions }) });
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(getAddressGeocoderStatus("jwt")).resolves.toEqual({ available: true });
+  await expect(lookupAddress("jwt", "Нижний Новгород, Покровская 34")).resolves.toMatchObject({ suggestions });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/auth/addresses/geocoder", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
+    body: JSON.stringify({ query: "Нижний Новгород, Покровская 34", selected: false }),
+  });
+});
 
 test("address book CRUD uses protected versioned paths and an empty DELETE response", async () => {
   const address = { label: "Дом", city: "Нижний Новгород", street: "Большая Покровская", house: "34" };

@@ -24,6 +24,7 @@ export type AdminStockResult = components["schemas"]["AdminStockResult"];
 export type AdminBonusResult = components["schemas"]["AdminBonusResult"];
 export type CustomerAddress = components["schemas"]["CustomerAddress"];
 export type CustomerAddressInput = components["schemas"]["CustomerAddressInput"];
+export type AddressLookupCandidate = components["schemas"]["AddressLookupCandidate"];
 type ProductUuidRequest = paths["/products/by-uuid"]["post"]["requestBody"]["content"]["application/json"];
 type SubscribeRequest = paths["/subscriptions"]["post"]["requestBody"]["content"]["application/json"];
 type SaveReviewRequest = paths["/products/review/{id}"]["post"]["requestBody"]["content"]["application/json"];
@@ -69,6 +70,17 @@ function bearer(token: string): Record<string, string> {
 
 export async function listCustomerAddresses(token: string): Promise<CustomerAddress[]> {
   return readJson<CustomerAddress[]>(await fetch("/api/v1/auth/addresses", { headers: bearer(token) }));
+}
+
+export async function getAddressGeocoderStatus(token: string): Promise<components["schemas"]["AddressGeocoderStatus"]> {
+  return readJson(await fetch("/api/v1/auth/addresses/geocoder", { headers: bearer(token) }));
+}
+
+export async function lookupAddress(token: string, query: string, selected = false): Promise<components["schemas"]["AddressLookupResult"]> {
+  return readJson(await fetch("/api/v1/auth/addresses/geocoder", {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) },
+    body: JSON.stringify({ query, selected }),
+  }));
 }
 
 export async function createCustomerAddress(token: string, address: CustomerAddressInput): Promise<CustomerAddress> {

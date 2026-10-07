@@ -495,7 +495,7 @@ test('redirects an unauthenticated visitor away from administration', async ({ p
   await expect(page.getByText('Личный кабинет').first()).toBeVisible();
 });
 
-async function openCheckout(page) {
+async function openCheckout(page, { geocoderAvailable = false } = {}) {
   const user = {
     id: '33333333-3333-3333-3333-333333333333',
     uuid: '33333333-3333-3333-3333-333333333333',
@@ -516,6 +516,7 @@ async function openCheckout(page) {
     savedAddresses.push(address);
     return route.fulfill({ status: 201, json: address });
   });
+  await page.route('**/auth/addresses/geocoder', (route) => route.fulfill({ json: { available: geocoderAvailable, suggestions: [] } }));
   await page.route('**/notifications?*', (route) => route.fulfill({ json: [] }));
   await page.route('**/subscriptions/status', (route) => route.fulfill({ json: { active: false } }));
   await page.addInitScript(({ account, product }) => {
@@ -545,8 +546,9 @@ test('saves and selects a delivery address before checkout', async ({ page }) =>
   await addressDialog.locator('.address-grid label').filter({ hasText: 'Улица' }).locator('input').fill('Большая Покровская');
   await addressDialog.getByRole('textbox', { name: 'Дом Номер дома' }).fill('34');
   await addressDialog.getByRole('button', { name: 'Сохранить адрес' }).click();
-  await expect(addressDialog.getByText('Проверьте точку адреса на карте')).toBeVisible();
-  await addressDialog.getByRole('checkbox', { name: 'Точка на карте соответствует адресу' }).check();
+  await expect(addressDialog.getByText('Подтвердите адрес, указанный вручную')).toBeVisible();
+  await expect(addressDialog.getByTitle('Проверка точки адреса на карте')).toHaveCount(0);
+  await addressDialog.getByRole('checkbox', { name: 'Подтверждаю адрес, указанный вручную' }).check();
   const addressSaved = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/auth/addresses' && request.method() === 'POST');
   await addressDialog.getByRole('button', { name: 'Сохранить адрес' }).click();
   expect((await addressSaved).postDataJSON()).toMatchObject({ city: 'Нижний Новгород', street: 'Большая Покровская', house: '34' });
@@ -564,6 +566,21 @@ test('saves and selects a delivery address before checkout', async ({ page }) =>
   const saved = await page.evaluate((id) => localStorage.getItem(`sunsetAddresses:${id}`), user.id);
   expect(saved).toBeNull();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('cartItems')))).toEqual({});
+});
+
+test('selects a geocoded address and previews its actual point', async ({ page }) => {
+  await openCheckout(page, { geocoderAvailable: true });
+  const candidate = { value: 'Нижний Новгород, Большая Покровская, 34', query: 'г Нижний Новгород, ул Большая Покровская, д 34', city: 'Нижний Новгород', street: 'Большая Покровская', house: '34', postalCode: '603000', lat: 56.3269, lon: 44.0059 };
+  await page.route('**/auth/addresses/geocoder', (route) => route.fulfill({ json: { available: true, suggestions: [candidate] } }));
+  await page.getByRole('button', { name: 'Новый адрес' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.locator('.address-grid label').filter({ hasText: 'Город' }).locator('input').fill('Нижний Новгород');
+  await dialog.locator('.address-grid label').filter({ hasText: 'Улица' }).locator('input').fill('Большая Покровская');
+  await dialog.getByRole('textbox', { name: 'Дом Номер дома' }).fill('34');
+  await dialog.getByRole('button', { name: 'Найти адрес на карте' }).click();
+  await dialog.getByRole('option', { name: candidate.value }).click();
+  await expect(dialog.getByTitle('Проверка точки адреса на карте')).toHaveAttribute('src', /marker=56\.3269%2C44\.0059/);
+  await expect(dialog.getByRole('checkbox', { name: 'Точка на карте соответствует адресу' })).toBeVisible();
 });
 
 test('pickup checkout needs no delivery address', async ({ page }) => {
