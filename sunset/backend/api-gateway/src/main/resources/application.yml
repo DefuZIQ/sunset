@@ -67,6 +67,8 @@ security:
     - /actuator/health
 
 management:
+  tracing:
+    enabled: false
   endpoints:
     web:
       exposure:
