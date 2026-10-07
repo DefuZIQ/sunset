@@ -64,7 +64,7 @@
 
 Добавить Actuator health/readiness, Prometheus, Grafana, централизованные JSON-логи и OpenTelemetry. Критерий: по trace ID виден путь запроса от Gateway до БД.
 
-Статус: health, метрики, Prometheus и Grafana работают. Добавлен доверенный `X-Request-Id` и записи с ним в Gateway, Auth, Product, Order и Notification; это основа диагностики, но не полноценный OpenTelemetry trace. Далее — централизованные JSON-логи, trace/span ID и дашборды с alert rules.
+Статус: health, метрики, Prometheus и Grafana работают. Добавлен доверенный `X-Request-Id` и единый построчный JSON-формат stdout-логов Gateway, Auth, Product, Order и Notification. Это основа диагностики, но не полноценный OpenTelemetry trace или централизованное хранилище логов. Далее — сбор логов с политикой хранения, trace/span ID и дашборды с alert rules.
 
 ### DEP-01. CI/CD и откат
 

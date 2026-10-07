@@ -11,8 +11,15 @@
 - Отдельный скрипт проверяет размер, gzip, checksum и сигнатуру PostgreSQL dump.
 - Testcontainers поднимает временную PostgreSQL 16, применяет Liquibase и проверяет полный транзакционный цикл заказа без доступа к production-данным.
 - Gateway создаёт `X-Request-Id` для каждого запроса; Auth, Product, Order и Notification добавляют тот же ID в свои логи и возвращают его в HTTP-ответе. Логи не содержат тело запроса, JWT, телефон или адрес.
+- Пять backend-контейнеров пишут построчные JSON-логи в stdout с полями `service`, `level`, `message`, `requestId` (для HTTP-запросов), `method`, `path`, `status` и `durationMs`.
 
-Для разбора ошибки возьмите `X-Request-Id` из ответа и найдите его в логах Gateway и целевого сервиса. Это корреляционный ID; распределённая трассировка OpenTelemetry и централизованный сбор JSON-логов пока не реализованы.
+Для разбора ошибки возьмите `X-Request-Id` из ответа и найдите его в логах Gateway и целевого сервиса. Например, на сервере:
+
+```sh
+sudo docker compose -f docker-compose.prod.yml logs --no-log-prefix --since 30m api-gateway auth-service product-service order-service notification-service | jq -Rc 'fromjson? | select(.requestId == "UUID-ИЗ-ОТВЕТА")'
+```
+
+JSON-формат упрощает машинный поиск, но это всё ещё локальные Docker-логи: централизованное хранилище, сроки хранения и распределённая трассировка OpenTelemetry пока не реализованы. `requestId` не равен trace/span ID.
 
 ## Включение наблюдаемости
 

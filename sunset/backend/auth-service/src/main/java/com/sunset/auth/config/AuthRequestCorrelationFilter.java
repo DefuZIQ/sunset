@@ -33,9 +33,12 @@ public class AuthRequestCorrelationFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
         } finally {
             if (!request.getRequestURI().startsWith("/actuator/")) {
-                log.info("requestId={} method={} path={} status={} durationMs={}", requestId,
-                        request.getMethod(), request.getRequestURI(), response.getStatus(),
-                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+                log.atInfo()
+                        .addKeyValue("method", request.getMethod())
+                        .addKeyValue("path", request.getRequestURI())
+                        .addKeyValue("status", response.getStatus())
+                        .addKeyValue("durationMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started))
+                        .log("request completed");
             }
             MDC.remove("requestId");
         }

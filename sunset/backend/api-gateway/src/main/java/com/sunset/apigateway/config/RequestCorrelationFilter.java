@@ -39,8 +39,13 @@ public class RequestCorrelationFilter implements WebFilter {
             int status = traced.getResponse().getStatusCode() == null
                     ? 200 : traced.getResponse().getStatusCode().value();
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
-            log.info("requestId={} method={} path={} status={} durationMs={}", requestId,
-                    request.getMethod(), path, status, durationMs);
+            log.atInfo()
+                    .addKeyValue("requestId", requestId)
+                    .addKeyValue("method", request.getMethod().name())
+                    .addKeyValue("path", path)
+                    .addKeyValue("status", status)
+                    .addKeyValue("durationMs", durationMs)
+                    .log("request completed");
         });
     }
 }
