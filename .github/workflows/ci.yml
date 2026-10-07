@@ -20,6 +20,24 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-openapi.ps1
 
+  observability-config:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sunset
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Prometheus configuration and alert rules
+        run: docker run --rm -v "$PWD/ops/prometheus:/etc/prometheus:ro" --entrypoint promtool prom/prometheus:v2.55.1 check config /etc/prometheus/prometheus.yml
+      - name: Validate Grafana dashboard JSON
+        run: jq -e '.uid == "sunset-overview" and (.panels | length) >= 6' ops/grafana/dashboards/sunset-overview.json
+      - name: Validate observability Compose configuration
+        env:
+          POSTGRES_PASSWORD: ci-not-used-at-runtime
+          JWT_SECRET: ci-validation-secret-at-least-32-bytes
+          GRAFANA_ADMIN_PASSWORD: ci-not-used-at-runtime
+        run: docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml config --quiet
+
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -97,7 +115,7 @@ jobs:
 
   images:
     runs-on: ubuntu-latest
-    needs: [api-contract, backend, frontend, commerce-http-e2e]
+    needs: [api-contract, observability-config, backend, frontend, commerce-http-e2e]
     defaults:
       run:
         working-directory: sunset

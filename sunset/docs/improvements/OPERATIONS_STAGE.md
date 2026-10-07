@@ -12,6 +12,7 @@
 - Testcontainers поднимает временную PostgreSQL 16, применяет Liquibase и проверяет полный транзакционный цикл заказа без доступа к production-данным.
 - Gateway создаёт `X-Request-Id` для каждого запроса; Auth, Product, Order и Notification добавляют тот же ID в свои логи и возвращают его в HTTP-ответе. Логи не содержат тело запроса, JWT, телефон или адрес.
 - Пять backend-контейнеров пишут построчные JSON-логи в stdout с полями `service`, `level`, `message`, `requestId` (для HTTP-запросов), `method`, `path`, `status` и `durationMs`.
+- Grafana автоматически загружает обзорный дашборд SUNSET: доступность пяти сервисов, запросы в секунду, доля HTTP 5xx, средняя задержка и Java heap. Prometheus оценивает правила `SunsetServiceDown`, `SunsetMetricsMissing` и `SunsetHighServerErrorRate`.
 
 Для разбора ошибки возьмите `X-Request-Id` из ответа и найдите его в логах Gateway и целевого сервиса. Например, на сервере:
 
@@ -31,6 +32,10 @@ docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up
 
 Grafana слушает только `127.0.0.1:3001`, поэтому не публикуется в локальную сеть без отдельного reverse proxy и авторизации.
 
+Для просмотра с рабочего компьютера откройте SSH-туннель `ssh -L 3001:127.0.0.1:3001 defuziq@192.168.1.186`, затем `http://127.0.0.1:3001/d/sunset-overview`. Логин Grafana задаётся в Compose, пароль берётся из серверного `.env`. Правила Prometheus видны в разделе Alerting Grafana/Prometheus, но **пока не отправляют сообщения наружу**: Alertmanager и канал доставки ещё не настроены. Не принимайте наличие правил за работающие SMS/email-оповещения.
+
+После изменения конфигурации проверьте `promtool check config /etc/prometheus/prometheus.yml` внутри контейнера Prometheus и перезапустите контейнеры `prometheus` и `grafana` через Compose. Убедитесь, что все пять `up{job="sunset-services"}` равны 1, правила загружены, а дашборд виден по указанному UID.
+
 ## Backup
 
 ```sh
@@ -43,7 +48,7 @@ sudo ./scripts/backup-postgres.sh /home/defuziq/sunset /home/defuziq/backups
 ## Что ещё требуется по большому плану
 
 - реальная проверка адреса геокодером и синхронизация адресов между устройствами (браузерный checkout уже проверяется с тестовыми API-ответами);
-- дашборды, alert rules и OpenTelemetry trace ID;
+- доставка тревог через Alertmanager, OpenTelemetry trace/span ID и централизованное хранилище логов;
 - реальный платёжный webhook и реальный логистический провайдер;
 - transactional outbox для уведомлений;
 - серверный поисковый индекс и полноценные фасеты;
