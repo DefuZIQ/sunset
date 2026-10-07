@@ -31,6 +31,8 @@ jobs:
         run: docker run --rm -v "$PWD/ops/prometheus:/etc/prometheus:ro" --entrypoint promtool prom/prometheus:v2.55.1 check config /etc/prometheus/prometheus.yml
       - name: Validate Grafana dashboard JSON
         run: jq -e '.uid == "sunset-overview" and (.panels | length) >= 6' ops/grafana/dashboards/sunset-overview.json
+      - name: Validate Tempo configuration
+        run: docker run --rm -v "$PWD/ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro" grafana/tempo:2.6.1 -config.file=/etc/tempo/tempo.yml -config.verify
       - name: Validate observability Compose configuration
         env:
           POSTGRES_PASSWORD: ci-not-used-at-runtime

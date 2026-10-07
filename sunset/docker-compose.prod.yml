@@ -26,6 +26,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       OLLAMA_URL: ${OLLAMA_URL:-http://172.18.0.1:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:0.5b}
+      SPRING_APPLICATION_NAME: api-gateway
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
     depends_on:
       auth-service:
         condition: service_healthy
@@ -50,11 +54,15 @@ services:
         MODULE: auth-service
         JAR_NAME: auth-service
     restart: unless-stopped
-    environment: &backend_environment
+    environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sunset}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sunset}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      SPRING_APPLICATION_NAME: auth-service
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,7 +81,15 @@ services:
         MODULE: product-service
         JAR_NAME: product-service
     restart: unless-stopped
-    environment: *backend_environment
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sunset}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sunset}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      SPRING_APPLICATION_NAME: product-service
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,7 +108,15 @@ services:
         MODULE: order-service
         JAR_NAME: order-service
     restart: unless-stopped
-    environment: *backend_environment
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sunset}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sunset}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      SPRING_APPLICATION_NAME: order-service
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,7 +135,15 @@ services:
         MODULE: notification-service
         JAR_NAME: notification-service
     restart: unless-stopped
-    environment: *backend_environment
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sunset}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sunset}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      SPRING_APPLICATION_NAME: notification-service
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
     depends_on:
       postgres:
         condition: service_healthy
