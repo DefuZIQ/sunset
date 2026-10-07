@@ -224,6 +224,17 @@ button:focus {
 }
 
 @media (max-width: 480px) {
+  .dropdown--basket, .dropdown--account { position: static; }
+  .dropdown--basket .dropdown-basket,
+  .dropdown--account .dropdown-content,
+  .dropdown--account .dropdown-profile { top: 100%; right: 0; }
+  .dropdown--basket .dropdown-basket::before,
+  .dropdown--basket .dropdown-basket::after { right: 94px; }
+  .dropdown--account .dropdown-content::before,
+  .dropdown--account .dropdown-content::after,
+  .dropdown--account .dropdown-profile::before,
+  .dropdown--account .dropdown-profile::after { right: 58px; }
+
   .navbar__logo {
     font-size: 1.5rem;
   }

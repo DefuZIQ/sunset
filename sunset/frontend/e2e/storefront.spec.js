@@ -60,6 +60,70 @@ test('guest account popup matches the profile style and keeps its actions on scr
   await expect(page).toHaveURL(/#\/register$/);
 });
 
+test('signed-in account popup keeps profile actions accessible on screen', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', firstName: 'Анна', lastName: 'Тестовая', role: 'USER' };
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+
+  await page.goto('/#/');
+  await page.getByRole('button', { name: 'Профиль' }).click();
+  const popup = page.getByRole('menu', { name: 'Аккаунт' });
+  await expect(popup).toBeVisible();
+  await expect(popup.getByText('Анна Тестовая')).toBeVisible();
+  await expect(popup.getByRole('menuitem', { name: 'Личный кабинет' })).toBeVisible();
+  await expect(popup.getByRole('menuitem', { name: 'Мои заказы' })).toBeVisible();
+  await expect(popup.getByRole('button', { name: 'Выйти' })).toBeVisible();
+  const bounds = await popup.boundingBox();
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize().width);
+  await popup.getByRole('menuitem', { name: 'Мои заказы' }).click();
+  await expect(page).toHaveURL(/#\/profile\/orders$/);
+});
+
+test('empty cart popup uses the shared card style and opens the catalog', async ({ page }) => {
+  await page.goto('/#/');
+  await page.getByRole('button', { name: 'Корзина' }).click();
+  const popup = page.getByRole('dialog', { name: 'Корзина' });
+  await expect(popup).toBeVisible();
+  await expect(popup.getByText('Корзина отдыхает')).toBeVisible();
+  const bounds = await popup.boundingBox();
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize().width);
+  await popup.getByRole('link', { name: 'Перейти в каталог' }).click();
+  await expect(page).toHaveURL(/#\/catalog$/);
+});
+
+test('cart popup stays below the header inside a 320px viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto('/#/');
+  await page.getByRole('button', { name: 'Корзина' }).click();
+  const popup = await page.getByRole('dialog', { name: 'Корзина' }).boundingBox();
+  const header = await page.locator('.header-container').boundingBox();
+  expect(popup.x).toBeGreaterThanOrEqual(0);
+  expect(popup.x + popup.width).toBeLessThanOrEqual(320);
+  expect(popup.y).toBeGreaterThanOrEqual(header.y + header.height);
+});
+
+test('filled cart popup keeps quantity and selected product navigation', async ({ page }) => {
+  const product = { ...products[0], selectedColorId: 'white', selectedColorName: 'Белый', selectedSizeId: 'women-m', selectedSizeName: 'M' };
+  await page.addInitScript((item) => {
+    localStorage.setItem('cartItems', JSON.stringify({ [`${item.id}::white::women-m`]: { product: item, quantity: 1 } }));
+  }, product);
+
+  await page.goto('/#/');
+  await page.getByRole('button', { name: 'Корзина' }).click();
+  const popup = page.getByRole('dialog', { name: 'Корзина' });
+  await expect(popup.getByText('Товаров: 1')).toBeVisible();
+  await expect(popup.locator('.cart-popup__total strong')).toHaveText('3 990 ₽');
+  await popup.getByRole('button', { name: 'Увеличить количество' }).click();
+  await expect(popup.getByText('Товаров: 2')).toBeVisible();
+  await popup.getByRole('link', { name: 'Открыть Льняная рубашка с выбранными параметрами' }).click();
+  await expect(page).toHaveURL(/color=white&size=women-m/);
+});
+
 test('guest newsletter signup uses the versioned API and shows confirmation', async ({ page }) => {
   let submitted = false;
   await page.route('**/api/v1/subscriptions', async (route) => {

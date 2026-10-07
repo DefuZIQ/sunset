@@ -14,7 +14,7 @@ export default function AvatarMenu({ isAuthenticated, user, onLogout, isPopupOpe
   const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="dropdown">
+    <div className="dropdown dropdown--account">
       <button
         className="avatar"
         aria-haspopup="true"
@@ -27,20 +27,24 @@ export default function AvatarMenu({ isAuthenticated, user, onLogout, isPopupOpe
       </button>
 
       {isAuthenticated ? (
-        <div className="dropdown-profile" role="menu">
+        <div className="dropdown-profile profile-popup--signed" role="menu" aria-label="Аккаунт">
           <div className="profile-popup__head">
             <Link to="/profile" className="profile-popup__avatar" role="menuitem">
               {user?.avatar ? <img src={user.avatar} alt="" /> : initials}
             </Link>
-            <div><span>Ваш профиль</span><strong>{displayName}</strong><small>{user?.email || "SUNSET ID"}</small></div>
+            <div><span>SUNSET ID</span><strong>{displayName}</strong><small>{user?.email || "Ваш профиль"}</small></div>
           </div>
           <div className="dropdown__background_profile">
-            <Link to="/profile" role="menuitem"><span className="profile-popup__icon">⌂</span>Личный кабинет</Link>
-            <Link to="/profile/orders" role="menuitem"><span className="profile-popup__icon">↗</span>Мои заказы</Link>
-            <Link to="/profile/notifications" role="menuitem"><span className="profile-popup__icon">♢</span>Уведомления</Link>
-            <Link to="/profile/settings#password" role="menuitem"><span className="profile-popup__icon">✦</span>Изменить пароль</Link>
-            {user?.role === "ADMIN" && <Link to="/admin" role="menuitem">Управление магазином</Link>}
-            <button onClick={handleLogoutClick} className="logout" aria-label="Выйти">Выйти</button>
+            <Link className="profile-popup__signed-primary" to="/profile" role="menuitem">Личный кабинет <span aria-hidden="true">→</span></Link>
+            <div className="profile-popup__signed-links">
+              <Link to="/profile/orders" role="menuitem">Мои заказы <span aria-hidden="true">↗</span></Link>
+              <Link to="/profile/notifications" role="menuitem">Уведомления <span aria-hidden="true">↗</span></Link>
+              <Link to="/profile/settings#password" role="menuitem">Изменить пароль <span aria-hidden="true">↗</span></Link>
+              {user?.role === "ADMIN" && <Link to="/admin" role="menuitem">Управление магазином <span aria-hidden="true">↗</span></Link>}
+            </div>
+          </div>
+          <div className="profile-popup__signed-foot">
+            <button onClick={handleLogoutClick} className="logout" aria-label="Выйти">Выйти <span aria-hidden="true">↗</span></button>
           </div>
         </div>
       ) : (

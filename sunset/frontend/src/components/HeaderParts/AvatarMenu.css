@@ -4,19 +4,28 @@
   height: 28px;
 }
 
-.dropdown-profile { width: 318px; padding: 0; overflow: hidden; border: 1px solid rgba(20,20,20,.08); border-radius: 18px; background: #fff; box-shadow: 0 20px 50px rgba(22,18,12,.16); }
-.profile-popup__head { display:flex; align-items:center; gap:12px; padding:18px 18px 16px; background:linear-gradient(135deg,#f3eee6,#fff); border-bottom:1px solid #eee8df; }
+.dropdown-profile.profile-popup--signed { width:min(318px, calc(100vw - 24px)); padding:0; border:1px solid rgba(20,20,20,.08); border-radius:18px; background:#fffdfb; box-shadow:0 20px 50px rgba(22,18,12,.16); font-family:'Istok Web',sans-serif; }
+.profile-popup--signed::after { border-bottom-color:#f3eee6; }
+.profile-popup__head { display:flex; align-items:center; gap:12px; padding:18px; border-radius:17px 17px 0 0; background:linear-gradient(135deg,#f3eee6,#fffdfb); border-bottom:1px solid #eee8df; }
 .profile-popup__head > div { min-width:0; display:flex; flex-direction:column; gap:3px; }
 .profile-popup__head span { color:#9a9085; font-size:10px; letter-spacing:.12em; text-transform:uppercase; }
 .profile-popup__head strong { color:#201d1a; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .profile-popup__head small { color:#877e75; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .profile-popup__avatar { width:48px; height:48px; flex:0 0 48px; display:grid; place-items:center; border-radius:50%; color:#fff; background:#211f1c; font-weight:700; text-decoration:none; overflow:hidden; }
 .profile-popup__avatar img { width:100%; height:100%; object-fit:cover; }
-.dropdown__background_profile { display:flex; flex-direction:column; padding:9px; }
-.dropdown__background_profile a { display:flex; align-items:center; gap:10px; padding:11px 10px; border-radius:10px; color:#292622; text-decoration:none; font-size:13px; transition:background .18s, transform .18s; }
-.dropdown__background_profile a:hover { background:#f6f2ed; transform:translateX(2px); }
-.profile-popup__icon { width:22px; color:#a46c45; font-size:16px; text-align:center; }
-.dropdown__background_profile .logout { margin-top:5px; padding:11px 10px; border:0; border-top:1px solid #eee8df; color:#9b4e48; background:transparent; text-align:left; cursor:pointer; font-size:13px; }
+.dropdown__background_profile { display:flex; flex-direction:column; gap:8px; padding:17px 18px 18px; background:transparent; }
+.dropdown__background_profile a.profile-popup__signed-primary { display:flex; align-items:center; justify-content:space-between; min-height:42px; box-sizing:border-box; padding:10px 13px; border-radius:10px; background:#211f1c; color:#fffdfb; font-size:13px; font-weight:600; text-decoration:none; transition:background .18s, transform .18s; }
+.dropdown__background_profile a.profile-popup__signed-primary:hover { background:#3d3530; transform:translateY(-1px); }
+.profile-popup__signed-primary span { font-size:18px; font-weight:400; line-height:1; }
+.profile-popup__signed-links { display:grid; gap:2px; }
+.dropdown__background_profile .profile-popup__signed-links a { display:flex; align-items:center; justify-content:space-between; min-height:37px; box-sizing:border-box; padding:8px 12px; border-radius:9px; color:#3d3530; font-size:12px; text-decoration:none; transition:background .18s; }
+.dropdown__background_profile .profile-popup__signed-links a:hover { background:#f5eee7; }
+.profile-popup__signed-links a span { color:#a46c45; font-size:16px; line-height:1; }
+.dropdown__background_profile a:focus-visible, .profile-popup__signed-foot button:focus-visible { outline:2px solid #a46c45; outline-offset:2px; }
+.profile-popup__signed-foot { padding:11px 18px 13px; border-top:1px solid #eee8df; }
+.profile-popup__signed-foot .logout { display:flex; align-items:center; justify-content:space-between; width:100%; padding:3px 0; color:#8d6356; font:600 12px 'Istok Web',sans-serif; }
+.profile-popup__signed-foot .logout span { font-size:16px; font-weight:400; }
+.profile-popup__signed-foot .logout:hover { color:#b45946; }
 
 .dropdown-content.profile-popup--guest { width:min(318px, calc(100vw - 24px)); padding:0; border:1px solid rgba(20,20,20,.08); border-radius:18px; background:#fffdfb; box-shadow:0 20px 50px rgba(22,18,12,.16); font-family:'Istok Web',sans-serif; }
 .profile-popup--guest::after { border-bottom-color:#f3eee6; }
