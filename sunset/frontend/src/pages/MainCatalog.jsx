@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/Main/ProductCard";
 import { useStore } from "../contexts/StoreContext";
 import { readCatalogFilters, writeCatalogFilters } from "./catalogFilters";
+import { productSearchScore } from "./productSearch";
 import "./MainCatalog.css";
 
 const toggleValue = (items, value) =>
@@ -62,10 +63,9 @@ export default function MainCatalog() {
 
   const filtered = useMemo(() => {
     const result = products.filter((product) => {
-      const text = `${product.name} ${product.description || ""}`.toLowerCase();
       const price = Number(product.price);
       const totalStock = (product.stock || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-      return (!filter.search || text.includes(filter.search.toLowerCase()))
+      return (!filter.search || productSearchScore(product, filter.search) > 0)
         && (filter.gender === "all" || product.gender === filter.gender || product.gender === "UNISEX")
         && (!filter.min || price >= Number(filter.min))
         && (!filter.max || price <= Number(filter.max))

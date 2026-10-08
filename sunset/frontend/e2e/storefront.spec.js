@@ -489,6 +489,16 @@ test('catalog deep link restores filters after reload and supports browser back'
   await expect(page.getByRole('heading', { name: 'Льняная рубашка' })).toBeVisible();
 });
 
+test('catalog and search page find the same product despite a typo', async ({ page }) => {
+  await page.goto('/#/catalog?q=' + encodeURIComponent('рубашки'));
+  await expect(page.getByRole('heading', { name: 'Льняная рубашка' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Мужское пальто' })).toHaveCount(0);
+
+  await page.goto('/#/search?q=' + encodeURIComponent('рубашки'));
+  await expect(page.getByRole('heading', { name: 'Льняная рубашка' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Мужское пальто' })).toHaveCount(0);
+});
+
 test('search popup opens and navigates to deterministic results', async ({ page }) => {
   await page.goto('/#/');
   await page.getByRole('button', { name: 'Поиск' }).click();
