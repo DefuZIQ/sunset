@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import AdminCategoryTree, { categoryMatches, firstLeafCategory } from "../components/AdminCategoryTree";
+import { categoryMatches } from "../components/AdminCategoryTree";
+import AdminProductsPanel, { AdminEditProductDialog } from "./admin/AdminProductsPanel";
+import AdminStockPanel from "./admin/AdminStockPanel";
 import { adjustAdminBonuses, createAdminProduct, createAdminPromotion, deleteAdminProduct, getAdminAnalytics, getCategoryTree, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock } from "../api/client";
 import "./Admin.css";
 
 const adminToken = () => localStorage.getItem("authToken") || "";
 const blankProduct = { name:"",description:"",price:"",quantity:10,category:"Женские боди",gender:"WOMEN",imageUrl:"/images/products/1.png" };
-const sizeGroupLabels = { clothing:"Базовая одежда", women_clothing:"Женская одежда", men_clothing:"Мужская одежда", tops:"Международные размеры", women_dress:"Платья", women_trousers:"Женские брюки", men_trousers:"Мужские брюки", waist:"Джинсы · базовая сетка", jeans:"Джинсы · полная сетка", accessory:"Аксессуары", belt:"Ремни", headwear:"Головные уборы", shoes:"Обувь" };
 const leafCategory = (item) => item?.categories?.[item.categories.length-1] || "";
 const orderStatusLabels={PENDING:"Новый",CONFIRMED:"Подтверждён",ASSEMBLING:"Собирается",SHIPPED:"Доставка",DELIVERED:"Доставлен",CANCELLED:"Отменён"};
 const nextOrderStatuses={PENDING:["CONFIRMED","CANCELLED"],CONFIRMED:["ASSEMBLING","CANCELLED"],ASSEMBLING:["SHIPPED","CANCELLED"],SHIPPED:["DELIVERED"],DELIVERED:[],CANCELLED:[]};
@@ -46,10 +47,8 @@ export default function Admin() {
   useEffect(()=>{load();},[load]);
   const stockCategoryProducts=useMemo(()=>products.filter((item)=>categoryMatches(categoryTree,stockCategory,item.categories||[])),[products,categoryTree,stockCategory]);
   const selectedStock=useMemo(()=>stockCategoryProducts.find((item)=>String(item.id)===String(stockProductId)),[stockCategoryProducts,stockProductId]);
-  const visibleProducts=useMemo(()=>products.filter((item)=>(productGender==="ALL"||(item.gender||"WOMEN")===productGender)&&categoryMatches(categoryTree,productCategoryFilter,item.categories||[])),[products,productGender,productCategoryFilter,categoryTree]);
   const expectedSizeType=useMemo(()=>{const category=leafCategory(selectedStock).toLowerCase();if(category.match(/аксессуар|сумк|ремн|головн|кепк|очк|час/))return "accessory";if(category.includes("плать"))return "women_dress";if(category.includes("джинс"))return "jeans";if(category.includes("брюк"))return selectedStock?.gender==="MEN"?"men_trousers":"women_trousers";return selectedStock?.gender==="MEN"?"men_clothing":"women_clothing";},[selectedStock]);
   const allowedStockSizes=useMemo(()=>stockOptions.sizes.filter((size)=>size.type===expectedSizeType),[stockOptions.sizes,expectedSizeType]);
-  const genderCount=(gender)=>products.filter((item)=>(item.gender||"WOMEN")===gender).length;
   useEffect(()=>setStockDraft((selectedStock?.stock||[]).map((item)=>({...item}))),[selectedStock]);
   useEffect(()=>{if(stockCategoryProducts.length&&!stockCategoryProducts.some((item)=>String(item.id)===String(stockProductId)))setStockProductId(stockCategoryProducts[0].id);},[stockCategoryProducts,stockProductId]);
   useEffect(()=>{if(allowedStockSizes.length&&!allowedStockSizes.some((size)=>String(size.id)===String(newVariant.sizeId)))setNewVariant((current)=>({...current,sizeId:allowedStockSizes[0].id}));},[allowedStockSizes,newVariant.sizeId]);
@@ -100,40 +99,26 @@ export default function Admin() {
 
     {tab==="returns"&&<div className="admin-table"><div className="admin-row admin-row--head"><span>Заказ</span><span>Клиент и причина</span><span>Сумма</span><span>Статус</span></div>{returns.map((item)=><div className="admin-row" key={item.id}><span><strong>{item.orderNumber}</strong><small>{new Date(item.created_at).toLocaleString("ru-RU")}</small></span><span>{item.email}<small>{item.reason}{item.comment?` · ${item.comment}`:""}</small></span><span>{Number(item.refund_amount).toLocaleString("ru-RU")} ₽</span><select value={item.status} onChange={(event)=>changeReturnStatus(item.id,event.target.value)}><option value="REQUESTED">Новая заявка</option><option value="APPROVED">Одобрено</option><option value="REJECTED">Отклонено</option><option value="RECEIVED">Товар получен</option><option value="REFUNDED">Деньги возвращены</option></select></div>)}</div>}
 
-    {tab==="products"&&<div className="admin-products-layout">
-      <form className="admin-form" onSubmit={createProduct}>
-        <p className="page-kicker">Новая карточка</p><h2>Добавить товар</h2>
-        <label>Название<input required value={product.name} onChange={(e)=>setProduct({...product,name:e.target.value})}/></label>
-        <label>Описание<textarea value={product.description} onChange={(e)=>setProduct({...product,description:e.target.value})}/></label>
-        <div><label>Цена<input required type="number" min="1" value={product.price} onChange={(e)=>setProduct({...product,price:e.target.value})}/></label><label>Стартовый остаток<input type="number" min="0" value={product.quantity} onChange={(e)=>setProduct({...product,quantity:e.target.value})}/></label></div>
-        <label>Раздел<select value={product.gender} onChange={(e)=>{const gender=e.target.value;setProduct({...product,gender,category:firstLeafCategory(categoryTree,gender)||product.category});}}><option value="WOMEN">Для женщин</option><option value="MEN">Для мужчин</option><option value="UNISEX">Унисекс</option></select></label>
-        <AdminCategoryTree tree={categoryTree} selected={product.category} gender={product.gender} onSelect={(category)=>setProduct({...product,category})} title="Категория товара" />
-        <label>Изображение<input value={product.imageUrl} onChange={(e)=>setProduct({...product,imageUrl:e.target.value})}/></label>
-        <button className="primary-action">Добавить в каталог</button>
-      </form>
-      <div className="admin-product-list">
-        <div className="admin-list-head"><div><h2>Карточки товаров</h2><span className="admin-list-subtitle">{visibleProducts.length} из {products.length}</span></div></div>
-        <div className="admin-gender-tabs" aria-label="Раздел товаров">{[["ALL","Все",products.length],["WOMEN","Для женщин",genderCount("WOMEN")],["MEN","Для мужчин",genderCount("MEN")],["UNISEX","Унисекс",genderCount("UNISEX")]].map(([key,label,count])=><button type="button" className={productGender===key?"active":""} onClick={()=>{setProductGender(key);setProductCategoryFilter("");}} key={key}><span>{label}</span><small>{count}</small></button>)}</div>
-        <AdminCategoryTree tree={categoryTree} selected={productCategoryFilter} gender={productGender} onSelect={setProductCategoryFilter} selectBranches allowAll title="Фильтр по категориям" />
-        {visibleProducts.length===0&&<p className="admin-empty-list">В выбранной категории товаров нет.</p>}
-        {visibleProducts.map((item)=><article key={item.id}><img src={item.imageUrl} alt=""/><div><strong>{item.name}</strong><small>{item.gender==="MEN"?"Для мужчин":item.gender==="UNISEX"?"Унисекс":"Для женщин"} · {item.categories?.join(" · ")}</small><span>{Number(item.price).toLocaleString("ru-RU")} ₽</span></div><button onClick={()=>setEditing({...item})}>Изменить</button><button className="danger" onClick={()=>deleteProduct(item)}>Удалить</button></article>)}
-      </div>
-    </div>}
+    {tab==="products"&&<AdminProductsPanel
+      products={products} categoryTree={categoryTree} product={product} setProduct={setProduct}
+      productGender={productGender} setProductGender={setProductGender}
+      productCategoryFilter={productCategoryFilter} setProductCategoryFilter={setProductCategoryFilter}
+      onCreate={createProduct} onEdit={setEditing} onDelete={deleteProduct}
+    />}
 
-    {tab==="stock"&&<div className="stock-panel">
-      <div className="stock-picker"><p className="page-kicker">Склад</p><h2>Управление остатками</h2>
-        <AdminCategoryTree tree={categoryTree} selected={stockCategory} onSelect={(category)=>{setStockCategory(category);const first=products.find((item)=>categoryMatches(categoryTree,category,item.categories||[]));setStockProductId(first?.id||"");}} selectBranches title="Сначала выберите категорию" />
-        <label className="stock-product-select">Товар<select value={stockProductId} onChange={(e)=>setStockProductId(e.target.value)} disabled={!stockCategoryProducts.length}><option value="">Выберите товар</option>{stockCategoryProducts.map((item)=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-        {!stockCategoryProducts.length&&<p className="stock-category-empty">В этой категории пока нет товаров.</p>}
-        {selectedStock&&<div className="stock-product"><img src={selectedStock.imageUrl} alt=""/><div><strong>{selectedStock.name}</strong><small>{selectedStock.categories?.join(" › ")}</small><span>Вариантов: {stockDraft.length} · всего {stockDraft.reduce((sum,item)=>sum+Number(item.quantity||0),0)} шт.</span></div></div>}
-      </div>
-      <div className="stock-workspace">{selectedStock?<><section className="stock-add"><div><p className="page-kicker">Новый вариант</p><h3>Добавить цвет и размер</h3><small>Сетка: {sizeGroupLabels[expectedSizeType]||expectedSizeType}</small></div><div className="stock-color-field"><span>Цвет</span><div className="stock-color-options">{stockOptions.colors.map((color)=><button type="button" className={String(newVariant.colorId)===String(color.id)?"selected":""} onClick={()=>setNewVariant({...newVariant,colorId:color.id})} key={color.id} title={color.name} aria-label={`Цвет ${color.name}`}><i style={{background:color.hexCode}}/><small>{color.name}</small></button>)}</div></div><label>Размер<select value={newVariant.sizeId} onChange={(e)=>setNewVariant({...newVariant,sizeId:e.target.value})}>{allowedStockSizes.map((size)=><option value={size.id} key={size.id}>{size.name}{size.description?` · ${size.description}`:""}</option>)}</select></label><label>Количество<input type="number" min="0" value={newVariant.quantity} onChange={(e)=>setNewVariant({...newVariant,quantity:e.target.value})}/></label><button type="button" className="stock-add__button" onClick={addStockVariant}>Добавить вариант</button></section><div className="stock-grid"><div className="stock-row stock-row--head"><span>Цвет</span><span>Размер</span><span>Количество</span><span></span></div>{stockDraft.length===0&&<p className="stock-empty">У товара пока нет вариантов. Добавьте размер и цвет выше.</p>}{stockDraft.map((row,index)=><div className="stock-row" key={`${row.colorId}-${row.sizeId}`}><span className="stock-color"><i style={{background:stockOptions.colors.find((color)=>String(color.id)===String(row.colorId))?.hexCode}}/>{row.colorName}</span><span><strong>{row.sizeName}</strong><small>{sizeGroupLabels[row.sizeType]||row.sizeType||"Размер"}</small></span><input type="number" min="0" value={row.quantity} onChange={(e)=>setStockDraft(stockDraft.map((item,i)=>i===index?{...item,quantity:e.target.value}:item))}/><button type="button" className="stock-remove" onClick={()=>removeStockVariant(index)} aria-label={`Удалить ${row.colorName}, размер ${row.sizeName}`}>Удалить</button></div>)}<div className="stock-save"><span>Удалённые строки исчезнут полностью после сохранения.</span><button className="primary-action" onClick={saveStock}>Сохранить остатки</button></div></div></>:<div className="stock-workspace-empty"><strong>Выберите категорию и товар</strong><span>Здесь появятся цвета, размеры и количество.</span></div>}</div>
-    </div>}
+    {tab==="stock"&&<AdminStockPanel
+      products={products} categoryTree={categoryTree} stockCategory={stockCategory} setStockCategory={setStockCategory}
+      stockCategoryProducts={stockCategoryProducts} stockProductId={stockProductId} setStockProductId={setStockProductId}
+      selectedStock={selectedStock} stockDraft={stockDraft} setStockDraft={setStockDraft}
+      stockOptions={stockOptions} newVariant={newVariant} setNewVariant={setNewVariant}
+      expectedSizeType={expectedSizeType} allowedStockSizes={allowedStockSizes}
+      onAddVariant={addStockVariant} onRemoveVariant={removeStockVariant} onSave={saveStock}
+    />}
 
     {tab==="promos"&&<><form className="admin-form" onSubmit={createPromo}><p className="page-kicker">Маркетинг</p><h2>Запустить промокод</h2><div><label>Код<input required value={promo.code} onChange={(e)=>setPromo({...promo,code:e.target.value.toUpperCase()})}/></label><label>Название<input required value={promo.title} onChange={(e)=>setPromo({...promo,title:e.target.value})}/></label></div><label>Описание<textarea value={promo.description} onChange={(e)=>setPromo({...promo,description:e.target.value})}/></label><div><label>Скидка, %<input type="number" min="0" max="100" value={promo.discountPercent} onChange={(e)=>setPromo({...promo,discountPercent:e.target.value})}/></label><label>Минимальный заказ<input type="number" min="0" value={promo.minOrder} onChange={(e)=>setPromo({...promo,minOrder:e.target.value})}/></label></div><button className="primary-action">Запустить акцию</button></form><div className="promo-admin-list">{promos.map((item)=><article key={item.id}><strong>{item.code}</strong><span>{item.title}</span><small>{item.active?"Активен":"Остановлен"} · использований: {item.usage_count}</small></article>)}</div></>}
 
     {tab==="users"&&<div className="admin-table admin-client-table"><div className="admin-row admin-users admin-row--head"><span>Клиент</span><span>Контакты</span><span>Заказы</span><span>Бонусы</span></div>{users.map((user)=><div className="admin-row admin-users" key={user.id}><span><strong>{user.firstName} {user.lastName}</strong><small>{user.role}</small></span><span>{user.email}<small>{user.phone||"Телефон не указан"}</small></span><span>{user.orderCount} · {Number(user.orderTotal).toLocaleString("ru-RU")} ₽</span><div className="bonus-control"><strong>{user.bonusBalance}</strong><input type="number" placeholder="+100 / −50" value={bonusDraft[user.id]||""} onChange={(e)=>setBonusDraft({...bonusDraft,[user.id]:e.target.value})}/><button onClick={()=>adjustBonus(user)}>Применить</button></div></div>)}</div>}
 
-    {editing&&<div className="admin-modal" role="dialog"><button className="admin-modal__backdrop" onClick={()=>setEditing(null)} aria-label="Закрыть"/><form className="admin-form admin-modal__body" onSubmit={saveProduct}><button type="button" className="admin-modal__close" onClick={()=>setEditing(null)}>×</button><p className="page-kicker">Редактирование</p><h2>{editing.name}</h2><label>Название<input required value={editing.name} onChange={(e)=>setEditing({...editing,name:e.target.value})}/></label><label>Описание<textarea value={editing.description||""} onChange={(e)=>setEditing({...editing,description:e.target.value})}/></label><div><label>Цена<input required type="number" min="1" value={editing.price} onChange={(e)=>setEditing({...editing,price:e.target.value})}/></label><label>Раздел<select value={editing.gender||"WOMEN"} onChange={(e)=>{const gender=e.target.value;setEditing({...editing,gender,categories:[firstLeafCategory(categoryTree,gender)||leafCategory(editing)]});}}><option value="WOMEN">Для женщин</option><option value="MEN">Для мужчин</option><option value="UNISEX">Унисекс</option></select></label></div><AdminCategoryTree tree={categoryTree} selected={leafCategory(editing)} gender={editing.gender||"WOMEN"} onSelect={(category)=>setEditing({...editing,categories:[category]})} title="Категория товара"/><label>Изображение<input value={editing.imageUrl||""} onChange={(e)=>setEditing({...editing,imageUrl:e.target.value})}/></label><button className="primary-action">Сохранить карточку</button></form></div>}
+    <AdminEditProductDialog editing={editing} setEditing={setEditing} categoryTree={categoryTree} onSave={saveProduct} />
   </div>;
 }
