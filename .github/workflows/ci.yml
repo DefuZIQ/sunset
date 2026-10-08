@@ -39,6 +39,8 @@ jobs:
           JWT_SECRET: ci-validation-secret-at-least-32-bytes
           GRAFANA_ADMIN_PASSWORD: ci-not-used-at-runtime
         run: docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml config --quiet
+      - name: Validate web rollout script syntax
+        run: sh -n scripts/deploy-web.sh
 
   backend:
     runs-on: ubuntu-latest
