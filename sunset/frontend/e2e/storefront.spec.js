@@ -463,6 +463,32 @@ test('opens the catalog and filters products by audience', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Мужское пальто' })).toHaveCount(0);
 });
 
+test('catalog deep link restores filters after reload and supports browser back', async ({ page }) => {
+  const query = new URLSearchParams({
+    gender: 'WOMEN', q: 'рубашка', min: '3000', max: '5000',
+    ratingMin: '4.8', ratingMax: '5', reviewed: '1', sort: 'price-asc',
+    utm_source: 'share',
+  });
+  query.append('category[]', 'Рубашки');
+  query.append('color[]', 'Белый');
+  query.append('size[]', 'women_clothing:M');
+  await page.goto(`/#/catalog?${query}`);
+  await expect(page.getByRole('heading', { name: 'Льняная рубашка' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Мужское пальто' })).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Сортировка' })).toHaveValue('price-asc');
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Льняная рубашка' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Сортировка' })).toHaveValue('price-asc');
+  expect(new URL(page.url()).hash).toContain('utm_source=share');
+
+  await page.getByRole('combobox', { name: 'Сортировка' }).selectOption('price-desc');
+  await expect(page).toHaveURL(/sort=price-desc/);
+  await page.goBack();
+  await expect(page.getByRole('combobox', { name: 'Сортировка' })).toHaveValue('price-asc');
+  await expect(page.getByRole('heading', { name: 'Льняная рубашка' })).toBeVisible();
+});
+
 test('search popup opens and navigates to deterministic results', async ({ page }) => {
   await page.goto('/#/');
   await page.getByRole('button', { name: 'Поиск' }).click();

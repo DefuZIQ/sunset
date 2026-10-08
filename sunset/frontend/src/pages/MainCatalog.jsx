@@ -2,12 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/Main/ProductCard";
 import { useStore } from "../contexts/StoreContext";
+import { readCatalogFilters, writeCatalogFilters } from "./catalogFilters";
 import "./MainCatalog.css";
-
-const initialFilter = (params) => ({
-  search: "", min: "", max: "", categories: params.getAll("category[]"),
-  gender: params.get("gender") || "all", colors: [], sizes: [], availability: "all", ratingMin: "", ratingMax: "", reviewedOnly: false, sort: "new",
-});
 
 const toggleValue = (items, value) =>
   items.includes(value) ? items.filter((item) => item !== value) : [...items, value];
@@ -22,9 +18,14 @@ const sizeKey = (stock) => `${stock.sizeType || "clothing"}:${stock.sizeName}`;
 
 export default function MainCatalog() {
   const { products, loading, categoryTree } = useStore();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filter, setFilter] = useState(() => initialFilter(params));
+  const filter = readCatalogFilters(params);
+
+  const changeFilters = (change, replace = false) => setParams((currentParams) => {
+    const current = readCatalogFilters(currentParams);
+    return writeCatalogFilters(currentParams, change(current));
+  }, { replace });
 
   const options = useMemo(() => ({
     categories: [...new Set(products.flatMap((product) => product.categories || []))].sort(),
@@ -94,11 +95,11 @@ export default function MainCatalog() {
     return () => { document.body.style.overflow = previous; };
   }, [filtersOpen]);
 
-  const update = (key, value) => setFilter((current) => ({ ...current, [key]: value }));
-  const setGender = (gender) => setFilter((current) => ({ ...current, gender, categories: [], sizes: [] }));
-  const toggle = (key, value) => update(key, toggleValue(filter[key], value));
-  const reset = () => setFilter(initialFilter(new URLSearchParams()));
-  const setPrice = (min, max) => setFilter((current) => ({ ...current, min, max }));
+  const update = (key, value, replace = false) => changeFilters((current) => ({ ...current, [key]: value }), replace);
+  const setGender = (gender) => changeFilters((current) => ({ ...current, gender, categories: [], sizes: [] }));
+  const toggle = (key, value) => changeFilters((current) => ({ ...current, [key]: toggleValue(current[key], value) }));
+  const reset = () => changeFilters(() => readCatalogFilters(new URLSearchParams()));
+  const setPrice = (min, max) => changeFilters((current) => ({ ...current, min, max }));
   const activeChips = [
     ...(filter.gender !== "all" ? [{ label: filter.gender === "WOMEN" ? "Для женщин" : "Для мужчин", clear: () => setGender("all") }] : []),
     ...filter.categories.map((value) => ({ label: value, clear: () => toggle("categories", value) })),
@@ -106,7 +107,7 @@ export default function MainCatalog() {
     ...filter.sizes.map((value) => ({ label: `Размер ${options.sizes.find((size)=>size.key===value)?.name || value.split(":").pop()}`, clear: () => toggle("sizes", value) })),
     ...(filter.min || filter.max ? [{ label: `${filter.min || 0}–${filter.max || catalogMax} ₽`, clear: () => setPrice("", "") }] : []),
     ...(filter.availability !== "all" ? [{ label: filter.availability === "in-stock" ? "В наличии" : "Заканчивается", clear: () => update("availability", "all") }] : []),
-    ...(filter.ratingMin || filter.ratingMax ? [{ label: `Рейтинг ${filter.ratingMin || "0"}–${filter.ratingMax || "5"}`, clear: () => setFilter((current) => ({ ...current, ratingMin: "", ratingMax: "" })) }] : []),
+    ...(filter.ratingMin || filter.ratingMax ? [{ label: `Рейтинг ${filter.ratingMin || "0"}–${filter.ratingMax || "5"}`, clear: () => changeFilters((current) => ({ ...current, ratingMin: "", ratingMax: "" })) }] : []),
     ...(filter.reviewedOnly ? [{ label: "Есть отзывы", clear: () => update("reviewedOnly", false) }] : []),
   ];
 
@@ -137,7 +138,7 @@ export default function MainCatalog() {
         {filtersOpen && <button className="filter-backdrop" aria-label="Закрыть фильтры" onClick={() => setFiltersOpen(false)} />}
         <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`} aria-label="Фильтры каталога">
           <div className="filter-heading"><div><span>Подбор товара</span><h2>Фильтры</h2></div><button className="filter-close" onClick={() => setFiltersOpen(false)} aria-label="Закрыть">×</button></div>
-          <label className="filter-field"><span>Поиск в каталоге</span><input value={filter.search} onChange={(event) => update("search", event.target.value)} placeholder="Футболка, худи…" /></label>
+          <label className="filter-field"><span>Поиск в каталоге</span><input value={filter.search} onChange={(event) => update("search", event.target.value, true)} placeholder="Футболка, худи…" /></label>
 
           <div className="filter-section">
             <div className="filter-section__title"><h3>Раздел</h3><small>{filter.gender === "all" ? "Все" : filter.gender === "WOMEN" ? "Женский" : "Мужской"}</small></div>
@@ -151,8 +152,8 @@ export default function MainCatalog() {
 
           <div className="filter-section">
             <div className="filter-section__title"><h3>Цена, ₽</h3><small>до {catalogMax.toLocaleString("ru-RU")}</small></div>
-            <div className="price-row"><input type="number" min="0" placeholder="От" value={filter.min} onChange={(event) => update("min", event.target.value)} /><input type="number" min="0" placeholder="До" value={filter.max} onChange={(event) => update("max", event.target.value)} /></div>
-            <input className="price-range" type="range" min="0" max={catalogMax} step="500" value={filter.max || catalogMax} onChange={(event) => update("max", event.target.value === String(catalogMax) ? "" : event.target.value)} aria-label="Максимальная цена" />
+            <div className="price-row"><input type="number" min="0" placeholder="От" value={filter.min} onChange={(event) => update("min", event.target.value, true)} /><input type="number" min="0" placeholder="До" value={filter.max} onChange={(event) => update("max", event.target.value, true)} /></div>
+            <input className="price-range" type="range" min="0" max={catalogMax} step="500" value={filter.max || catalogMax} onChange={(event) => update("max", event.target.value === String(catalogMax) ? "" : event.target.value, true)} aria-label="Максимальная цена" />
             <div className="price-presets"><button onClick={() => setPrice("", "2000")}>до 2 000</button><button onClick={() => setPrice("2000", "4000")}>2–4 тыс.</button><button onClick={() => setPrice("4000", "")}>от 4 000</button></div>
           </div>
 
@@ -172,9 +173,9 @@ export default function MainCatalog() {
             <label className="check-line"><input type="radio" name="availability" checked={filter.availability === "low-stock"} onChange={() => update("availability", "low-stock")} /><span>Заканчивается</span></label>
           </div>
           <div className="filter-section rating-filter"><div className="filter-section__title"><h3>Рейтинг по отзывам</h3><small>шаг 0,1</small></div>
-            <div className="rating-presets"><button className={filter.ratingMin === "4.8" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => setFilter((current) => ({ ...current, ratingMin: "4.8", ratingMax: "5", reviewedOnly: true }))}>4,8–5,0</button><button className={filter.ratingMin === "4.5" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => setFilter((current) => ({ ...current, ratingMin: "4.5", ratingMax: "5", reviewedOnly: true }))}>4,5–5,0</button><button className={filter.ratingMin === "4" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => setFilter((current) => ({ ...current, ratingMin: "4", ratingMax: "5", reviewedOnly: true }))}>4,0–5,0</button></div>
-            <div className="rating-values"><label><span>От</span><input type="number" min="0" max="5" step="0.1" value={filter.ratingMin} placeholder="0,0" onChange={(event) => update("ratingMin", event.target.value)} /></label><label><span>До</span><input type="number" min="0" max="5" step="0.1" value={filter.ratingMax} placeholder="5,0" onChange={(event) => update("ratingMax", event.target.value)} /></label></div>
-            <input className="rating-range" type="range" min="0" max="5" step="0.1" value={filter.ratingMin || 0} onChange={(event) => update("ratingMin", event.target.value === "0" ? "" : event.target.value)} aria-label="Минимальный рейтинг" />
+            <div className="rating-presets"><button className={filter.ratingMin === "4.8" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => changeFilters((current) => ({ ...current, ratingMin: "4.8", ratingMax: "5", reviewedOnly: true }))}>4,8–5,0</button><button className={filter.ratingMin === "4.5" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => changeFilters((current) => ({ ...current, ratingMin: "4.5", ratingMax: "5", reviewedOnly: true }))}>4,5–5,0</button><button className={filter.ratingMin === "4" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => changeFilters((current) => ({ ...current, ratingMin: "4", ratingMax: "5", reviewedOnly: true }))}>4,0–5,0</button></div>
+            <div className="rating-values"><label><span>От</span><input type="number" min="0" max="5" step="0.1" value={filter.ratingMin} placeholder="0,0" onChange={(event) => update("ratingMin", event.target.value, true)} /></label><label><span>До</span><input type="number" min="0" max="5" step="0.1" value={filter.ratingMax} placeholder="5,0" onChange={(event) => update("ratingMax", event.target.value, true)} /></label></div>
+            <input className="rating-range" type="range" min="0" max="5" step="0.1" value={filter.ratingMin || 0} onChange={(event) => update("ratingMin", event.target.value === "0" ? "" : event.target.value, true)} aria-label="Минимальный рейтинг" />
             <label className="check-line"><input type="checkbox" checked={filter.reviewedOnly} onChange={(event) => update("reviewedOnly", event.target.checked)} /><span>Показывать только товары с отзывами</span></label>
           </div>
           <div className="filter-actions"><button className="filter-apply" onClick={() => setFiltersOpen(false)}>Показать {filtered.length}</button><button onClick={reset}>Сбросить</button></div>
