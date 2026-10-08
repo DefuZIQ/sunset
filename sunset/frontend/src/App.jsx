@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import Header from "./components/HeaderParts/Header";
 import Footer from "./components/FooterParts/Footer";
@@ -18,11 +18,17 @@ import Promotions from "./pages/Promotions";
 import Admin from "./pages/Admin";
 import AssistantWidget from "./components/AssistantWidget";
 import OrderDetail from "./pages/OrderDetail";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { ApiHttpError, getProfile } from "./api/client";
 
 import { CartProvider } from "./components/HeaderParts/CartContext";
 import { StoreProvider } from "./contexts/StoreContext";
 import { FavoritesProvider } from "./contexts/FavoritesContext";
+
+function PageBoundary({ children }) {
+  const location = useLocation();
+  return <ErrorBoundary resetKey={`${location.pathname}${location.search}`}>{children}</ErrorBoundary>;
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -73,7 +79,7 @@ function App() {
     <FavoritesProvider>
     <CartProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <div id="root" style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+        <div className="app-shell" style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
           <Header
             isAuthenticated={!!user}
             user={user}
@@ -81,6 +87,7 @@ function App() {
           />
 
           <main className="main-content" style={{ flex: 1 }}>
+            <PageBoundary>
             <Routes>
               <Route path="/" element={<Main />} />
               <Route path="/catalog" element={<MainCatalog />} />
@@ -111,6 +118,7 @@ function App() {
               <Route path="/admin" element={!authReady ? null : user?.role === "ADMIN" ? <Admin /> : <Navigate to="/profile" replace />} />
               <Route path="/admin/products/new" element={<Navigate to="/admin" replace />} />
             </Routes>
+            </PageBoundary>
           </main>
 
           <Footer />

@@ -1,0 +1,13 @@
+.error-recovery { display:grid; place-items:center; min-height:420px; padding:clamp(1.5rem,5vw,4rem); box-sizing:border-box; background:#f4eee8; color:#3d3530; }
+.error-recovery--app { min-height:100vh; }
+.error-recovery__card { width:min(100%,650px); padding:clamp(1.5rem,5vw,3.5rem); box-sizing:border-box; border:1px solid #d6c9be; background:#fffdfb; box-shadow:0 20px 55px rgba(61,53,48,.08); }
+.error-recovery__symbol { display:inline-grid; place-items:center; width:46px; height:46px; border-radius:50%; background:#3d3530; color:#fffdfb; font-size:1.3rem; }
+.error-recovery__eyebrow { margin:1.5rem 0 .75rem; color:#8d796a; font-size:.72rem; letter-spacing:.18em; }
+.error-recovery h1 { margin:0; font:400 clamp(2rem,5vw,3rem)/1.15 'Istok Web',sans-serif; }
+.error-recovery__card>p:not(.error-recovery__eyebrow) { max-width:28rem; margin:1.2rem 0 2rem; color:#73665d; line-height:1.6; }
+.error-recovery__actions { display:flex; flex-wrap:wrap; gap:.8rem; }
+.error-recovery__actions button,.error-recovery__actions a { display:inline-flex; align-items:center; justify-content:center; min-height:46px; padding:.7rem 1.35rem; box-sizing:border-box; border:1px solid #3d3530; border-radius:0; text-decoration:none; font:inherit; cursor:pointer; }
+.error-recovery__actions button { background:#3d3530; color:#fffdfb; }
+.error-recovery__actions a { background:transparent; color:#3d3530; }
+.error-recovery__actions button:focus-visible,.error-recovery__actions a:focus-visible { outline:3px solid #a8704e; outline-offset:3px; }
+@media(max-width:420px) { .error-recovery__actions>* { flex:1 1 100%; } }
