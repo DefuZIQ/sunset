@@ -3,7 +3,7 @@ import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotificat
   getAddressGeocoderStatus, getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
   listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
   listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
-  markNotificationRead, quoteDelivery, registerCustomer, saveProductReview,
+  markNotificationRead, markProductReviewHelpful, quoteDelivery, registerCustomer, saveProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
   updateCustomerAddress, validatePromoCode, getProfile, syncCustomerAddresses } from "./client";
 
@@ -249,6 +249,16 @@ test("reviews use a public list and a protected write with encoded product ID", 
   expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/products/review/product%2F1", {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
     body: JSON.stringify({ rating: 5, body: "Отлично" }),
+  });
+});
+
+test("helpful vote uses an authenticated idempotent PUT", async () => {
+  const vote = { reviewId: "review/1", helpfulCount: 3 };
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => vote });
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(markProductReviewHelpful("jwt", "review/1")).resolves.toEqual(vote);
+  expect(fetchMock).toHaveBeenCalledWith("/api/v1/products/reviews/review%2F1/helpful", {
+    method: "PUT", headers: { Authorization: "Bearer jwt" },
   });
 });
 

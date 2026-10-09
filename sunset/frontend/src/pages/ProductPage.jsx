@@ -4,7 +4,7 @@ import { useCart } from "../components/HeaderParts/CartContext";
 import "../App.css"; // Для .container
 import "../components/Main/ProductCard.css"; // Переиспользуем стили
 import "./ProductPage.css"; // Подключаем стили для страницы товара
-import { ApiHttpError, getProductById, listProductReviews, saveProductReview } from "../api/client";
+import { ApiHttpError, getProductById, listProductReviews, markProductReviewHelpful, saveProductReview } from "../api/client";
 import { defaultReviewFilter, reviewSummary, selectReviews } from "./reviewFilters";
 
 export default function ProductPage() {
@@ -17,6 +17,8 @@ export default function ProductPage() {
   const [error, setError] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [reviewFilter, setReviewFilter] = useState(defaultReviewFilter);
+  const [helpfulReviewIds, setHelpfulReviewIds] = useState(() => new Set());
+  const [helpfulError, setHelpfulError] = useState(null);
   const [review, setReview] = useState({ rating: 5, qualityRating: 5, fit: "AS_EXPECTED", photoUrl: "", body: "" });
   const [reviewMessage, setReviewMessage] = useState("");
   const { addToCart, getItemQuantity, decreaseQuantity } = useCart();
@@ -65,6 +67,17 @@ export default function ProductPage() {
       setReview({ rating: 5, qualityRating: 5, fit: "AS_EXPECTED", photoUrl: "", body: "" }); setReviewMessage("Спасибо! Отзыв опубликован."); loadReviews();
     } catch (error) {
       setReviewMessage(error instanceof ApiHttpError && error.status === 401 ? "Сначала войдите в аккаунт" : error.message || "Не удалось сохранить отзыв");
+    }
+  };
+
+  const markHelpful = async (reviewId) => {
+    try {
+      setHelpfulError(null);
+      const result = await markProductReviewHelpful(localStorage.getItem("authToken"), reviewId);
+      setReviews((current) => current.map((item) => item.id === reviewId ? { ...item, helpfulCount: result.helpfulCount } : item));
+      setHelpfulReviewIds((current) => new Set(current).add(reviewId));
+    } catch (error) {
+      setHelpfulError({ reviewId, message: error.message || "Не удалось отметить отзыв" });
     }
   };
 
@@ -225,7 +238,7 @@ export default function ProductPage() {
           </div>
         </div>}
         <div className="reviews-layout">
-          <div className="reviews-list">{visibleReviews.length ? visibleReviews.map((item) => <article className="review-card" key={item.id}><div><strong>{item.authorName}{item.verifiedPurchase&&<em>Покупка подтверждена</em>}</strong><span>{"★".repeat(item.rating)}{"☆".repeat(5-item.rating)}</span></div><p>{item.body}</p>{item.photoUrl&&<img className="review-photo" src={item.photoUrl} alt="Фотография покупателя" loading="lazy"/>}<small>Качество: {item.qualityRating||item.rating}/5 · Посадка: {({SMALL:"маломерит",AS_EXPECTED:"соответствует размеру",LARGE:"большемерит"})[item.fit]||"не указана"}</small><time>{new Date(item.createdAt).toLocaleDateString("ru-RU")}</time></article>) : <div className="reviews-empty">{reviews.length ? <><p>По этим параметрам отзывов нет.</p><button type="button" onClick={() => setReviewFilter(defaultReviewFilter)}>Показать все отзывы</button></> : "Пока нет отзывов — станьте первым."}</div>}</div>
+          <div className="reviews-list">{visibleReviews.length ? visibleReviews.map((item) => <article className="review-card" key={item.id}><div><strong>{item.authorName}{item.verifiedPurchase&&<em>Покупка подтверждена</em>}</strong><span>{"★".repeat(item.rating)}{"☆".repeat(5-item.rating)}</span></div><p>{item.body}</p>{item.photoUrl&&<img className="review-photo" src={item.photoUrl} alt="Фотография покупателя" loading="lazy"/>}<small>Качество: {item.qualityRating||item.rating}/5 · Посадка: {({SMALL:"маломерит",AS_EXPECTED:"соответствует размеру",LARGE:"большемерит"})[item.fit]||"не указана"}</small><time>{new Date(item.createdAt).toLocaleDateString("ru-RU")}</time><div className="review-card__actions">{localStorage.getItem("authToken") ? <button type="button" onClick={() => markHelpful(item.id)} disabled={helpfulReviewIds.has(item.id)} aria-label={`Отметить отзыв ${item.authorName} полезным`}>{helpfulReviewIds.has(item.id) ? "✓ Спасибо" : "Полезно"} · {item.helpfulCount || 0}</button> : <Link to="/login">Полезно · {item.helpfulCount || 0}</Link>}{helpfulError?.reviewId === item.id && <span role="alert">{helpfulError.message}</span>}</div></article>) : <div className="reviews-empty">{reviews.length ? <><p>По этим параметрам отзывов нет.</p><button type="button" onClick={() => setReviewFilter(defaultReviewFilter)}>Показать все отзывы</button></> : "Пока нет отзывов — станьте первым."}</div>}</div>
           {localStorage.getItem("authToken") ? <form className="review-form" onSubmit={submitReview}><h3>Оставить отзыв</h3><label>Общая оценка<select value={review.rating} onChange={(event) => setReview({ ...review, rating: Number(event.target.value) })}>{[5,4,3,2,1].map((value) => <option value={value} key={value}>{"★".repeat(value)} · {value}</option>)}</select></label><label>Качество<select value={review.qualityRating} onChange={(event)=>setReview({...review,qualityRating:Number(event.target.value)})}>{[5,4,3,2,1].map((value)=><option value={value} key={value}>{value} из 5</option>)}</select></label><label>Как подошёл размер<select value={review.fit} onChange={(event)=>setReview({...review,fit:event.target.value})}><option value="SMALL">Маломерит</option><option value="AS_EXPECTED">Соответствует</option><option value="LARGE">Большемерит</option></select></label><label>Ссылка на фотографию<input type="url" value={review.photoUrl} onChange={(event)=>setReview({...review,photoUrl:event.target.value})} placeholder="https://…" /></label><label>Комментарий<textarea required minLength="3" maxLength="1500" value={review.body} onChange={(event) => setReview({ ...review, body: event.target.value })} placeholder="Расскажите о посадке, ткани и впечатлениях" /></label><button className="primary-action">Опубликовать</button>{reviewMessage && <p>{reviewMessage}</p>}</form> : <div className="review-login"><h3>Поделитесь впечатлением</h3><p>Чтобы оставить отзыв, войдите в личный кабинет.</p><Link className="primary-action" to="/login">Войти</Link></div>}
         </div>
       </section>

@@ -85,6 +85,9 @@ public class ProductController {
     @PostMapping("/review/{id}")
     public Object saveReview(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody Map<String,Object> request) { return reviewService.save(userId,id,request); }
 
+    @PutMapping("/reviews/{id}/helpful")
+    public Object markReviewHelpful(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id) { return reviewService.markHelpful(userId,id); }
+
     @GetMapping("/categories/tree")
     public Object categoryTree() { return reviewService.categoryTree(); }
 

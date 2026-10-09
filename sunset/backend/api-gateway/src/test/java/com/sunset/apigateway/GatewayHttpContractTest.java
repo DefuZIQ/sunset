@@ -69,6 +69,9 @@ class GatewayHttpContractTest {
         registry.add("spring.cloud.gateway.routes[3].id", () -> "subscriptions-test");
         registry.add("spring.cloud.gateway.routes[3].uri", () -> "http://localhost:" + DOWNSTREAM.port());
         registry.add("spring.cloud.gateway.routes[3].predicates[0]", () -> "Path=/subscriptions/**");
+        registry.add("spring.cloud.gateway.routes[4].id", () -> "products-test");
+        registry.add("spring.cloud.gateway.routes[4].uri", () -> "http://localhost:" + DOWNSTREAM.port());
+        registry.add("spring.cloud.gateway.routes[4].predicates[0]", () -> "Path=/products/**");
     }
 
     @AfterAll
@@ -173,6 +176,23 @@ class GatewayHttpContractTest {
 
         assertThat(REQUEST_COUNT.get()).isEqualTo(1);
         assertThat(FORWARDED.get().path()).isEqualTo("/order/my?limit=2");
+        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+    }
+
+    @Test
+    void helpfulReviewVoteRequiresJwtAndForwardsTrustedIdentity() {
+        String path = "/api/v1/products/reviews/20000000-0000-0000-0000-000000000001/helpful";
+        client.put().uri(path).header("user-id", "forged-admin")
+                .exchange().expectStatus().isUnauthorized();
+        assertThat(REQUEST_COUNT.get()).isZero();
+
+        client.put().uri(path)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header("user-id", "forged-admin")
+                .exchange().expectStatus().isOk();
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().method()).isEqualTo("PUT");
+        assertThat(FORWARDED.get().path()).isEqualTo("/products/reviews/20000000-0000-0000-0000-000000000001/helpful");
         assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
     }
 

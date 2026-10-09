@@ -4,6 +4,7 @@ export type Product = components["schemas"]["Product"];
 export type CategoryNode = components["schemas"]["CategoryNode"];
 export type Promotion = components["schemas"]["Promotion"];
 export type ProductReview = components["schemas"]["ProductReview"];
+export type ReviewHelpfulVote = components["schemas"]["ReviewHelpfulVote"];
 export type LoyaltyAccount = components["schemas"]["LoyaltyAccount"];
 export type DeliveryQuote = components["schemas"]["DeliveryQuote"];
 export type Order = components["schemas"]["Order"];
@@ -252,6 +253,13 @@ export async function saveProductReview(token: string, id: string, review: SaveR
     method: "POST",
     headers: { "Content-Type": "application/json", ...bearer(token) },
     body: JSON.stringify(review),
+  }));
+}
+
+export async function markProductReviewHelpful(token: string, reviewId: string): Promise<ReviewHelpfulVote> {
+  return readJson<ReviewHelpfulVote>(await fetch(`/api/v1/products/reviews/${encodeURIComponent(reviewId)}/helpful`, {
+    method: "PUT",
+    headers: bearer(token),
   }));
 }
 

@@ -89,4 +89,8 @@
         <sqlFile path="classpath:/db/migrations/V14__review_details.sql"/>
     </changeSet>
 
+    <changeSet id="119" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V15__review_helpfulness.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

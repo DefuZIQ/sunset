@@ -291,6 +291,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/reviews/{id}/helpful": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Отметить чужой отзыв полезным (повторный вызов идемпотентен) */
+        put: operations["markProductReviewHelpful"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/order": {
         parameters: {
             query?: never;
@@ -1143,9 +1162,15 @@ export interface components {
             fit?: string;
             photoUrl?: string | null;
             verifiedPurchase?: boolean;
+            helpfulCount?: number;
             body?: string;
             /** Format: date-time */
             createdAt?: string;
+        };
+        ReviewHelpfulVote: {
+            /** Format: uuid */
+            reviewId: string;
+            helpfulCount: number;
         };
         LoyaltyAccount: {
             balance?: number;
@@ -1772,6 +1797,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductReview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    markProductReviewHelpful: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Актуальный счётчик */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewHelpfulVote"];
                 };
             };
             400: components["responses"]["BadRequest"];

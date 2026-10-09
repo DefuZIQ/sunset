@@ -148,6 +148,13 @@
         "responses": { "200": { "description": "Сохранённый отзыв", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductReview" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
+    "/products/reviews/{id}/helpful": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Reviews"], "operationId": "markProductReviewHelpful", "summary": "Отметить чужой отзыв полезным (повторный вызов идемпотентен)", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Актуальный счётчик", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewHelpfulVote" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
     "/order": {
       "post": {
         "tags": ["Orders"], "operationId": "createOrder", "summary": "Оформить заказ", "security": [{ "bearerAuth": [] }],
@@ -497,7 +504,8 @@
       },
       "ValidatePromoRequest": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "subtotal": { "type": "number" } } },
       "SaveReviewRequest": { "type": "object", "required": ["rating", "body"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5 }, "qualityRating": { "type": "integer", "minimum": 1, "maximum": 5 }, "fit": { "type": "string", "enum": ["SMALL", "AS_EXPECTED", "LARGE"] }, "photoUrl": { "type": "string", "maxLength": 1000 }, "body": { "type": "string", "minLength": 3, "maxLength": 1500 } } },
-      "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "body": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "helpfulCount": { "type": "integer", "minimum": 0 }, "body": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "ReviewHelpfulVote": { "type": "object", "required": ["reviewId", "helpfulCount"], "properties": { "reviewId": { "type": "string", "format": "uuid" }, "helpfulCount": { "type": "integer", "minimum": 0 } } },
       "LoyaltyAccount": { "type": "object", "properties": { "balance": { "type": "integer" }, "lifetimeEarned": { "type": "integer" }, "tier": { "type": "string" }, "updatedAt": { "type": "string", "format": "date-time" }, "birthdayToday": { "type": "boolean" }, "birthdayBenefit": { "type": "string" }, "transactions": { "type": "array", "items": { "$ref": "#/components/schemas/LoyaltyTransaction" } } } },
       "LoyaltyTransaction": { "type": "object", "properties": { "amount": { "type": "integer" }, "type": { "type": "string" }, "description": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
       "DeliveryQuoteRequest": { "type": "object", "properties": { "method": { "type": "string", "enum": ["courier", "pickup"] }, "subtotal": { "type": "number" } } },

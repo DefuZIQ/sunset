@@ -475,6 +475,34 @@ test('product reviews filter by rating, photo and verified purchase', async ({ p
   await expect(page.locator('.review-card').first()).toContainText('Хорошая ткань');
 });
 
+test('signed-in customer can mark a review helpful once', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [
+    { id: 'review-1', authorName: 'Ольга', rating: 5, body: 'Удобная рубашка', helpfulCount: 2, createdAt: '2026-09-01T00:00:00Z' },
+  ] }));
+  let votes = 0;
+  await page.route('**/api/v1/products/reviews/review-1/helpful', (route) => {
+    votes += 1;
+    expect(route.request().method()).toBe('PUT');
+    expect(route.request().headers().authorization).toBe('Bearer e2e-token');
+    return route.fulfill({ json: { reviewId: 'review-1', helpfulCount: 3 } });
+  });
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  const helpful = page.getByRole('button', { name: 'Отметить отзыв Ольга полезным' });
+  await expect(helpful).toContainText('2');
+  await helpful.click();
+  await expect(helpful).toContainText('3');
+  await expect(helpful).toBeDisabled();
+  expect(votes).toBe(1);
+});
+
 test('opens the catalog and filters products by audience', async ({ page }) => {
   await page.goto('/#/catalog');
   await expect(page).toHaveTitle(/SUNSET/);

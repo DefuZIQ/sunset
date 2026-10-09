@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 class ProductPostgresIntegrationTest {
@@ -70,5 +71,26 @@ class ProductPostgresIntegrationTest {
         List<Map<String, Object>> persisted = reviews.list(productId);
         assertThat(persisted).hasSize(1);
         assertThat(persisted.get(0).get("authorName")).isEqualTo("Иван Соколов");
+    }
+
+    @Test
+    void helpfulVotesAreIdempotentAndAuthorsCannotVoteForThemselves() {
+        UUID productId = jdbc.queryForObject("SELECT id FROM products LIMIT 1", UUID.class);
+        UUID authorId = UUID.randomUUID();
+        UUID voterId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,first_name,last_name) VALUES (?,?,?)", authorId, "Анна", "Автор");
+        jdbc.update("INSERT INTO users(id,first_name,last_name) VALUES (?,?,?)", voterId, "Иван", "Читатель");
+        UUID reviewId = UUID.randomUUID();
+        jdbc.update("INSERT INTO product_reviews(id,product_id,user_id,author_name,rating,body) VALUES (?,?,?,?,?,?)",
+                reviewId, productId, authorId, "Анна Автор", 5, "Хорошее качество");
+
+        assertThat(reviews.markHelpful(voterId, reviewId).get("helpfulCount")).isEqualTo(1L);
+        assertThat(reviews.markHelpful(voterId, reviewId).get("helpfulCount")).isEqualTo(1L);
+        assertThat(reviews.list(productId).stream().filter(row -> reviewId.equals(row.get("id")))
+                .findFirst().orElseThrow().get("helpfulCount")).isEqualTo(1L);
+        assertThatThrownBy(() -> reviews.markHelpful(authorId, reviewId))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("собственный");
+        assertThatThrownBy(() -> reviews.markHelpful(voterId, UUID.randomUUID()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("не найден");
     }
 }

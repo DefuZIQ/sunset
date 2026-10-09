@@ -13,7 +13,7 @@ public class ReviewService {
     public ReviewService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     public List<Map<String, Object>> list(UUID productId) {
-        return jdbc.queryForList("SELECT id,user_id AS \"userId\",author_name AS \"authorName\",rating,quality_rating AS \"qualityRating\",fit,photo_url AS \"photoUrl\",verified_purchase AS \"verifiedPurchase\",body,created_at AS \"createdAt\" FROM product_reviews WHERE product_id=? ORDER BY verified_purchase DESC,created_at DESC", productId);
+        return jdbc.queryForList("SELECT r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id) AS \"helpfulCount\" FROM product_reviews r WHERE r.product_id=? ORDER BY r.verified_purchase DESC,r.created_at DESC", productId);
     }
 
     @Transactional
@@ -38,7 +38,17 @@ public class ReviewService {
         if (author.isBlank()) author = "Клиент SUNSET";
         boolean verified = Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.product_id=? AND o.user_id=? AND o.status='DELIVERED')", Boolean.class, productId, userId));
         jdbc.update("INSERT INTO product_reviews(product_id,user_id,author_name,rating,quality_rating,fit,photo_url,verified_purchase,body) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT (product_id,user_id) DO UPDATE SET author_name=EXCLUDED.author_name,rating=EXCLUDED.rating,quality_rating=EXCLUDED.quality_rating,fit=EXCLUDED.fit,photo_url=EXCLUDED.photo_url,verified_purchase=EXCLUDED.verified_purchase,body=EXCLUDED.body,updated_at=NOW()", productId,userId,author,rating,qualityRating,fit,photoUrl.isBlank()?null:photoUrl,verified,body);
-        return jdbc.queryForMap("SELECT id,user_id AS \"userId\",author_name AS \"authorName\",rating,quality_rating AS \"qualityRating\",fit,photo_url AS \"photoUrl\",verified_purchase AS \"verifiedPurchase\",body,created_at AS \"createdAt\" FROM product_reviews WHERE product_id=? AND user_id=?", productId,userId);
+        return jdbc.queryForMap("SELECT r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id) AS \"helpfulCount\" FROM product_reviews r WHERE r.product_id=? AND r.user_id=?", productId,userId);
+    }
+
+    @Transactional
+    public Map<String, Object> markHelpful(UUID userId, UUID reviewId) {
+        List<UUID> authors = jdbc.query("SELECT user_id FROM product_reviews WHERE id=?", (rs, row) -> rs.getObject(1, UUID.class), reviewId);
+        if (authors.isEmpty()) throw new IllegalArgumentException("Отзыв не найден");
+        if (authors.get(0).equals(userId)) throw new IllegalArgumentException("Нельзя оценить собственный отзыв");
+        jdbc.update("INSERT INTO product_review_helpful_votes(review_id,user_id) VALUES (?,?) ON CONFLICT DO NOTHING", reviewId, userId);
+        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM product_review_helpful_votes WHERE review_id=?", Long.class, reviewId);
+        return Map.of("reviewId", reviewId, "helpfulCount", count == null ? 0L : count);
     }
 
     public List<Map<String, Object>> categoryTree() {
