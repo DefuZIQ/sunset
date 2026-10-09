@@ -451,6 +451,30 @@ test('product page loads reviews from the versioned public API', async ({ page }
   expect(requested).toBe(true);
 });
 
+test('product reviews filter by rating, photo and verified purchase', async ({ page }) => {
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [
+    { id: 'review-5', authorName: 'Анна', rating: 5, body: 'Отлично сидит', verifiedPurchase: true, photoUrl: 'https://example.test/photo.jpg', createdAt: '2026-09-01T00:00:00Z' },
+    { id: 'review-4', authorName: 'Ольга', rating: 4, body: 'Хорошая ткань', verifiedPurchase: false, createdAt: '2026-10-01T00:00:00Z' },
+  ] }));
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await expect(page.getByText('Отлично сидит')).toBeVisible();
+  await expect(page.getByText('Хорошая ткань')).toBeVisible();
+  await expect(page.locator('.reviews-summary strong')).toHaveText('4.5');
+
+  await page.getByRole('button', { name: /5 ★/ }).click();
+  await expect(page.getByText('Хорошая ткань')).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'С фото' }).check();
+  await page.getByRole('checkbox', { name: 'Подтверждённые покупки' }).check();
+  await expect(page.getByText('Отлично сидит')).toBeVisible();
+  await page.getByRole('button', { name: /4 ★/ }).click();
+  await expect(page.getByText('По этим параметрам отзывов нет.')).toBeVisible();
+  await page.getByRole('button', { name: 'Показать все отзывы' }).click();
+  await expect(page.locator('.review-card')).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Сортировка отзывов' }).selectOption('newest');
+  await expect(page.locator('.review-card').first()).toContainText('Хорошая ткань');
+});
+
 test('opens the catalog and filters products by audience', async ({ page }) => {
   await page.goto('/#/catalog');
   await expect(page).toHaveTitle(/SUNSET/);

@@ -5,6 +5,7 @@ import "../App.css"; // Для .container
 import "../components/Main/ProductCard.css"; // Переиспользуем стили
 import "./ProductPage.css"; // Подключаем стили для страницы товара
 import { ApiHttpError, getProductById, listProductReviews, saveProductReview } from "../api/client";
+import { defaultReviewFilter, reviewSummary, selectReviews } from "./reviewFilters";
 
 export default function ProductPage() {
   const { id } = useParams();
@@ -15,6 +16,7 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [reviews, setReviews] = useState([]);
+  const [reviewFilter, setReviewFilter] = useState(defaultReviewFilter);
   const [review, setReview] = useState({ rating: 5, qualityRating: 5, fit: "AS_EXPECTED", photoUrl: "", body: "" });
   const [reviewMessage, setReviewMessage] = useState("");
   const { addToCart, getItemQuantity, decreaseQuantity } = useCart();
@@ -65,6 +67,9 @@ export default function ProductPage() {
       setReviewMessage(error instanceof ApiHttpError && error.status === 401 ? "Сначала войдите в аккаунт" : error.message || "Не удалось сохранить отзыв");
     }
   };
+
+  const summary = reviewSummary(reviews);
+  const visibleReviews = selectReviews(reviews, reviewFilter);
 
   // Обновляем доступное количество при изменении выбора цвета или размера
   useEffect(() => {
@@ -207,9 +212,20 @@ export default function ProductPage() {
         </div>
       </div>
       <section className="reviews-section">
-        <div className="reviews-head"><div><p className="page-kicker">Мнения покупателей</p><h2>Отзывы</h2></div><div className="reviews-summary"><strong>{Number(product.rating || 0).toFixed(1)}</strong><span>★★★★★</span><small>{reviews.length} отзывов</small></div></div>
+        <div className="reviews-head"><div><p className="page-kicker">Мнения покупателей</p><h2>Отзывы</h2></div><div className="reviews-summary"><strong>{(summary.count ? summary.average : Number(product.rating || 0)).toFixed(1)}</strong><span>★★★★★</span><small>{reviews.length} отзывов</small></div></div>
+        {reviews.length > 0 && <div className="reviews-filters" aria-label="Фильтры отзывов">
+          <div className="reviews-filters__ratings" aria-label="Оценка">
+            <button type="button" className={reviewFilter.rating === 0 ? "selected" : ""} aria-pressed={reviewFilter.rating === 0} onClick={() => setReviewFilter((current) => ({ ...current, rating: 0 }))}>Все · {reviews.length}</button>
+            {[5, 4, 3, 2, 1].map((rating) => <button type="button" key={rating} className={reviewFilter.rating === rating ? "selected" : ""} aria-pressed={reviewFilter.rating === rating} onClick={() => setReviewFilter((current) => ({ ...current, rating }))} disabled={!summary.counts[rating]}>{rating} ★ <small>{summary.counts[rating]}</small></button>)}
+          </div>
+          <div className="reviews-filters__options">
+            <label><input type="checkbox" checked={reviewFilter.verified} onChange={(event) => setReviewFilter((current) => ({ ...current, verified: event.target.checked }))} />Подтверждённые покупки</label>
+            <label><input type="checkbox" checked={reviewFilter.withPhoto} onChange={(event) => setReviewFilter((current) => ({ ...current, withPhoto: event.target.checked }))} />С фото</label>
+            <label className="reviews-filters__sort">Сортировка <select value={reviewFilter.sort} onChange={(event) => setReviewFilter((current) => ({ ...current, sort: event.target.value }))} aria-label="Сортировка отзывов"><option value="recommended">Сначала подтверждённые</option><option value="newest">Сначала новые</option><option value="rating-high">Высокие оценки</option><option value="rating-low">Низкие оценки</option></select></label>
+          </div>
+        </div>}
         <div className="reviews-layout">
-          <div className="reviews-list">{reviews.length ? reviews.map((item) => <article className="review-card" key={item.id}><div><strong>{item.authorName}{item.verifiedPurchase&&<em>Покупка подтверждена</em>}</strong><span>{"★".repeat(item.rating)}{"☆".repeat(5-item.rating)}</span></div><p>{item.body}</p>{item.photoUrl&&<img className="review-photo" src={item.photoUrl} alt="Фотография покупателя" loading="lazy"/>}<small>Качество: {item.qualityRating||item.rating}/5 · Посадка: {({SMALL:"маломерит",AS_EXPECTED:"соответствует размеру",LARGE:"большемерит"})[item.fit]||"не указана"}</small><time>{new Date(item.createdAt).toLocaleDateString("ru-RU")}</time></article>) : <div className="reviews-empty">Пока нет отзывов — станьте первым.</div>}</div>
+          <div className="reviews-list">{visibleReviews.length ? visibleReviews.map((item) => <article className="review-card" key={item.id}><div><strong>{item.authorName}{item.verifiedPurchase&&<em>Покупка подтверждена</em>}</strong><span>{"★".repeat(item.rating)}{"☆".repeat(5-item.rating)}</span></div><p>{item.body}</p>{item.photoUrl&&<img className="review-photo" src={item.photoUrl} alt="Фотография покупателя" loading="lazy"/>}<small>Качество: {item.qualityRating||item.rating}/5 · Посадка: {({SMALL:"маломерит",AS_EXPECTED:"соответствует размеру",LARGE:"большемерит"})[item.fit]||"не указана"}</small><time>{new Date(item.createdAt).toLocaleDateString("ru-RU")}</time></article>) : <div className="reviews-empty">{reviews.length ? <><p>По этим параметрам отзывов нет.</p><button type="button" onClick={() => setReviewFilter(defaultReviewFilter)}>Показать все отзывы</button></> : "Пока нет отзывов — станьте первым."}</div>}</div>
           {localStorage.getItem("authToken") ? <form className="review-form" onSubmit={submitReview}><h3>Оставить отзыв</h3><label>Общая оценка<select value={review.rating} onChange={(event) => setReview({ ...review, rating: Number(event.target.value) })}>{[5,4,3,2,1].map((value) => <option value={value} key={value}>{"★".repeat(value)} · {value}</option>)}</select></label><label>Качество<select value={review.qualityRating} onChange={(event)=>setReview({...review,qualityRating:Number(event.target.value)})}>{[5,4,3,2,1].map((value)=><option value={value} key={value}>{value} из 5</option>)}</select></label><label>Как подошёл размер<select value={review.fit} onChange={(event)=>setReview({...review,fit:event.target.value})}><option value="SMALL">Маломерит</option><option value="AS_EXPECTED">Соответствует</option><option value="LARGE">Большемерит</option></select></label><label>Ссылка на фотографию<input type="url" value={review.photoUrl} onChange={(event)=>setReview({...review,photoUrl:event.target.value})} placeholder="https://…" /></label><label>Комментарий<textarea required minLength="3" maxLength="1500" value={review.body} onChange={(event) => setReview({ ...review, body: event.target.value })} placeholder="Расскажите о посадке, ткани и впечатлениях" /></label><button className="primary-action">Опубликовать</button>{reviewMessage && <p>{reviewMessage}</p>}</form> : <div className="review-login"><h3>Поделитесь впечатлением</h3><p>Чтобы оставить отзыв, войдите в личный кабинет.</p><Link className="primary-action" to="/login">Войти</Link></div>}
         </div>
       </section>
