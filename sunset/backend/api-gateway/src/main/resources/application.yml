@@ -62,6 +62,7 @@ security:
     - /products/all
     - /products/by-uuid
     - /products/reviews
+    - /products/review-photos
     - /products/categories
     - /order/promotions
     - /actuator/health

@@ -5,7 +5,7 @@ import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotificat
   listAdminReviews, listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
     markNotificationRead, markProductReviewHelpful, moderateAdminReview, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
-  updateCustomerAddress, validatePromoCode, getProfile, syncCustomerAddresses } from "./client";
+  updateCustomerAddress, uploadProductReviewPhoto, validatePromoCode, getProfile, syncCustomerAddresses } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -283,6 +283,19 @@ test("review moderation uses a protected versioned route", async () => {
   expect(fetchMock).toHaveBeenCalledWith("/api/v1/products/admin/reviews/review%2F1/moderation", {
     method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify({ isHidden: true }),
   });
+});
+
+test("review photo upload sends multipart data with JWT and no manual content type", async () => {
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ photoUrl: "/api/v1/products/review-photos/photo-id" }) });
+  vi.stubGlobal("fetch", fetchMock);
+  const file = new File(["image"], "photo.png", { type: "image/png" });
+  await expect(uploadProductReviewPhoto("jwt", "product/1", file)).resolves.toHaveProperty("photoUrl");
+  const [url, options] = fetchMock.mock.calls[0];
+  expect(url).toBe("/api/v1/products/review/product%2F1/photo");
+  expect(options.method).toBe("POST");
+  expect(options.headers).toEqual({ Authorization: "Bearer jwt" });
+  expect(options.body).toBeInstanceOf(FormData);
+  expect(options.body.get("file")).toBe(file);
 });
 
 test("loyalty and delivery quote use protected versioned routes", async () => {

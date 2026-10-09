@@ -4,6 +4,7 @@ export type Product = components["schemas"]["Product"];
 export type CategoryNode = components["schemas"]["CategoryNode"];
 export type Promotion = components["schemas"]["Promotion"];
 export type ProductReview = components["schemas"]["ProductReview"];
+export type ReviewPhotoUpload = components["schemas"]["ReviewPhotoUpload"];
 export type ReviewHelpfulVote = components["schemas"]["ReviewHelpfulVote"];
 export type AdminReview = components["schemas"]["AdminReview"];
 export type LoyaltyAccount = components["schemas"]["LoyaltyAccount"];
@@ -256,6 +257,16 @@ export async function saveProductReview(token: string, id: string, review: SaveR
     method: "POST",
     headers: { "Content-Type": "application/json", ...bearer(token) },
     body: JSON.stringify(review),
+  }));
+}
+
+export async function uploadProductReviewPhoto(token: string, id: string, file: File): Promise<ReviewPhotoUpload> {
+  const form = new FormData();
+  form.append("file", file);
+  return readJson<ReviewPhotoUpload>(await fetch(`/api/v1/products/review/${encodeURIComponent(id)}/photo`, {
+    method: "POST",
+    headers: bearer(token),
+    body: form,
   }));
 }
 

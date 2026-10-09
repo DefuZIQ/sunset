@@ -291,6 +291,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/review/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Загрузить JPEG или PNG к своему отзыву (до 5 МБ) */
+        post: operations["uploadProductReviewPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/review-photos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /** Фото опубликованного отзыва */
+        get: operations["getPublishedReviewPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/reviews/{id}/helpful": {
         parameters: {
             query?: never;
@@ -1203,8 +1241,12 @@ export interface components {
             qualityRating?: number;
             /** @enum {string} */
             fit?: "SMALL" | "AS_EXPECTED" | "LARGE";
+            /** @description Адрес, полученный от uploadProductReviewPhoto; внешние ссылки для новых отзывов не принимаются */
             photoUrl?: string;
             body: string;
+        };
+        ReviewPhotoUpload: {
+            photoUrl: string;
         };
         ProductReview: {
             /** Format: uuid */
@@ -1874,6 +1916,61 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    uploadProductReviewPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Адрес загруженного фото */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewPhotoUpload"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getPublishedReviewPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Изображение */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     markProductReviewHelpful: {

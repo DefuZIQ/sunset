@@ -101,4 +101,8 @@
         <sqlFile path="classpath:/db/migrations/V17__review_moderation.sql"/>
     </changeSet>
 
+    <changeSet id="122" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V18__review_photos.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

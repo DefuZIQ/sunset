@@ -9,9 +9,10 @@ import java.util.*;
 @Service
 public class ReviewService {
     private final JdbcTemplate jdbc;
+    private final ReviewPhotoService photos;
     private static final String REVIEW_FIELDS = "r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",r.store_reply AS \"storeReply\",r.store_replied_at AS \"storeRepliedAt\",r.is_hidden AS \"isHidden\",r.moderated_at AS \"moderatedAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id) AS \"helpfulCount\"";
 
-    public ReviewService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public ReviewService(JdbcTemplate jdbc, ReviewPhotoService photos) { this.jdbc = jdbc; this.photos = photos; }
 
     public List<Map<String, Object>> list(UUID productId) {
         return jdbc.queryForList("SELECT " + REVIEW_FIELDS + " FROM product_reviews r WHERE r.product_id=? AND NOT r.is_hidden ORDER BY r.verified_purchase DESC,r.created_at DESC", productId);
@@ -32,6 +33,16 @@ public class ReviewService {
         if (qualityRating < 1 || qualityRating > 5) throw new IllegalArgumentException("Оценка качества должна быть от 1 до 5");
         if (!Set.of("SMALL", "AS_EXPECTED", "LARGE").contains(fit)) throw new IllegalArgumentException("Некорректная оценка посадки");
         if (photoUrl.length() > 1000) throw new IllegalArgumentException("Ссылка на фото слишком длинная");
+        if (!photoUrl.isBlank()) {
+            try {
+                UUID photoId = UUID.fromString(photoUrl.replaceFirst("^/api/v1/products/review-photos/", ""));
+                if (!photoUrl.equals(ReviewPhotoService.path(photoId)) || !photos.ownedBy(userId, productId, photoId)) {
+                    throw new IllegalArgumentException("Загрузите фото через форму отзыва");
+                }
+            } catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException("Загрузите фото через форму отзыва", error);
+            }
+        }
         if (body.length() < 3 || body.length() > 1500) throw new IllegalArgumentException("Отзыв должен содержать от 3 до 1500 символов");
         if (jdbc.queryForObject("SELECT COUNT(*) FROM products WHERE id=?", Integer.class, productId) == 0) throw new IllegalArgumentException("Товар не найден");
         Map<String, Object> user = jdbc.queryForMap("SELECT first_name,last_name FROM users WHERE id=?", userId);
@@ -39,6 +50,7 @@ public class ReviewService {
         if (author.isBlank()) author = "Клиент SUNSET";
         boolean verified = Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.product_id=? AND o.user_id=? AND o.status='DELIVERED')", Boolean.class, productId, userId));
         jdbc.update("INSERT INTO product_reviews(product_id,user_id,author_name,rating,quality_rating,fit,photo_url,verified_purchase,body) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT (product_id,user_id) DO UPDATE SET author_name=EXCLUDED.author_name,rating=EXCLUDED.rating,quality_rating=EXCLUDED.quality_rating,fit=EXCLUDED.fit,photo_url=EXCLUDED.photo_url,verified_purchase=EXCLUDED.verified_purchase,body=EXCLUDED.body,updated_at=NOW()", productId,userId,author,rating,qualityRating,fit,photoUrl.isBlank()?null:photoUrl,verified,body);
+        photos.removeUnused(userId, productId, photoUrl);
         return jdbc.queryForMap("SELECT " + REVIEW_FIELDS + " FROM product_reviews r WHERE r.product_id=? AND r.user_id=?", productId,userId);
     }
 

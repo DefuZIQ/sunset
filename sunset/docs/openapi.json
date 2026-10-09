@@ -148,6 +148,21 @@
         "responses": { "200": { "description": "Сохранённый отзыв", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductReview" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
+    "/products/review/{id}/photo": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "post": {
+        "tags": ["Reviews"], "operationId": "uploadProductReviewPhoto", "summary": "Загрузить JPEG или PNG к своему отзыву (до 5 МБ)", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } } },
+        "responses": { "200": { "description": "Адрес загруженного фото", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewPhotoUpload" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/products/review-photos/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Reviews"], "operationId": "getPublishedReviewPhoto", "summary": "Фото опубликованного отзыва",
+        "responses": { "200": { "description": "Изображение", "content": { "image/jpeg": { "schema": { "type": "string", "format": "binary" } }, "image/png": { "schema": { "type": "string", "format": "binary" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
     "/products/reviews/{id}/helpful": {
       "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
       "put": {
@@ -525,7 +540,8 @@
         }
       },
       "ValidatePromoRequest": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "subtotal": { "type": "number" } } },
-      "SaveReviewRequest": { "type": "object", "required": ["rating", "body"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5 }, "qualityRating": { "type": "integer", "minimum": 1, "maximum": 5 }, "fit": { "type": "string", "enum": ["SMALL", "AS_EXPECTED", "LARGE"] }, "photoUrl": { "type": "string", "maxLength": 1000 }, "body": { "type": "string", "minLength": 3, "maxLength": 1500 } } },
+      "SaveReviewRequest": { "type": "object", "required": ["rating", "body"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5 }, "qualityRating": { "type": "integer", "minimum": 1, "maximum": 5 }, "fit": { "type": "string", "enum": ["SMALL", "AS_EXPECTED", "LARGE"] }, "photoUrl": { "type": "string", "maxLength": 1000, "description": "Адрес, полученный от uploadProductReviewPhoto; внешние ссылки для новых отзывов не принимаются" }, "body": { "type": "string", "minLength": 3, "maxLength": 1500 } } },
+      "ReviewPhotoUpload": { "type": "object", "required": ["photoUrl"], "properties": { "photoUrl": { "type": "string" } } },
       "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "helpfulCount": { "type": "integer", "minimum": 0 }, "body": { "type": "string" }, "storeReply": { "type": "string", "nullable": true }, "storeRepliedAt": { "type": "string", "format": "date-time", "nullable": true }, "createdAt": { "type": "string", "format": "date-time" } } },
       "AdminReview": { "allOf": [{ "$ref": "#/components/schemas/ProductReview" }, { "type": "object", "required": ["productId", "productName", "isHidden"], "properties": { "productId": { "type": "string", "format": "uuid" }, "productName": { "type": "string" }, "isHidden": { "type": "boolean" }, "moderatedAt": { "type": "string", "format": "date-time", "nullable": true } } }] },
       "StoreReplyRequest": { "type": "object", "required": ["reply"], "properties": { "reply": { "type": "string", "maxLength": 1500, "description": "Пустая строка удаляет ответ" } } },

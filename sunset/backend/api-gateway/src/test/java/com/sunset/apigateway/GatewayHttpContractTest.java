@@ -233,6 +233,24 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void reviewPhotoReadIsPublicButUploadRequiresJwt() {
+        String photoPath = "/api/v1/products/review-photos/20000000-0000-0000-0000-000000000001";
+        client.get().uri(photoPath).exchange().expectStatus().isOk();
+        assertThat(FORWARDED.get().path()).isEqualTo("/products/review-photos/20000000-0000-0000-0000-000000000001");
+
+        REQUEST_COUNT.set(0);
+        String uploadPath = "/api/v1/products/review/20000000-0000-0000-0000-000000000001/photo";
+        client.post().uri(uploadPath).header("user-id", "forged-user")
+                .exchange().expectStatus().isUnauthorized();
+        assertThat(REQUEST_COUNT.get()).isZero();
+        client.post().uri(uploadPath)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header("user-id", "forged-user")
+                .exchange().expectStatus().isOk();
+        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+    }
+
+    @Test
     void versionedAdminRouteRequiresJwtAndDoesNotTrustClientIdentity() {
         client.get().uri("/api/v1/order/admin/users")
                 .header("user-id", "forged-admin")

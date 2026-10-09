@@ -2,6 +2,7 @@ package com.sunset.product;
 
 import com.sunset.product.service.ProductService;
 import com.sunset.product.service.ReviewService;
+import com.sunset.product.service.ReviewPhotoService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -9,6 +10,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 import java.util.List;
 import java.util.Map;
@@ -41,6 +49,7 @@ class ProductPostgresIntegrationTest {
 
     @Autowired private ProductService products;
     @Autowired private ReviewService reviews;
+    @Autowired private ReviewPhotoService photos;
     @Autowired private JdbcTemplate jdbc;
 
     @Test
@@ -150,5 +159,48 @@ class ProductPostgresIntegrationTest {
         assertThat(products.getProductById(productId).orElseThrow().getReviewCount()).isEqualTo(originalCount + 1);
         assertThatThrownBy(() -> reviews.setHidden(adminId, UUID.randomUUID(), Map.of("isHidden", true)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("не найден");
+    }
+
+    @Test
+    void uploadedPhotoIsOwnedByReviewerAndVisibleOnlyWithPublishedReview() throws IOException {
+        UUID productId = jdbc.queryForObject("SELECT id FROM products LIMIT 1", UUID.class);
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,first_name,role) VALUES (?,?,'USER')", userId, "Фотограф");
+        jdbc.update("INSERT INTO users(id,first_name,role) VALUES (?,?,'USER')", otherUserId, "Другой");
+        jdbc.update("INSERT INTO users(id,first_name,role) VALUES (?,?,'ADMIN')", adminId, "Менеджер");
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(12, 12, BufferedImage.TYPE_INT_RGB), "png", output);
+        byte[] png = output.toByteArray();
+        String photoUrl = photos.upload(userId, productId,
+                new MockMultipartFile("file", "photo.png", "image/png", png)).get("photoUrl");
+        UUID photoId = UUID.fromString(photoUrl.substring(photoUrl.lastIndexOf('/') + 1));
+        assertThatThrownBy(() -> photos.readPublished(photoId)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> reviews.save(otherUserId, productId,
+                Map.of("rating", 5, "body", "Чужая фотография", "photoUrl", photoUrl))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reviews.save(userId, productId,
+                Map.of("rating", 5, "body", "Внешняя ссылка", "photoUrl", "https://example.test/photo.png"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> photos.upload(userId, productId,
+                new MockMultipartFile("file", "fake.png", "image/png", "not an image".getBytes())))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        Map<String, Object> saved = reviews.save(userId, productId,
+                Map.of("rating", 5, "body", "Фото ткани", "photoUrl", photoUrl));
+        assertThat(saved.get("photoUrl")).isEqualTo(photoUrl);
+        assertThat(photos.readPublished(photoId).contentType()).isEqualTo("image/png");
+        assertThat(photos.readPublished(photoId).bytes()).isNotEmpty();
+        reviews.setHidden(adminId, (UUID) saved.get("id"), Map.of("isHidden", true));
+        assertThatThrownBy(() -> photos.readPublished(photoId)).isInstanceOf(ResponseStatusException.class);
+        reviews.setHidden(adminId, (UUID) saved.get("id"), Map.of("isHidden", false));
+        assertThat(photos.readPublished(photoId).bytes()).isNotEmpty();
+
+        String unusedUrl = photos.upload(userId, productId,
+                new MockMultipartFile("file", "unused.png", "image/png", png)).get("photoUrl");
+        UUID unusedId = UUID.fromString(unusedUrl.substring(unusedUrl.lastIndexOf('/') + 1));
+        jdbc.update("UPDATE product_review_photos SET created_at=NOW() - INTERVAL '2 days' WHERE id=?", unusedId);
+        photos.cleanupOrphans();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM product_review_photos WHERE id=?", Integer.class, unusedId)).isZero();
+        assertThat(photos.readPublished(photoId).bytes()).isNotEmpty();
     }
 }

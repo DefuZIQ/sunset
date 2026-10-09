@@ -6,6 +6,7 @@ import com.sunset.product.dto.ProductUuidRequest;
 import com.sunset.product.service.AdminProductService;
 import com.sunset.product.service.ProductService;
 import com.sunset.product.service.ReviewService;
+import com.sunset.product.service.ReviewPhotoService;
 import org.springframework.web.server.ResponseStatusException;
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +18,7 @@ import static org.mockito.Mockito.*;
 
 class ProductControllerTest {
     private final ProductService products = mock(ProductService.class);
-    private final ProductController controller = new ProductController(products, mock(AdminProductService.class), mock(ReviewService.class));
+    private final ProductController controller = new ProductController(products, mock(AdminProductService.class), mock(ReviewService.class), mock(ReviewPhotoService.class));
 
     @Test void rejectsMissingProductId() {
         assertThrows(IllegalArgumentException.class, () -> controller.getProductByUuid(null));

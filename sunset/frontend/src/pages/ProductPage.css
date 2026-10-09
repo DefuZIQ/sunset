@@ -140,3 +140,4 @@
   opacity: 0.5;
 }
 .product-category-path{display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.8rem;color:#857970;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase}.product-category-path span+span::before{content:"/";margin-right:.45rem;color:#b6aaa2}
+.review-photo-picker small{font-size:.73rem;letter-spacing:0;text-transform:none;color:#81746a}.review-photo-picker input[type=file]{font:inherit;cursor:pointer}.review-photo-picker input::file-selector-button{margin-right:.8rem;padding:.65rem .9rem;border:1px solid #a8917e;background:#f8f3ef;color:#544237;font:inherit;cursor:pointer}.review-photo-preview{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}.review-photo-preview img{width:100px;height:120px;object-fit:cover;border-radius:8px}.review-photo-preview button{border:0;border-bottom:1px solid currentColor;background:transparent;color:#795847;padding:.3rem 0;cursor:pointer}.review-form .primary-action:disabled{opacity:.6;cursor:wait}

@@ -93,7 +93,7 @@ public class SecurityConfig {
                     auth.pathMatchers(HttpMethod.OPTIONS).permitAll();
                     auth.pathMatchers(HttpMethod.POST, "/subscriptions").permitAll();
                     auth.pathMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll();
-                    auth.pathMatchers(HttpMethod.GET, "/products/reviews/**", "/products/categories/tree").permitAll();
+                    auth.pathMatchers(HttpMethod.GET, "/products/reviews/**", "/products/review-photos/**", "/products/categories/tree").permitAll();
                     whitelistConfig.getWhitelistPaths()
                             .forEach(path -> auth.pathMatchers(path).permitAll());
                     auth.anyExchange().authenticated();

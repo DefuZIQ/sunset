@@ -1,10 +1,10 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useCart } from "../components/HeaderParts/CartContext";
 import "../App.css"; // Для .container
 import "../components/Main/ProductCard.css"; // Переиспользуем стили
 import "./ProductPage.css"; // Подключаем стили для страницы товара
-import { ApiHttpError, getProductById, listProductReviews, markProductReviewHelpful, saveProductReview } from "../api/client";
+import { ApiHttpError, getProductById, listProductReviews, markProductReviewHelpful, saveProductReview, uploadProductReviewPhoto } from "../api/client";
 import { defaultReviewFilter, reviewSummary, selectReviews } from "./reviewFilters";
 
 export default function ProductPage() {
@@ -20,6 +20,10 @@ export default function ProductPage() {
   const [helpfulReviewIds, setHelpfulReviewIds] = useState(() => new Set());
   const [helpfulError, setHelpfulError] = useState(null);
   const [review, setReview] = useState({ rating: 5, qualityRating: 5, fit: "AS_EXPECTED", photoUrl: "", body: "" });
+  const [reviewFile, setReviewFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState("");
+  const [savingReview, setSavingReview] = useState(false);
+  const reviewFileInput = useRef(null);
   const [reviewMessage, setReviewMessage] = useState("");
   const { addToCart, getItemQuantity, decreaseQuantity } = useCart();
 
@@ -59,14 +63,41 @@ export default function ProductPage() {
 
   const loadReviews = useCallback(() => listProductReviews(id).then(setReviews).catch(() => setReviews([])), [id]);
   useEffect(() => { if (id) loadReviews(); }, [id, loadReviews]);
+  useEffect(() => {
+    if (!reviewFile) { setPhotoPreview(""); return; }
+    const preview = URL.createObjectURL(reviewFile);
+    setPhotoPreview(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [reviewFile]);
+
+  const selectReviewPhoto = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (file && (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+      setReviewFile(null);
+      event.target.value = "";
+      setReviewMessage("Выберите JPEG или PNG размером до 5 МБ");
+      return;
+    }
+    setReviewFile(file);
+    setReviewMessage("");
+  };
 
   const submitReview = async (event) => {
     event.preventDefault();
+    setSavingReview(true);
     try {
-      await saveProductReview(localStorage.getItem("authToken"), id, review);
-      setReview({ rating: 5, qualityRating: 5, fit: "AS_EXPECTED", photoUrl: "", body: "" }); setReviewMessage("Спасибо! Отзыв опубликован."); loadReviews();
+      const token = localStorage.getItem("authToken");
+      const uploaded = reviewFile ? await uploadProductReviewPhoto(token, id, reviewFile) : null;
+      const saved = await saveProductReview(token, id, { ...review, photoUrl: uploaded?.photoUrl || "" });
+      setReview({ rating: 5, qualityRating: 5, fit: "AS_EXPECTED", photoUrl: "", body: "" });
+      setReviewFile(null);
+      if (reviewFileInput.current) reviewFileInput.current.value = "";
+      setReviewMessage(saved.isHidden ? "Отзыв сохранён, но скрыт модератором." : "Спасибо! Отзыв опубликован.");
+      loadReviews();
     } catch (error) {
       setReviewMessage(error instanceof ApiHttpError && error.status === 401 ? "Сначала войдите в аккаунт" : error.message || "Не удалось сохранить отзыв");
+    } finally {
+      setSavingReview(false);
     }
   };
 
@@ -239,7 +270,17 @@ export default function ProductPage() {
         </div>}
         <div className="reviews-layout">
           <div className="reviews-list">{visibleReviews.length ? visibleReviews.map((item) => <article className="review-card" key={item.id}><div><strong>{item.authorName}{item.verifiedPurchase&&<em>Покупка подтверждена</em>}</strong><span>{"★".repeat(item.rating)}{"☆".repeat(5-item.rating)}</span></div><p>{item.body}</p>{item.storeReply&&<blockquote className="review-card__reply"><strong>SUNSET отвечает</strong><p>{item.storeReply}</p>{item.storeRepliedAt&&<time>{new Date(item.storeRepliedAt).toLocaleDateString("ru-RU")}</time>}</blockquote>}{item.photoUrl&&<img className="review-photo" src={item.photoUrl} alt="Фотография покупателя" loading="lazy"/>}<small>Качество: {item.qualityRating||item.rating}/5 · Посадка: {({SMALL:"маломерит",AS_EXPECTED:"соответствует размеру",LARGE:"большемерит"})[item.fit]||"не указана"}</small><time>{new Date(item.createdAt).toLocaleDateString("ru-RU")}</time><div className="review-card__actions">{localStorage.getItem("authToken") ? <button type="button" onClick={() => markHelpful(item.id)} disabled={helpfulReviewIds.has(item.id)} aria-label={`Отметить отзыв ${item.authorName} полезным`}>{helpfulReviewIds.has(item.id) ? "✓ Спасибо" : "Полезно"} · {item.helpfulCount || 0}</button> : <Link to="/login">Полезно · {item.helpfulCount || 0}</Link>}{helpfulError?.reviewId === item.id && <span role="alert">{helpfulError.message}</span>}</div></article>) : <div className="reviews-empty">{reviews.length ? <><p>По этим параметрам отзывов нет.</p><button type="button" onClick={() => setReviewFilter(defaultReviewFilter)}>Показать все отзывы</button></> : "Пока нет отзывов — станьте первым."}</div>}</div>
-          {localStorage.getItem("authToken") ? <form className="review-form" onSubmit={submitReview}><h3>Оставить отзыв</h3><label>Общая оценка<select value={review.rating} onChange={(event) => setReview({ ...review, rating: Number(event.target.value) })}>{[5,4,3,2,1].map((value) => <option value={value} key={value}>{"★".repeat(value)} · {value}</option>)}</select></label><label>Качество<select value={review.qualityRating} onChange={(event)=>setReview({...review,qualityRating:Number(event.target.value)})}>{[5,4,3,2,1].map((value)=><option value={value} key={value}>{value} из 5</option>)}</select></label><label>Как подошёл размер<select value={review.fit} onChange={(event)=>setReview({...review,fit:event.target.value})}><option value="SMALL">Маломерит</option><option value="AS_EXPECTED">Соответствует</option><option value="LARGE">Большемерит</option></select></label><label>Ссылка на фотографию<input type="url" value={review.photoUrl} onChange={(event)=>setReview({...review,photoUrl:event.target.value})} placeholder="https://…" /></label><label>Комментарий<textarea required minLength="3" maxLength="1500" value={review.body} onChange={(event) => setReview({ ...review, body: event.target.value })} placeholder="Расскажите о посадке, ткани и впечатлениях" /></label><button className="primary-action">Опубликовать</button>{reviewMessage && <p>{reviewMessage}</p>}</form> : <div className="review-login"><h3>Поделитесь впечатлением</h3><p>Чтобы оставить отзыв, войдите в личный кабинет.</p><Link className="primary-action" to="/login">Войти</Link></div>}
+          {localStorage.getItem("authToken") ? <form className="review-form" onSubmit={submitReview}>
+            <h3>Оставить отзыв</h3>
+            <label>Общая оценка<select value={review.rating} onChange={(event) => setReview({ ...review, rating: Number(event.target.value) })}>{[5,4,3,2,1].map((value) => <option value={value} key={value}>{"★".repeat(value)} · {value}</option>)}</select></label>
+            <label>Качество<select value={review.qualityRating} onChange={(event)=>setReview({...review,qualityRating:Number(event.target.value)})}>{[5,4,3,2,1].map((value)=><option value={value} key={value}>{value} из 5</option>)}</select></label>
+            <label>Как подошёл размер<select value={review.fit} onChange={(event)=>setReview({...review,fit:event.target.value})}><option value="SMALL">Маломерит</option><option value="AS_EXPECTED">Соответствует</option><option value="LARGE">Большемерит</option></select></label>
+            <label className="review-photo-picker">Фото товара (необязательно)<input ref={reviewFileInput} type="file" accept="image/jpeg,image/png" onChange={selectReviewPhoto} /><small>JPEG или PNG, до 5 МБ</small></label>
+            {photoPreview && <div className="review-photo-preview"><img src={photoPreview} alt="Предпросмотр фотографии отзыва" /><button type="button" onClick={() => { setReviewFile(null); if (reviewFileInput.current) reviewFileInput.current.value = ""; }}>Убрать фото</button></div>}
+            <label>Комментарий<textarea required minLength="3" maxLength="1500" value={review.body} onChange={(event) => setReview({ ...review, body: event.target.value })} placeholder="Расскажите о посадке, ткани и впечатлениях" /></label>
+            <button className="primary-action" disabled={savingReview}>{savingReview ? "Сохраняем…" : "Опубликовать"}</button>
+            {reviewMessage && <p role="status">{reviewMessage}</p>}
+          </form> : <div className="review-login"><h3>Поделитесь впечатлением</h3><p>Чтобы оставить отзыв, войдите в личный кабинет.</p><Link className="primary-action" to="/login">Войти</Link></div>}
         </div>
       </section>
     </div>

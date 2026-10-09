@@ -499,6 +499,38 @@ test('product page loads reviews from the versioned public API', async ({ page }
   expect(requested).toBe(true);
 });
 
+test('customer uploads a review photo before publishing the review', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
+  const photoUrl = '/api/v1/products/review-photos/55555555-5555-5555-5555-555555555555';
+  let published = null;
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: published ? [published] : [] }));
+  await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111/photo', (route) => {
+    expect(route.request().headers().authorization).toBe('Bearer e2e-token');
+    expect(route.request().headers()['content-type']).toContain('multipart/form-data');
+    return route.fulfill({ json: { photoUrl } });
+  });
+  await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111', (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({ body: 'Хорошая ткань', photoUrl });
+    published = { id: 'review-with-photo', authorName: 'Анна', rating: 5, body: 'Хорошая ткань', photoUrl, createdAt: '2026-10-09T00:00:00Z' };
+    return route.fulfill({ json: published });
+  });
+  await page.route('**/api/v1/products/review-photos/55555555-5555-5555-5555-555555555555', (route) => route.fulfill({ body: Buffer.from('image'), contentType: 'image/png' }));
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await page.getByLabel('Фото товара (необязательно)').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from('image') });
+  await expect(page.getByAltText('Предпросмотр фотографии отзыва')).toBeVisible();
+  await page.getByPlaceholder('Расскажите о посадке, ткани и впечатлениях').fill('Хорошая ткань');
+  await page.getByRole('button', { name: 'Опубликовать' }).click();
+  await expect(page.getByText('Спасибо! Отзыв опубликован.')).toBeVisible();
+  await expect(page.locator('.review-card .review-photo')).toHaveAttribute('src', photoUrl);
+});
+
 test('product reviews filter by rating, photo and verified purchase', async ({ page }) => {
   await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
   await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [
