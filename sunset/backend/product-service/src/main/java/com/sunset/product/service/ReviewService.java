@@ -53,7 +53,7 @@ public class ReviewService {
         String reply = Objects.toString(request.get("reply"), "").trim();
         if (reply.length() > 1500) throw new IllegalArgumentException("Ответ магазина не должен превышать 1500 символов");
         String value = reply.isBlank() ? null : reply;
-        int updated = jdbc.update("UPDATE product_reviews SET store_reply=?,store_replied_at=CASE WHEN ? IS NULL THEN NULL ELSE NOW() END,store_replied_by=?,updated_at=NOW() WHERE id=?", value, value, value == null ? null : adminId, reviewId);
+        int updated = jdbc.update("UPDATE product_reviews SET store_reply=?,store_replied_at=CASE WHEN ? THEN NULL ELSE NOW() END,store_replied_by=?,updated_at=NOW() WHERE id=?", value, value == null, value == null ? null : adminId, reviewId);
         if (updated == 0) throw new IllegalArgumentException("Отзыв не найден");
         return jdbc.queryForMap("SELECT " + REVIEW_FIELDS + ",p.id AS \"productId\",p.name AS \"productName\" FROM product_reviews r JOIN products p ON p.id=r.product_id WHERE r.id=?", reviewId);
     }
