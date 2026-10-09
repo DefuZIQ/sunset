@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { categoryMatches } from "../components/AdminCategoryTree";
 import AdminProductsPanel, { AdminEditProductDialog } from "./admin/AdminProductsPanel";
 import AdminStockPanel from "./admin/AdminStockPanel";
+import AdminReviewsPanel from "./admin/AdminReviewsPanel";
 import { adjustAdminBonuses, createAdminProduct, createAdminPromotion, deleteAdminProduct, getAdminAnalytics, getCategoryTree, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock } from "../api/client";
 import "./Admin.css";
 
@@ -91,7 +92,7 @@ export default function Admin() {
   }catch(error){notify(error.message);}};
 
   return <div className="page-shell container admin-page"><div className="admin-heading"><div><p className="page-kicker">SUNSET CONTROL</p><h1 className="page-title">Управление магазином</h1></div><span>{products.length} товаров · {users.length} клиентов</span></div>
-    <div className="admin-tabs">{[["overview","Обзор"],["orders","Заказы"],["returns","Возвраты"],["products","Товары"],["stock","Остатки"],["promos","Акции"],["users","Клиенты"]].map(([key,label])=><button className={tab===key?"active":""} onClick={()=>setTab(key)} key={key}>{label}</button>)}</div>{message&&<p className="admin-message">{message}</p>}
+    <div className="admin-tabs">{[["overview","Обзор"],["orders","Заказы"],["returns","Возвраты"],["products","Товары"],["stock","Остатки"],["reviews","Отзывы"],["promos","Акции"],["users","Клиенты"]].map(([key,label])=><button className={tab===key?"active":""} onClick={()=>setTab(key)} key={key}>{label}</button>)}</div>{message&&<p className="admin-message">{message}</p>}
 
     {tab==="overview"&&<><div className="admin-metrics"><article><span>Заказов</span><strong>{analytics?.orders?.total||0}</strong><small>За 30 дней: {analytics?.orders?.last30Days||0}</small></article><article><span>Выручка</span><strong>{Number(analytics?.orders?.revenue||0).toLocaleString("ru-RU")} ₽</strong><small>Без отменённых заказов</small></article><article><span>Возвраты</span><strong>{analytics?.returns?.requested||0}</strong><small>Ожидают решения</small></article><article><span>Низкий остаток</span><strong>{analytics?.lowStock||0}</strong><small>Вариантов по 0–3 шт.</small></article></div><div className="admin-top-products"><h2>Популярные товары</h2>{analytics?.topProducts?.map((item,index)=><div key={item.id}><i>{index+1}</i><span><strong>{item.name}</strong><small>{item.quantity} шт.</small></span><b>{Number(item.revenue).toLocaleString("ru-RU")} ₽</b></div>)}</div></>}
 
@@ -114,6 +115,8 @@ export default function Admin() {
       expectedSizeType={expectedSizeType} allowedStockSizes={allowedStockSizes}
       onAddVariant={addStockVariant} onRemoveVariant={removeStockVariant} onSave={saveStock}
     />}
+
+    {tab==="reviews"&&<AdminReviewsPanel />}
 
     {tab==="promos"&&<><form className="admin-form" onSubmit={createPromo}><p className="page-kicker">Маркетинг</p><h2>Запустить промокод</h2><div><label>Код<input required value={promo.code} onChange={(e)=>setPromo({...promo,code:e.target.value.toUpperCase()})}/></label><label>Название<input required value={promo.title} onChange={(e)=>setPromo({...promo,title:e.target.value})}/></label></div><label>Описание<textarea value={promo.description} onChange={(e)=>setPromo({...promo,description:e.target.value})}/></label><div><label>Скидка, %<input type="number" min="0" max="100" value={promo.discountPercent} onChange={(e)=>setPromo({...promo,discountPercent:e.target.value})}/></label><label>Минимальный заказ<input type="number" min="0" value={promo.minOrder} onChange={(e)=>setPromo({...promo,minOrder:e.target.value})}/></label></div><button className="primary-action">Запустить акцию</button></form><div className="promo-admin-list">{promos.map((item)=><article key={item.id}><strong>{item.code}</strong><span>{item.title}</span><small>{item.active?"Активен":"Остановлен"} · использований: {item.usage_count}</small></article>)}</div></>}
 

@@ -5,6 +5,7 @@ export type CategoryNode = components["schemas"]["CategoryNode"];
 export type Promotion = components["schemas"]["Promotion"];
 export type ProductReview = components["schemas"]["ProductReview"];
 export type ReviewHelpfulVote = components["schemas"]["ReviewHelpfulVote"];
+export type AdminReview = components["schemas"]["AdminReview"];
 export type LoyaltyAccount = components["schemas"]["LoyaltyAccount"];
 export type DeliveryQuote = components["schemas"]["DeliveryQuote"];
 export type Order = components["schemas"]["Order"];
@@ -29,6 +30,7 @@ export type AddressLookupCandidate = components["schemas"]["AddressLookupCandida
 type ProductUuidRequest = paths["/products/by-uuid"]["post"]["requestBody"]["content"]["application/json"];
 type SubscribeRequest = paths["/subscriptions"]["post"]["requestBody"]["content"]["application/json"];
 type SaveReviewRequest = paths["/products/review/{id}"]["post"]["requestBody"]["content"]["application/json"];
+type StoreReplyRequest = paths["/products/admin/reviews/{id}/reply"]["put"]["requestBody"]["content"]["application/json"];
 type DeliveryQuoteRequest = paths["/order/delivery/quote"]["post"]["requestBody"]["content"]["application/json"];
 type CreateOrderRequest = paths["/order"]["post"]["requestBody"]["content"]["application/json"];
 type UpdatePendingOrderRequest = paths["/order/my/{id}"]["put"]["requestBody"]["content"]["application/json"];
@@ -260,6 +262,18 @@ export async function markProductReviewHelpful(token: string, reviewId: string):
   return readJson<ReviewHelpfulVote>(await fetch(`/api/v1/products/reviews/${encodeURIComponent(reviewId)}/helpful`, {
     method: "PUT",
     headers: bearer(token),
+  }));
+}
+
+export async function listAdminReviews(token: string): Promise<AdminReview[]> {
+  return readJson<AdminReview[]>(await fetch("/api/v1/products/admin/reviews", { headers: bearer(token) }));
+}
+
+export async function saveAdminReviewReply(token: string, reviewId: string, reply: StoreReplyRequest): Promise<AdminReview> {
+  return readJson<AdminReview>(await fetch(`/api/v1/products/admin/reviews/${encodeURIComponent(reviewId)}/reply`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...bearer(token) },
+    body: JSON.stringify(reply),
   }));
 }
 

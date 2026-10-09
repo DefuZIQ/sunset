@@ -2,8 +2,8 @@ import { afterEach, expect, test, vi } from "vitest";
 import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createCustomerAddress, createOrder, createOrderReturn, deleteAdminProduct, deleteCustomerAddress, getCategoryTree,
   getAddressGeocoderStatus, getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
   listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
-  listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
-  markNotificationRead, markProductReviewHelpful, quoteDelivery, registerCustomer, saveProductReview,
+  listAdminReviews, listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
+  markNotificationRead, markProductReviewHelpful, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
   updateCustomerAddress, validatePromoCode, getProfile, syncCustomerAddresses } from "./client";
 
@@ -259,6 +259,19 @@ test("helpful vote uses an authenticated idempotent PUT", async () => {
   await expect(markProductReviewHelpful("jwt", "review/1")).resolves.toEqual(vote);
   expect(fetchMock).toHaveBeenCalledWith("/api/v1/products/reviews/review%2F1/helpful", {
     method: "PUT", headers: { Authorization: "Bearer jwt" },
+  });
+});
+
+test("admin review replies use protected versioned routes", async () => {
+  const review = { id: "review/1", productId: "product-1", productName: "Пальто", body: "Тёплое", storeReply: null };
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => [review] })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ...review, storeReply: "Спасибо!" }) });
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(listAdminReviews("jwt")).resolves.toEqual([review]);
+  await expect(saveAdminReviewReply("jwt", "review/1", { reply: "Спасибо!" })).resolves.toMatchObject({ storeReply: "Спасибо!" });
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/products/admin/reviews", { headers: { Authorization: "Bearer jwt" } });
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/products/admin/reviews/review%2F1/reply", {
+    method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify({ reply: "Спасибо!" }),
   });
 });
 

@@ -310,6 +310,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/admin/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Последние 200 отзывов для администратора */
+        get: operations["listAdminReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/admin/reviews/{id}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Добавить, изменить или убрать ответ магазина */
+        put: operations["saveAdminReviewReply"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/order": {
         parameters: {
             query?: never;
@@ -1164,8 +1200,20 @@ export interface components {
             verifiedPurchase?: boolean;
             helpfulCount?: number;
             body?: string;
+            storeReply?: string | null;
+            /** Format: date-time */
+            storeRepliedAt?: string | null;
             /** Format: date-time */
             createdAt?: string;
+        };
+        AdminReview: components["schemas"]["ProductReview"] & {
+            /** Format: uuid */
+            productId: string;
+            productName: string;
+        };
+        StoreReplyRequest: {
+            /** @description Пустая строка удаляет ответ */
+            reply: string;
         };
         ReviewHelpfulVote: {
             /** Format: uuid */
@@ -1825,6 +1873,57 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listAdminReviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Отзывы для ответа магазина */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReview"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveAdminReviewReply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoreReplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Обновлённый отзыв */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     createOrder: {

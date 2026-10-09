@@ -88,6 +88,12 @@ public class ProductController {
     @PutMapping("/reviews/{id}/helpful")
     public Object markReviewHelpful(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id) { return reviewService.markHelpful(userId,id); }
 
+    @GetMapping("/admin/reviews")
+    public Object adminReviews(@RequestHeader("user-id") UUID userId) { return reviewService.adminList(userId); }
+
+    @PutMapping("/admin/reviews/{id}/reply")
+    public Object saveStoreReply(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody Map<String,Object> request) { return reviewService.saveStoreReply(userId,id,request); }
+
     @GetMapping("/categories/tree")
     public Object categoryTree() { return reviewService.categoryTree(); }
 

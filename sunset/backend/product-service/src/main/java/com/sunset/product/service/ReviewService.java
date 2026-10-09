@@ -9,11 +9,12 @@ import java.util.*;
 @Service
 public class ReviewService {
     private final JdbcTemplate jdbc;
+    private static final String REVIEW_FIELDS = "r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",r.store_reply AS \"storeReply\",r.store_replied_at AS \"storeRepliedAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id) AS \"helpfulCount\"";
 
     public ReviewService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     public List<Map<String, Object>> list(UUID productId) {
-        return jdbc.queryForList("SELECT r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id) AS \"helpfulCount\" FROM product_reviews r WHERE r.product_id=? ORDER BY r.verified_purchase DESC,r.created_at DESC", productId);
+        return jdbc.queryForList("SELECT " + REVIEW_FIELDS + " FROM product_reviews r WHERE r.product_id=? ORDER BY r.verified_purchase DESC,r.created_at DESC", productId);
     }
 
     @Transactional
@@ -38,7 +39,23 @@ public class ReviewService {
         if (author.isBlank()) author = "Клиент SUNSET";
         boolean verified = Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.product_id=? AND o.user_id=? AND o.status='DELIVERED')", Boolean.class, productId, userId));
         jdbc.update("INSERT INTO product_reviews(product_id,user_id,author_name,rating,quality_rating,fit,photo_url,verified_purchase,body) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT (product_id,user_id) DO UPDATE SET author_name=EXCLUDED.author_name,rating=EXCLUDED.rating,quality_rating=EXCLUDED.quality_rating,fit=EXCLUDED.fit,photo_url=EXCLUDED.photo_url,verified_purchase=EXCLUDED.verified_purchase,body=EXCLUDED.body,updated_at=NOW()", productId,userId,author,rating,qualityRating,fit,photoUrl.isBlank()?null:photoUrl,verified,body);
-        return jdbc.queryForMap("SELECT r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id) AS \"helpfulCount\" FROM product_reviews r WHERE r.product_id=? AND r.user_id=?", productId,userId);
+        return jdbc.queryForMap("SELECT " + REVIEW_FIELDS + " FROM product_reviews r WHERE r.product_id=? AND r.user_id=?", productId,userId);
+    }
+
+    public List<Map<String, Object>> adminList(UUID adminId) {
+        ensureAdmin(adminId);
+        return jdbc.queryForList("SELECT " + REVIEW_FIELDS + ",p.id AS \"productId\",p.name AS \"productName\" FROM product_reviews r JOIN products p ON p.id=r.product_id ORDER BY r.created_at DESC LIMIT 200");
+    }
+
+    @Transactional
+    public Map<String, Object> saveStoreReply(UUID adminId, UUID reviewId, Map<String, Object> request) {
+        ensureAdmin(adminId);
+        String reply = Objects.toString(request.get("reply"), "").trim();
+        if (reply.length() > 1500) throw new IllegalArgumentException("Ответ магазина не должен превышать 1500 символов");
+        String value = reply.isBlank() ? null : reply;
+        int updated = jdbc.update("UPDATE product_reviews SET store_reply=?,store_replied_at=CASE WHEN ? IS NULL THEN NULL ELSE NOW() END,store_replied_by=?,updated_at=NOW() WHERE id=?", value, value, value == null ? null : adminId, reviewId);
+        if (updated == 0) throw new IllegalArgumentException("Отзыв не найден");
+        return jdbc.queryForMap("SELECT " + REVIEW_FIELDS + ",p.id AS \"productId\",p.name AS \"productName\" FROM product_reviews r JOIN products p ON p.id=r.product_id WHERE r.id=?", reviewId);
     }
 
     @Transactional
@@ -49,6 +66,11 @@ public class ReviewService {
         jdbc.update("INSERT INTO product_review_helpful_votes(review_id,user_id) VALUES (?,?) ON CONFLICT DO NOTHING", reviewId, userId);
         Long count = jdbc.queryForObject("SELECT COUNT(*) FROM product_review_helpful_votes WHERE review_id=?", Long.class, reviewId);
         return Map.of("reviewId", reviewId, "helpfulCount", count == null ? 0L : count);
+    }
+
+    private void ensureAdmin(UUID userId) {
+        List<String> roles = jdbc.query("SELECT role FROM users WHERE id=?", (rs, row) -> rs.getString(1), userId);
+        if (roles.isEmpty() || !"ADMIN".equalsIgnoreCase(roles.get(0))) throw new SecurityException("Требуются права администратора");
     }
 
     public List<Map<String, Object>> categoryTree() {

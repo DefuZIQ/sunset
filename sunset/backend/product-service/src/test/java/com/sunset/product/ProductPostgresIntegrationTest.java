@@ -93,4 +93,33 @@ class ProductPostgresIntegrationTest {
         assertThatThrownBy(() -> reviews.markHelpful(voterId, UUID.randomUUID()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("не найден");
     }
+
+    @Test
+    void onlyAdminCanReplyAndPublicReviewShowsTheReply() {
+        UUID productId = jdbc.queryForObject("SELECT id FROM products LIMIT 1", UUID.class);
+        UUID authorId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,first_name,last_name) VALUES (?,?,?)", authorId, "Анна", "Автор");
+        jdbc.update("INSERT INTO users(id,first_name,last_name,role) VALUES (?,?,?,'ADMIN')", adminId, "Мария", "Менеджер");
+        UUID reviewId = UUID.randomUUID();
+        jdbc.update("INSERT INTO product_reviews(id,product_id,user_id,author_name,rating,body) VALUES (?,?,?,?,?,?)",
+                reviewId, productId, authorId, "Анна Автор", 5, "Хорошая ткань");
+
+        assertThatThrownBy(() -> reviews.adminList(authorId)).isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> reviews.saveStoreReply(authorId, reviewId, Map.of("reply", "Неавторизованный ответ")))
+                .isInstanceOf(SecurityException.class);
+        assertThat(reviews.adminList(adminId)).anySatisfy(row -> assertThat(row.get("id")).isEqualTo(reviewId));
+
+        Map<String, Object> saved = reviews.saveStoreReply(adminId, reviewId, Map.of("reply", "  Спасибо за отзыв!  "));
+        assertThat(saved.get("storeReply")).isEqualTo("Спасибо за отзыв!");
+        assertThat(saved.get("storeRepliedAt")).isNotNull();
+        assertThat(reviews.list(productId).stream().filter(row -> reviewId.equals(row.get("id")))
+                .findFirst().orElseThrow().get("storeReply")).isEqualTo("Спасибо за отзыв!");
+
+        assertThatThrownBy(() -> reviews.saveStoreReply(adminId, reviewId, Map.of("reply", "а".repeat(1501))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(reviews.saveStoreReply(adminId, reviewId, Map.of("reply", "")).get("storeReply")).isNull();
+        assertThatThrownBy(() -> reviews.saveStoreReply(adminId, UUID.randomUUID(), Map.of("reply", "Ответ")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("не найден");
+    }
 }

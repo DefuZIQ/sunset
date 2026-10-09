@@ -197,6 +197,25 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void adminReviewReplyRequiresJwtAndForwardsTrustedIdentity() {
+        String path = "/api/v1/products/admin/reviews/20000000-0000-0000-0000-000000000001/reply";
+        client.put().uri(path).header("user-id", "forged-admin")
+                .bodyValue("{\"reply\":\"Thanks\"}")
+                .exchange().expectStatus().isUnauthorized();
+        assertThat(REQUEST_COUNT.get()).isZero();
+
+        client.put().uri(path)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header("user-id", "forged-admin")
+                .bodyValue("{\"reply\":\"Thanks\"}")
+                .exchange().expectStatus().isOk();
+        assertThat(FORWARDED.get().method()).isEqualTo("PUT");
+        assertThat(FORWARDED.get().path()).isEqualTo("/products/admin/reviews/20000000-0000-0000-0000-000000000001/reply");
+        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+        assertThat(FORWARDED.get().body()).contains("Thanks");
+    }
+
+    @Test
     void versionedAdminRouteRequiresJwtAndDoesNotTrustClientIdentity() {
         client.get().uri("/api/v1/order/admin/users")
                 .header("user-id", "forged-admin")

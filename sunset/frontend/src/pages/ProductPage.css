@@ -67,6 +67,7 @@
 .review-card__actions button:hover,.review-card__actions a:hover{background:#eee8e2}
 .review-card__actions button:disabled{opacity:.7;cursor:default}
 .review-card__actions span[role="alert"]{color:#9e4b3e;letter-spacing:normal}
+.review-card__reply{display:grid;gap:.45rem;margin:1rem 0;padding:1rem 1.2rem;border-left:3px solid #8c684e;background:#eee8e2;color:#54463b}.review-card__reply strong{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase}.review-card__reply p{margin:0;color:#54463b}.review-card__reply time{margin:0;color:#8a7869}
 .review-form,.review-login { align-self:start; display:grid;gap:1rem;padding:1.6rem;background:#eee8e2; }.review-form h3,.review-login h3{margin:0;font:400 1.7rem 'Istok Web'}.review-form label{display:grid;gap:.5rem;font-size:.76rem;text-transform:uppercase;letter-spacing:.08em}.review-form select,.review-form textarea,.review-form input{width:100%;box-sizing:border-box;border:1px solid #c9bfb8;background:#fffdfb;padding:.8rem}.review-form textarea{min-height:130px;resize:vertical}.review-form p{margin:0;color:#65755e}.review-login p{color:#756960;line-height:1.6}
 @media(max-width:760px){.reviews-head{align-items:flex-start;flex-direction:column}.reviews-layout{grid-template-columns:1fr}.reviews-summary{text-align:left}.reviews-summary strong{font-size:2.5rem}.reviews-filters{padding:1rem}.reviews-filters__sort{margin-left:0;width:100%;justify-content:space-between}.reviews-filters__sort select{min-width:0}}
 

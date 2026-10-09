@@ -281,6 +281,41 @@ test('admin dashboard loads protected data from the versioned API', async ({ pag
   expect(requested.size).toBe(Object.keys(adminResponses).length);
 });
 
+test('admin replies to a review and the reply appears on the product page', async ({ page }) => {
+  const account = { id: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN' };
+  const review = { id: 'review-1', productId: products[0].id, productName: products[0].name, authorName: 'Анна', rating: 5, body: 'Удобная рубашка', storeReply: null, createdAt: '2026-10-06T00:00:00Z' };
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'admin-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/order/admin/**', (route) => route.fulfill({ json: route.request().url().endsWith('/analytics')
+    ? { orders: { total: 0, last30Days: 0, revenue: 0 }, returns: { total: 0, requested: 0 }, lowStock: 0, topProducts: [] } : [] }));
+  await page.route('**/api/v1/products/admin/variants', (route) => route.fulfill({ json: { colors: [], sizes: [] } }));
+  await page.route('**/api/v1/products/admin/reviews', (route) => route.fulfill({ json: [review] }));
+  await page.route('**/api/v1/products/admin/reviews/review-1/reply', (route) => {
+    expect(route.request().method()).toBe('PUT');
+    expect(route.request().headers().authorization).toBe('Bearer admin-token');
+    expect(route.request().postDataJSON()).toEqual({ reply: 'Спасибо за отзыв!' });
+    review.storeReply = 'Спасибо за отзыв!';
+    review.storeRepliedAt = '2026-10-09T00:00:00Z';
+    return route.fulfill({ json: review });
+  });
+  await page.goto('/#/admin');
+  await page.getByRole('button', { name: 'Отзывы', exact: true }).click();
+  await expect(page.getByText('Удобная рубашка')).toBeVisible();
+  await page.getByRole('textbox', { name: 'Ответ магазина' }).fill('Спасибо за отзыв!');
+  await page.getByRole('button', { name: 'Сохранить ответ' }).click();
+  await expect(page.getByText('SUNSET отвечает')).toBeVisible();
+  await page.getByRole('button', { name: 'Без ответа' }).click();
+  await expect(page.getByText('По этому фильтру отзывов нет.')).toBeVisible();
+
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [review] }));
+  await page.goto(`/#/catalog/product/${products[0].id}`);
+  await expect(page.locator('.review-card__reply')).toContainText('Спасибо за отзыв!');
+});
+
 test('admin dashboard keeps available sections visible if one API call fails', async ({ page }) => {
   const account = { id: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN' };
   await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
