@@ -94,6 +94,9 @@ public class ProductController {
     @PutMapping("/admin/reviews/{id}/reply")
     public Object saveStoreReply(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody Map<String,Object> request) { return reviewService.saveStoreReply(userId,id,request); }
 
+    @PutMapping("/admin/reviews/{id}/moderation")
+    public Object moderateReview(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody Map<String,Object> request) { return reviewService.setHidden(userId,id,request); }
+
     @GetMapping("/categories/tree")
     public Object categoryTree() { return reviewService.categoryTree(); }
 

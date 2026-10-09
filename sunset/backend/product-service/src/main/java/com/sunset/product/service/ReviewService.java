@@ -9,12 +9,12 @@ import java.util.*;
 @Service
 public class ReviewService {
     private final JdbcTemplate jdbc;
-    private static final String REVIEW_FIELDS = "r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",r.store_reply AS \"storeReply\",r.store_replied_at AS \"storeRepliedAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id) AS \"helpfulCount\"";
+    private static final String REVIEW_FIELDS = "r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",r.store_reply AS \"storeReply\",r.store_replied_at AS \"storeRepliedAt\",r.is_hidden AS \"isHidden\",r.moderated_at AS \"moderatedAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id) AS \"helpfulCount\"";
 
     public ReviewService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     public List<Map<String, Object>> list(UUID productId) {
-        return jdbc.queryForList("SELECT " + REVIEW_FIELDS + " FROM product_reviews r WHERE r.product_id=? ORDER BY r.verified_purchase DESC,r.created_at DESC", productId);
+        return jdbc.queryForList("SELECT " + REVIEW_FIELDS + " FROM product_reviews r WHERE r.product_id=? AND NOT r.is_hidden ORDER BY r.verified_purchase DESC,r.created_at DESC", productId);
     }
 
     @Transactional
@@ -59,8 +59,17 @@ public class ReviewService {
     }
 
     @Transactional
+    public Map<String, Object> setHidden(UUID adminId, UUID reviewId, Map<String, Object> request) {
+        ensureAdmin(adminId);
+        if (!(request.get("isHidden") instanceof Boolean hidden)) throw new IllegalArgumentException("Укажите isHidden: true или false");
+        int updated = jdbc.update("UPDATE product_reviews SET is_hidden=?,moderated_at=NOW(),moderated_by=?,updated_at=NOW() WHERE id=?", hidden, adminId, reviewId);
+        if (updated == 0) throw new IllegalArgumentException("Отзыв не найден");
+        return jdbc.queryForMap("SELECT " + REVIEW_FIELDS + ",p.id AS \"productId\",p.name AS \"productName\" FROM product_reviews r JOIN products p ON p.id=r.product_id WHERE r.id=?", reviewId);
+    }
+
+    @Transactional
     public Map<String, Object> markHelpful(UUID userId, UUID reviewId) {
-        List<UUID> authors = jdbc.query("SELECT user_id FROM product_reviews WHERE id=?", (rs, row) -> rs.getObject(1, UUID.class), reviewId);
+        List<UUID> authors = jdbc.query("SELECT user_id FROM product_reviews WHERE id=? AND NOT is_hidden", (rs, row) -> rs.getObject(1, UUID.class), reviewId);
         if (authors.isEmpty()) throw new IllegalArgumentException("Отзыв не найден");
         if (authors.get(0).equals(userId)) throw new IllegalArgumentException("Нельзя оценить собственный отзыв");
         jdbc.update("INSERT INTO product_review_helpful_votes(review_id,user_id) VALUES (?,?) ON CONFLICT DO NOTHING", reviewId, userId);

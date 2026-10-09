@@ -31,6 +31,7 @@ type ProductUuidRequest = paths["/products/by-uuid"]["post"]["requestBody"]["con
 type SubscribeRequest = paths["/subscriptions"]["post"]["requestBody"]["content"]["application/json"];
 type SaveReviewRequest = paths["/products/review/{id}"]["post"]["requestBody"]["content"]["application/json"];
 type StoreReplyRequest = paths["/products/admin/reviews/{id}/reply"]["put"]["requestBody"]["content"]["application/json"];
+type ModerateReviewRequest = paths["/products/admin/reviews/{id}/moderation"]["put"]["requestBody"]["content"]["application/json"];
 type DeliveryQuoteRequest = paths["/order/delivery/quote"]["post"]["requestBody"]["content"]["application/json"];
 type CreateOrderRequest = paths["/order"]["post"]["requestBody"]["content"]["application/json"];
 type UpdatePendingOrderRequest = paths["/order/my/{id}"]["put"]["requestBody"]["content"]["application/json"];
@@ -274,6 +275,14 @@ export async function saveAdminReviewReply(token: string, reviewId: string, repl
     method: "PUT",
     headers: { "Content-Type": "application/json", ...bearer(token) },
     body: JSON.stringify(reply),
+  }));
+}
+
+export async function moderateAdminReview(token: string, reviewId: string, body: ModerateReviewRequest): Promise<AdminReview> {
+  return readJson<AdminReview>(await fetch(`/api/v1/products/admin/reviews/${encodeURIComponent(reviewId)}/moderation`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...bearer(token) },
+    body: JSON.stringify(body),
   }));
 }
 

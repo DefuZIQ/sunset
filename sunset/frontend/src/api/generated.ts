@@ -346,6 +346,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/admin/reviews/{id}/moderation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Скрыть или снова опубликовать отзыв */
+        put: operations["moderateAdminReview"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/order": {
         parameters: {
             query?: never;
@@ -1210,10 +1229,16 @@ export interface components {
             /** Format: uuid */
             productId: string;
             productName: string;
+            isHidden: boolean;
+            /** Format: date-time */
+            moderatedAt?: string | null;
         };
         StoreReplyRequest: {
             /** @description Пустая строка удаляет ответ */
             reply: string;
+        };
+        ModerateReviewRequest: {
+            isHidden: boolean;
         };
         ReviewHelpfulVote: {
             /** Format: uuid */
@@ -1909,6 +1934,35 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["StoreReplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Обновлённый отзыв */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    moderateAdminReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModerateReviewRequest"];
             };
         };
         responses: {

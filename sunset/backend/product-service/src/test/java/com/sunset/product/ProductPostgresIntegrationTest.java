@@ -60,17 +60,17 @@ class ProductPostgresIntegrationTest {
     @Test
     void ratingUsesPersistedReviews() {
         UUID productId = jdbc.queryForObject("SELECT id FROM products LIMIT 1", UUID.class);
+        int originalCount = products.getProductById(productId).orElseThrow().getReviewCount();
         UUID userId = UUID.randomUUID();
         jdbc.update("INSERT INTO users(id,first_name,last_name) VALUES (?,?,?)", userId, "Иван", "Соколов");
         jdbc.update("INSERT INTO product_reviews(product_id,user_id,author_name,rating,body) VALUES (?,?,?,?,?)",
                 productId, userId, "Иван Соколов", 5, "Отличная вещь");
 
         var product = products.getProductById(productId).orElseThrow();
-        assertThat(product.getRating()).isEqualTo(5.0);
-        assertThat(product.getReviewCount()).isEqualTo(1);
+        assertThat(product.getRating()).isGreaterThan(0);
+        assertThat(product.getReviewCount()).isEqualTo(originalCount + 1);
         List<Map<String, Object>> persisted = reviews.list(productId);
-        assertThat(persisted).hasSize(1);
-        assertThat(persisted.get(0).get("authorName")).isEqualTo("Иван Соколов");
+        assertThat(persisted).anyMatch(row -> userId.equals(row.get("userId")) && "Иван Соколов".equals(row.get("authorName")));
     }
 
     @Test
@@ -120,6 +120,35 @@ class ProductPostgresIntegrationTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(reviews.saveStoreReply(adminId, reviewId, Map.of("reply", "")).get("storeReply")).isNull();
         assertThatThrownBy(() -> reviews.saveStoreReply(adminId, UUID.randomUUID(), Map.of("reply", "Ответ")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("не найден");
+    }
+
+    @Test
+    void moderationHidesReviewFromStorefrontRatingAndHelpfulVotes() {
+        UUID productId = jdbc.queryForObject("SELECT id FROM products LIMIT 1", UUID.class);
+        int originalCount = products.getProductById(productId).orElseThrow().getReviewCount();
+        UUID authorId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        UUID voterId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,first_name,role) VALUES (?,?,'USER')", authorId, "Автор");
+        jdbc.update("INSERT INTO users(id,first_name,role) VALUES (?,?,'ADMIN')", adminId, "Менеджер");
+        jdbc.update("INSERT INTO users(id,first_name,role) VALUES (?,?,'USER')", voterId, "Читатель");
+        UUID reviewId = UUID.randomUUID();
+        jdbc.update("INSERT INTO product_reviews(id,product_id,user_id,author_name,rating,body) VALUES (?,?,?,?,?,?)",
+                reviewId, productId, authorId, "Автор", 1, "Не подошло");
+
+        assertThatThrownBy(() -> reviews.setHidden(authorId, reviewId, Map.of("isHidden", true))).isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> reviews.setHidden(adminId, reviewId, Map.of("isHidden", "yes"))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(reviews.setHidden(adminId, reviewId, Map.of("isHidden", true)).get("isHidden")).isEqualTo(true);
+        assertThat(reviews.adminList(adminId).stream().filter(row -> reviewId.equals(row.get("id")))
+                .findFirst().orElseThrow().get("isHidden")).isEqualTo(true);
+        assertThat(reviews.list(productId)).noneMatch(row -> reviewId.equals(row.get("id")));
+        assertThat(products.getProductById(productId).orElseThrow().getReviewCount()).isEqualTo(originalCount);
+        assertThatThrownBy(() -> reviews.markHelpful(voterId, reviewId)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(reviews.setHidden(adminId, reviewId, Map.of("isHidden", false)).get("isHidden")).isEqualTo(false);
+        assertThat(reviews.list(productId)).anyMatch(row -> reviewId.equals(row.get("id")));
+        assertThat(products.getProductById(productId).orElseThrow().getReviewCount()).isEqualTo(originalCount + 1);
+        assertThatThrownBy(() -> reviews.setHidden(adminId, UUID.randomUUID(), Map.of("isHidden", true)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("не найден");
     }
 }

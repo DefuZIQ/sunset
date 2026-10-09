@@ -169,6 +169,14 @@
         "responses": { "200": { "description": "Обновлённый отзыв", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminReview" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
       }
     },
+    "/products/admin/reviews/{id}/moderation": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Reviews", "Admin"], "operationId": "moderateAdminReview", "summary": "Скрыть или снова опубликовать отзыв", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ModerateReviewRequest" } } } },
+        "responses": { "200": { "description": "Обновлённый отзыв", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminReview" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
     "/order": {
       "post": {
         "tags": ["Orders"], "operationId": "createOrder", "summary": "Оформить заказ", "security": [{ "bearerAuth": [] }],
@@ -519,8 +527,9 @@
       "ValidatePromoRequest": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "subtotal": { "type": "number" } } },
       "SaveReviewRequest": { "type": "object", "required": ["rating", "body"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5 }, "qualityRating": { "type": "integer", "minimum": 1, "maximum": 5 }, "fit": { "type": "string", "enum": ["SMALL", "AS_EXPECTED", "LARGE"] }, "photoUrl": { "type": "string", "maxLength": 1000 }, "body": { "type": "string", "minLength": 3, "maxLength": 1500 } } },
       "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "helpfulCount": { "type": "integer", "minimum": 0 }, "body": { "type": "string" }, "storeReply": { "type": "string", "nullable": true }, "storeRepliedAt": { "type": "string", "format": "date-time", "nullable": true }, "createdAt": { "type": "string", "format": "date-time" } } },
-      "AdminReview": { "allOf": [{ "$ref": "#/components/schemas/ProductReview" }, { "type": "object", "required": ["productId", "productName"], "properties": { "productId": { "type": "string", "format": "uuid" }, "productName": { "type": "string" } } }] },
+      "AdminReview": { "allOf": [{ "$ref": "#/components/schemas/ProductReview" }, { "type": "object", "required": ["productId", "productName", "isHidden"], "properties": { "productId": { "type": "string", "format": "uuid" }, "productName": { "type": "string" }, "isHidden": { "type": "boolean" }, "moderatedAt": { "type": "string", "format": "date-time", "nullable": true } } }] },
       "StoreReplyRequest": { "type": "object", "required": ["reply"], "properties": { "reply": { "type": "string", "maxLength": 1500, "description": "Пустая строка удаляет ответ" } } },
+      "ModerateReviewRequest": { "type": "object", "required": ["isHidden"], "properties": { "isHidden": { "type": "boolean" } } },
       "ReviewHelpfulVote": { "type": "object", "required": ["reviewId", "helpfulCount"], "properties": { "reviewId": { "type": "string", "format": "uuid" }, "helpfulCount": { "type": "integer", "minimum": 0 } } },
       "LoyaltyAccount": { "type": "object", "properties": { "balance": { "type": "integer" }, "lifetimeEarned": { "type": "integer" }, "tier": { "type": "string" }, "updatedAt": { "type": "string", "format": "date-time" }, "birthdayToday": { "type": "boolean" }, "birthdayBenefit": { "type": "string" }, "transactions": { "type": "array", "items": { "$ref": "#/components/schemas/LoyaltyTransaction" } } } },
       "LoyaltyTransaction": { "type": "object", "properties": { "amount": { "type": "integer" }, "type": { "type": "string" }, "description": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },

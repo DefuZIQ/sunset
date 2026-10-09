@@ -3,7 +3,7 @@ import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotificat
   getAddressGeocoderStatus, getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
   listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
   listAdminReviews, listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
-  markNotificationRead, markProductReviewHelpful, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview,
+    markNotificationRead, markProductReviewHelpful, moderateAdminReview, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
   updateCustomerAddress, validatePromoCode, getProfile, syncCustomerAddresses } from "./client";
 
@@ -272,6 +272,16 @@ test("admin review replies use protected versioned routes", async () => {
   expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/products/admin/reviews", { headers: { Authorization: "Bearer jwt" } });
   expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/products/admin/reviews/review%2F1/reply", {
     method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify({ reply: "Спасибо!" }),
+  });
+});
+
+test("review moderation uses a protected versioned route", async () => {
+  const review = { id: "review/1", isHidden: true };
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => review });
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(moderateAdminReview("jwt", "review/1", { isHidden: true })).resolves.toEqual(review);
+  expect(fetchMock).toHaveBeenCalledWith("/api/v1/products/admin/reviews/review%2F1/moderation", {
+    method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify({ isHidden: true }),
   });
 });
 

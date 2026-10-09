@@ -283,7 +283,7 @@ test('admin dashboard loads protected data from the versioned API', async ({ pag
 
 test('admin replies to a review and the reply appears on the product page', async ({ page }) => {
   const account = { id: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN' };
-  const review = { id: 'review-1', productId: products[0].id, productName: products[0].name, authorName: 'Анна', rating: 5, body: 'Удобная рубашка', storeReply: null, createdAt: '2026-10-06T00:00:00Z' };
+  const review = { id: 'review-1', productId: products[0].id, productName: products[0].name, authorName: 'Анна', rating: 5, body: 'Удобная рубашка', storeReply: null, isHidden: false, createdAt: '2026-10-06T00:00:00Z' };
   await page.addInitScript((user) => {
     localStorage.setItem('authToken', 'admin-token');
     localStorage.setItem('user', JSON.stringify(user));
@@ -301,6 +301,11 @@ test('admin replies to a review and the reply appears on the product page', asyn
     review.storeRepliedAt = '2026-10-09T00:00:00Z';
     return route.fulfill({ json: review });
   });
+  await page.route('**/api/v1/products/admin/reviews/review-1/moderation', (route) => {
+    expect(route.request().headers().authorization).toBe('Bearer admin-token');
+    review.isHidden = route.request().postDataJSON().isHidden;
+    return route.fulfill({ json: review });
+  });
   await page.goto('/#/admin');
   await page.getByRole('button', { name: 'Отзывы', exact: true }).click();
   await expect(page.getByText('Удобная рубашка')).toBeVisible();
@@ -308,6 +313,14 @@ test('admin replies to a review and the reply appears on the product page', asyn
   await page.getByRole('button', { name: 'Сохранить ответ' }).click();
   await expect(page.getByText('SUNSET отвечает')).toBeVisible();
   await page.getByRole('button', { name: 'Без ответа' }).click();
+  await expect(page.getByText('По этому фильтру отзывов нет.')).toBeVisible();
+  await page.getByRole('button', { name: 'Опубликованы' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Скрыть отзыв' }).click();
+  await expect(page.getByText('По этому фильтру отзывов нет.')).toBeVisible();
+  await page.getByRole('button', { name: 'Скрыты' }).click();
+  await expect(page.getByText('Скрыт', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Опубликовать' }).click();
   await expect(page.getByText('По этому фильтру отзывов нет.')).toBeVisible();
 
   await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));

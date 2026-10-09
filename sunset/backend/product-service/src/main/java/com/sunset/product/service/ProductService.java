@@ -123,7 +123,7 @@ public class ProductService {
         dto.setStock(stockList);
 
         Map<String, Object> reviewStats = jdbc.queryForMap(
-                "SELECT COALESCE(ROUND(AVG(rating)::numeric,1),0) AS rating, COUNT(*) AS count FROM product_reviews WHERE product_id=?",
+                "SELECT COALESCE(ROUND(AVG(rating)::numeric,1),0) AS rating, COUNT(*) AS count FROM product_reviews WHERE product_id=? AND NOT is_hidden",
                 product.getId());
         dto.setRating(((Number) reviewStats.get("rating")).doubleValue());
         dto.setReviewCount(((Number) reviewStats.get("count")).intValue());
