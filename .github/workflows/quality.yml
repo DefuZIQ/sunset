@@ -37,7 +37,7 @@ jobs:
           cache: maven
           cache-dependency-path: sunset/pom.xml
       - name: Test services and Liquibase migrations
-        run: bash ./mvnw -B --no-transfer-progress verify
+        run: mvn -B --no-transfer-progress verify
       - name: Verify safe web deployment and rollback
         run: sh scripts/test-deploy-web.sh
       - name: Verify PostgreSQL backup failure handling
