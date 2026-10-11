@@ -30,7 +30,9 @@ docker run -d --network "$network" --network-alias postgres --name "$postgres" \
 
 ready=0
 for _ in $(seq 1 60); do
-  if docker exec "$postgres" pg_isready -U postgres >/dev/null 2>&1; then ready=1; break; fi
+  # The image starts a temporary Unix-socket server during initdb, then restarts.
+  # TCP becomes available only after the final server is ready for restoration.
+  if docker exec "$postgres" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then ready=1; break; fi
   sleep 1
 done
 test "$ready" -eq 1
