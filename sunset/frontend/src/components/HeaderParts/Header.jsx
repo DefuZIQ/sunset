@@ -43,6 +43,11 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+    popupSearchClose();
+  }, [location.pathname]);
+
   const submitSearch = (event) => {
     event.preventDefault();
     const query = searchQuery.trim();
@@ -75,12 +80,12 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
           </div>
 
           {/* Бургер-кнопка */}
-          <button className="burger" onClick={toggleMobileMenu}>
-            ☰
+          <button className="burger" onClick={toggleMobileMenu} aria-label={isMobileMenuOpen ? "Закрыть меню" : "Открыть меню"} aria-expanded={isMobileMenuOpen} aria-controls="site-mobile-menu">
+            <span className="burger__lines" aria-hidden="true"><i /><i /><i /></span>
           </button>
 
           {/* Центр меню */}
-          <ul className={`nav-menu ${isMobileMenuOpen ? "active" : ""}`}>
+          <ul id="site-mobile-menu" className={`nav-menu ${isMobileMenuOpen ? "active" : ""}`}>
             <li>
               <Link to="/about" onClick={() => setIsMobileMenuOpen(false)}>О НАС</Link>
             </li>

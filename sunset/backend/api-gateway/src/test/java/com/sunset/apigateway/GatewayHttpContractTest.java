@@ -104,6 +104,17 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void storeAvailabilityIsPublicButDoesNotForwardForgedIdentity() {
+        client.get().uri("/api/v1/products/all/availability?storeId=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+                .header("user-id", "forged-admin")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(FORWARDED.get().path()).startsWith("/products/all/availability?storeId=");
+        assertThat(FORWARDED.get().userId()).isNull();
+    }
+
+    @Test
     void versionedRegistrationUsesTheSamePublicRoute() {
         client.post().uri("/api/v1/auth/register")
                 .header("user-id", "forged-admin")
@@ -119,6 +130,32 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void productionOriginCanSubmitLogin() {
+        client.mutate().baseUrl("http://localhost").build().post().uri("/api/v1/auth/login")
+                .header(HttpHeaders.ORIGIN, "https://t3ch.pro")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"email\":\"buyer@sunset.test\",\"password\":\"invalid\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://t3ch.pro");
+
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().path()).isEqualTo("/auth/login");
+    }
+
+    @Test
+    void untrustedOriginCannotSubmitLogin() {
+        client.mutate().baseUrl("http://localhost").build().post().uri("/api/v1/auth/login")
+                .header(HttpHeaders.ORIGIN, "https://untrusted.example.invalid")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"email\":\"buyer@sunset.test\",\"password\":\"invalid\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+
+        assertThat(REQUEST_COUNT.get()).isZero();
+    }
+
+    @Test
     void versionedNewsletterSignupIsPublicWithoutForwardingForgedIdentity() {
         client.post().uri("/api/v1/subscriptions")
                 .header("user-id", "forged-admin")
@@ -130,6 +167,24 @@ class GatewayHttpContractTest {
         assertThat(FORWARDED.get().path()).isEqualTo("/subscriptions");
         assertThat(FORWARDED.get().userId()).isNull();
         assertThat(FORWARDED.get().body()).contains("guest@sunset.test");
+    }
+
+    @Test
+    void guestsCanListStoresButCannotCreateThem() {
+        client.get().uri("/api/v1/order/stores")
+                .header("user-id", "forged-admin")
+                .exchange()
+                .expectStatus().isOk();
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().path()).isEqualTo("/order/stores");
+        assertThat(FORWARDED.get().userId()).isNull();
+
+        client.post().uri("/api/v1/order/stores")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"name\":\"Unauthorized shop\"}")
+                .exchange()
+                .expectStatus().isUnauthorized();
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
     }
 
     @Test
@@ -193,6 +248,22 @@ class GatewayHttpContractTest {
         assertThat(REQUEST_COUNT.get()).isEqualTo(1);
         assertThat(FORWARDED.get().method()).isEqualTo("PUT");
         assertThat(FORWARDED.get().path()).isEqualTo("/products/reviews/20000000-0000-0000-0000-000000000001/helpful");
+        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+    }
+
+    @Test
+    void deletingReviewRequiresJwtAndForwardsTrustedIdentity() {
+        String path = "/api/v1/products/reviews/20000000-0000-0000-0000-000000000001";
+        client.delete().uri(path).header("user-id", "forged-admin")
+                .exchange().expectStatus().isUnauthorized();
+        assertThat(REQUEST_COUNT.get()).isZero();
+
+        client.delete().uri(path)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header("user-id", "forged-admin")
+                .exchange().expectStatus().isOk();
+        assertThat(FORWARDED.get().method()).isEqualTo("DELETE");
+        assertThat(FORWARDED.get().path()).isEqualTo("/products/reviews/20000000-0000-0000-0000-000000000001");
         assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
     }
 

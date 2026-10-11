@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { products as fallbackProducts } from "../data/products";
 import { getCategoryTree, listProducts } from "../api/client";
+import { readCatalogCache, writeCatalogCache } from "./catalogCache";
 
 const StoreContext = createContext(null);
 
@@ -23,20 +23,28 @@ const normalizeProduct = (product, index) => ({
 });
 
 export function StoreProvider({ children }) {
-  const [products, setProducts] = useState(fallbackProducts.map(normalizeProduct));
+  const [cachedProducts] = useState(readCatalogCache);
+  const [products, setProducts] = useState(() => cachedProducts?.map(normalizeProduct) ?? []);
   const [categoryTree, setCategoryTree] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(cachedProducts === null);
+  const [catalogError, setCatalogError] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
     listProducts(controller.signal)
       .then((data) => {
-        if (Array.isArray(data) && data.length) setProducts(data.map(normalizeProduct));
+        if (!Array.isArray(data)) throw new Error("Invalid catalog response");
+        setProducts(data.map(normalizeProduct));
+        writeCatalogCache(data);
+        setCatalogError(false);
       })
       .catch((error) => {
-        if (error.name !== "AbortError") console.warn(error.message);
+        if (error.name !== "AbortError") {
+          console.warn(error.message);
+          setCatalogError(true);
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, []);
 
@@ -48,7 +56,7 @@ export function StoreProvider({ children }) {
     return () => controller.abort();
   }, []);
 
-  const value = useMemo(() => ({ products, loading, categoryTree }), [products, loading, categoryTree]);
+  const value = useMemo(() => ({ products, loading, catalogError, categoryTree }), [products, loading, catalogError, categoryTree]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 

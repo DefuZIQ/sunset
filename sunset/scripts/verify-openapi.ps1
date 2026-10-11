@@ -20,9 +20,9 @@ $controllerSources = @{
 }
 $publicRoutes = @(
     'POST /auth/register', 'POST /auth/login',
-    'GET /products/all', 'POST /products/by-uuid',
+    'GET /products/all', 'GET /products/all/availability', 'POST /products/by-uuid',
     'GET /products/categories/tree', 'GET /products/reviews/{id}', 'GET /products/review-photos/{id}',
-    'GET /order/promotions', 'POST /subscriptions'
+    'GET /order/promotions', 'GET /order/stores', 'POST /subscriptions'
 )
 $operationIds = [System.Collections.Generic.HashSet[string]]::new()
 $count = 0

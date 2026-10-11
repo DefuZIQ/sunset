@@ -1,13 +1,22 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createCustomerAddress, createOrder, createOrderReturn, deleteAdminProduct, deleteCustomerAddress, getCategoryTree,
+import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createCustomerAddress, createOrder, createOrderReturn, deleteAdminProduct, deleteCustomerAddress, deleteOwnProductReview, getCategoryTree,
   getAddressGeocoderStatus, getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
   listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
   listAdminReviews, listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
-    markNotificationRead, markProductReviewHelpful, moderateAdminReview, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview,
+    markNotificationRead, markProductReviewHelpful, moderateAdminReview, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview, voteProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
   updateCustomerAddress, uploadProductReviewPhoto, validatePromoCode, getProfile, syncCustomerAddresses } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("deleting an own review uses the protected endpoint and accepts 204", async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, status: 204, json: async () => { throw new Error("204 must not be parsed"); } });
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(deleteOwnProductReview("jwt", "review/1")).resolves.toBeUndefined();
+  expect(fetchMock).toHaveBeenCalledWith("/api/v1/products/reviews/review%2F1", {
+    method: "DELETE", headers: { Authorization: "Bearer jwt" },
+  });
+});
 
 test("address lookup keeps provider credentials on the server", async () => {
   const suggestions = [{ query: "г Нижний Новгород, ул Большая Покровская, д 34", city: "Нижний Новгород", street: "Большая Покровская", house: "34", lat: 56.3269, lon: 44.0059 }];
@@ -64,7 +73,7 @@ test("admin product writes use versioned paths and DELETE accepts an empty 204 r
   const product = { name: "Пальто", price: 9000, category: "Пальто", gender: "WOMEN" as const };
   await createAdminProduct("jwt", product);
   await updateAdminProduct("jwt", "product/1", { ...product, price: 9500 });
-  await updateAdminStock("jwt", "product/1", { stock: [{ sizeId: "size-1", colorId: "color-1", quantity: 3 }] });
+  await updateAdminStock("jwt", "product/1", { locationId: "location-1", stock: [{ sizeId: "size-1", colorId: "color-1", quantity: 3 }] });
   await expect(deleteAdminProduct("jwt", "product/1")).resolves.toBeUndefined();
   expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/products/admin", {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" }, body: JSON.stringify(product),
@@ -74,7 +83,7 @@ test("admin product writes use versioned paths and DELETE accepts an empty 204 r
   });
   expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/v1/products/admin/product%2F1/stock", {
     method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
-    body: JSON.stringify({ stock: [{ sizeId: "size-1", colorId: "color-1", quantity: 3 }] }),
+    body: JSON.stringify({ locationId: "location-1", stock: [{ sizeId: "size-1", colorId: "color-1", quantity: 3 }] }),
   });
   expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/v1/products/admin/product%2F1", {
     method: "DELETE", headers: { Authorization: "Bearer jwt" },
@@ -259,6 +268,18 @@ test("helpful vote uses an authenticated idempotent PUT", async () => {
   await expect(markProductReviewHelpful("jwt", "review/1")).resolves.toEqual(vote);
   expect(fetchMock).toHaveBeenCalledWith("/api/v1/products/reviews/review%2F1/helpful", {
     method: "PUT", headers: { Authorization: "Bearer jwt" },
+  });
+});
+
+test("review reactions send an authenticated vote and encode the review ID", async () => {
+  const result = { reviewId: "review/1", likeCount: 1, dislikeCount: 2, myVote: "DISLIKE" };
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => result });
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(voteProductReview("jwt", "review/1", "DISLIKE")).resolves.toEqual(result);
+  expect(fetchMock).toHaveBeenCalledWith("/api/v1/products/reviews/review%2F1/vote", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer jwt" },
+    body: JSON.stringify({ vote: "DISLIKE" }),
   });
 });
 

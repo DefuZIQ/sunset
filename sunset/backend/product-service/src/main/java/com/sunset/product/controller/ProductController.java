@@ -25,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.io.IOException;
 
@@ -47,6 +48,11 @@ public class ProductController {
     @GetMapping("/all")
     public List<ProductDTO> getAllProducts() {
         return productService.getProducts();
+    }
+
+    @GetMapping("/all/availability")
+    public List<Map<String, Object>> getStoreAvailability(@RequestParam("storeId") UUID storeId) {
+        return productService.getStoreAvailability(storeId);
     }
 
     @PostMapping("/by-uuid")
@@ -87,11 +93,22 @@ public class ProductController {
         return adminProductService.updateStock(userId,id,request);
     }
 
+    @GetMapping("/admin/{id}/stock")
+    public Object locationStock(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestParam("locationId") UUID locationId) {
+        return adminProductService.stock(userId, id, locationId);
+    }
+
     @GetMapping("/reviews/{id}")
-    public Object reviews(@PathVariable("id") UUID id) { return reviewService.list(id); }
+    public Object reviews(@PathVariable("id") UUID id, @RequestHeader(value="user-id", required=false) UUID userId) { return reviewService.list(id, userId); }
 
     @PostMapping("/review/{id}")
     public Object saveReview(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody Map<String,Object> request) { return reviewService.save(userId,id,request); }
+
+    @DeleteMapping("/reviews/{id}")
+    public ResponseEntity<Void> deleteOwnReview(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id) {
+        reviewService.deleteOwn(userId, id);
+        return ResponseEntity.noContent().build();
+    }
 
     @PostMapping("/review/{id}/photo")
     public Object uploadReviewPhoto(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestParam("file") MultipartFile file) throws IOException {
@@ -108,6 +125,11 @@ public class ProductController {
 
     @PutMapping("/reviews/{id}/helpful")
     public Object markReviewHelpful(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id) { return reviewService.markHelpful(userId,id); }
+
+    @PutMapping("/reviews/{id}/vote")
+    public Object voteReview(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody Map<String,Object> request) {
+        return reviewService.vote(userId, id, Objects.toString(request.get("vote"), ""));
+    }
 
     @GetMapping("/admin/reviews")
     public Object adminReviews(@RequestHeader("user-id") UUID userId) { return reviewService.adminList(userId); }

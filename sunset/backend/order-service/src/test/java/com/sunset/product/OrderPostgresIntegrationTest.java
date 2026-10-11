@@ -51,7 +51,7 @@ class OrderPostgresIntegrationTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.jpa.database", () -> "postgresql");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "update");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.liquibase.enabled", () -> "true");
         registry.add("spring.security.jwt.secret", () -> "test-secret-that-is-at-least-32-bytes");
     }
@@ -61,7 +61,7 @@ class OrderPostgresIntegrationTest {
 
     @BeforeEach
     void resetDatabase() {
-        jdbc.execute("TRUNCATE TABLE return_requests, order_events, stock_reservations, payments, deliveries, " +
+        jdbc.execute("TRUNCATE TABLE return_requests, order_events, stock_reservations, payments, deliveries, location_stock, " +
                 "order_items, orders, loyalty_transactions, loyalty_accounts, product_images, images, " +
                 "product_stock, products, colors, sizes, users RESTART IDENTITY CASCADE");
         jdbc.execute("ALTER SEQUENCE order_number_seq RESTART WITH 1001");
@@ -75,6 +75,7 @@ class OrderPostgresIntegrationTest {
         jdbc.update("INSERT INTO colors(id,name,hex_code) VALUES (?,?,?)", COLOR_ID, "Карамельный", "#A56B46");
         jdbc.update("INSERT INTO sizes(id,name,type,gender,region,sort_order) VALUES (?,?,?,?,?,?)", SIZE_ID, "M", "clothes", "female", "RU", 20);
         jdbc.update("INSERT INTO product_stock(product_id,size_id,color_id,quantity) VALUES (?,?,?,5)", PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("INSERT INTO location_stock(location_id,product_id,size_id,color_id,quantity) VALUES ('00000000-0000-4000-8000-000000000001',?,?,?,5)", PRODUCT_ID, SIZE_ID, COLOR_ID);
         jdbc.update("INSERT INTO loyalty_accounts(user_id,balance,lifetime_earned,tier) VALUES (?,?,?,?)", CUSTOMER_ID, 1000, 0, "SUNRISE");
     }
 
@@ -130,6 +131,36 @@ class OrderPostgresIntegrationTest {
     }
 
     @Test
+    void concurrentRetriesWithTheSameKeyReturnTheSameOrder() throws Exception {
+        jdbc.update("UPDATE product_stock SET quantity=1 WHERE product_id=? AND size_id=? AND color_id=?",
+                PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("UPDATE location_stock SET quantity=1 WHERE product_id=? AND size_id=? AND color_id=?",
+                PRODUCT_ID, SIZE_ID, COLOR_ID);
+        CreateOrderRequest request = order("concurrent-retry", null, 0, 1, "CARD");
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<UUID> first = executor.submit(() -> createAfterSignal(request, ready, start));
+            Future<UUID> second = executor.submit(() -> createAfterSignal(request, ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(first.get(30, TimeUnit.SECONDS)).isEqualTo(second.get(30, TimeUnit.SECONDS));
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(1);
+            assertThat(stock()).isZero();
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private UUID createAfterSignal(CreateOrderRequest request, CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent checkouts did not start together");
+        return (UUID) service.create(CUSTOMER_ID, request).get("id");
+    }
+
+    @Test
     void paymentFailureRollsBackOrderAndReservation() {
         assertThatThrownBy(() -> service.create(CUSTOMER_ID, order("bad-payment", null, 0, 1, "CRYPTO")))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -142,8 +173,28 @@ class OrderPostgresIntegrationTest {
     }
 
     @Test
+    void pickupUsesSelectedStoreStockBeforeWarehouseAndRestoresItOnCancellation() {
+        UUID storeId = jdbc.queryForObject("SELECT id FROM stores WHERE kind='STORE' LIMIT 1", UUID.class);
+        jdbc.update("INSERT INTO location_stock(location_id,product_id,size_id,color_id,quantity) VALUES (?,?,?,?,2)", storeId, PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("UPDATE product_stock SET quantity=7 WHERE product_id=? AND size_id=? AND color_id=?", PRODUCT_ID, SIZE_ID, COLOR_ID);
+        CreateOrderRequest request = new CreateOrderRequest("Иван Соколов", "customer@sunset.test", "+79990000001",
+                "Магазин самовывоза", "pickup", "CARD", "store-pickup", null, 0, storeId,
+                List.of(new OrderItemRequest(PRODUCT_ID, COLOR_ID, SIZE_ID, 1)));
+
+        UUID orderId = (UUID) service.create(CUSTOMER_ID, request).get("id");
+        assertThat(jdbc.queryForObject("SELECT quantity FROM location_stock WHERE location_id=? AND product_id=?", Integer.class, storeId, PRODUCT_ID)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM location_stock WHERE location_id='00000000-0000-4000-8000-000000000001' AND product_id=?", Integer.class, PRODUCT_ID)).isEqualTo(5);
+        assertThat(stock()).isEqualTo(6);
+        service.cancel(CUSTOMER_ID, orderId);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM location_stock WHERE location_id=? AND product_id=?", Integer.class, storeId, PRODUCT_ID)).isEqualTo(2);
+        assertThat(stock()).isEqualTo(7);
+    }
+
+    @Test
     void concurrentCustomersCannotBuyTheLastItemTwice() throws Exception {
         jdbc.update("UPDATE product_stock SET quantity=1 WHERE product_id=? AND size_id=? AND color_id=?",
+                PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("UPDATE location_stock SET quantity=1 WHERE product_id=? AND size_id=? AND color_id=?",
                 PRODUCT_ID, SIZE_ID, COLOR_ID);
         jdbc.update("INSERT INTO users(id,email,password,first_name,last_name,phone,role) VALUES (?,?,?,?,?,?,?)",
                 SECOND_CUSTOMER_ID, "second@sunset.test", "hash", "Мария", "Соколова", "+79990000003", "CUSTOMER");
@@ -184,7 +235,7 @@ class OrderPostgresIntegrationTest {
     private CreateOrderRequest order(String key, String promoCode, int bonuses, int quantity, String paymentMethod) {
         return new CreateOrderRequest("Иван Соколов", "customer@sunset.test", "+79990000001",
                 "SUNSET Нижний Новгород, Большая Покровская, 34", "pickup", paymentMethod,
-                key, promoCode, bonuses, List.of(new OrderItemRequest(PRODUCT_ID, COLOR_ID, SIZE_ID, quantity)));
+                key, promoCode, bonuses, null, List.of(new OrderItemRequest(PRODUCT_ID, COLOR_ID, SIZE_ID, quantity)));
     }
 
     private int balance() {

@@ -1,0 +1,15 @@
+[Unit]
+Description=SUNSET PostgreSQL restore drill in isolated Docker container
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/home/defuziq/sunset
+ExecStart=/bin/sh /home/defuziq/sunset/scripts/test-restore-postgres.sh /home/defuziq/backups
+UMask=0077
+TimeoutStartSec=30min
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

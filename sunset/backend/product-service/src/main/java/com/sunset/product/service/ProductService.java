@@ -12,6 +12,8 @@ import com.sunset.product.repository.ProductStockRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -53,6 +55,20 @@ public class ProductService {
     public Optional<ProductDTO> getProductById(UUID id) {
         return productRepository.findById(id)
                 .map(this::mapToDTO);
+    }
+
+    public List<Map<String, Object>> getStoreAvailability(UUID storeId) {
+        Integer activeStore = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM stores WHERE id=? AND kind='STORE' AND active=TRUE", Integer.class, storeId);
+        if (activeStore == null || activeStore == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Магазин не найден");
+        }
+        return jdbc.queryForList("""
+                SELECT product_id AS "productId", size_id AS "sizeId",
+                       color_id AS "colorId", quantity
+                FROM location_stock
+                WHERE location_id=? AND quantity>0
+                """, storeId);
     }
 
     private ProductDTO mapToDTO(Product product) {

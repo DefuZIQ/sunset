@@ -27,7 +27,7 @@ class OrderServiceTest {
     }
 
     @Test void rejectsEmptyCartBeforeDatabaseWrites() {
-        CreateOrderRequest request = new CreateOrderRequest("Иван", "mail@example.com", "+79990000000", "Адрес", "courier", "CARD", "test-key", null, 0, List.of());
+        CreateOrderRequest request = new CreateOrderRequest("Иван", "mail@example.com", "+79990000000", "Адрес", "courier", "CARD", "test-key", null, 0, null, List.of());
         assertThrows(IllegalArgumentException.class, () -> service.create(UUID.randomUUID(), request));
         verifyNoInteractions(jdbc);
     }

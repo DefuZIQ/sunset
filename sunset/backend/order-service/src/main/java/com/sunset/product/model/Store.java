@@ -14,8 +14,9 @@ public class Store {
     @Column(nullable = false) private String address;
     private String phone;
     private String hours;
-    private BigDecimal latitude;
-    private BigDecimal longitude;
+    @Column(nullable = false) private String kind = "STORE";
+    @Column(precision = 10, scale = 7) private BigDecimal latitude;
+    @Column(precision = 10, scale = 7) private BigDecimal longitude;
     private boolean active = true;
     public UUID getId() { return id; }
     public String getName() { return name; }
@@ -28,6 +29,8 @@ public class Store {
     public void setPhone(String value) { phone = value; }
     public String getHours() { return hours; }
     public void setHours(String value) { hours = value; }
+    public String getKind() { return kind; }
+    public void setKind(String value) { kind = value == null || value.isBlank() ? "STORE" : value.trim().toUpperCase(java.util.Locale.ROOT); }
     public BigDecimal getLatitude() { return latitude; }
     public void setLatitude(BigDecimal value) { latitude = value; }
     public BigDecimal getLongitude() { return longitude; }

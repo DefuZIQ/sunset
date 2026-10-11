@@ -135,6 +135,12 @@ button:focus {
   display: block;
 }
 
+.dropdown.dropdown--dismissed .dropdown-basket,
+.dropdown.dropdown--dismissed .dropdown-content,
+.dropdown.dropdown--dismissed .dropdown-profile {
+  display: none;
+}
+
 .dropdown__background_basket,
 .dropdown__background_profile,
 .dropdown__background {

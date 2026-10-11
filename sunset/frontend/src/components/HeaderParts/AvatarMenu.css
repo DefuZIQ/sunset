@@ -16,15 +16,12 @@
 .dropdown__background_profile { display:flex; flex-direction:column; gap:8px; padding:17px 18px 18px; background:transparent; }
 .dropdown__background_profile a.profile-popup__signed-primary { display:flex; align-items:center; justify-content:space-between; min-height:42px; box-sizing:border-box; padding:10px 13px; border-radius:10px; background:#211f1c; color:#fffdfb; font-size:13px; font-weight:600; text-decoration:none; transition:background .18s, transform .18s; }
 .dropdown__background_profile a.profile-popup__signed-primary:hover { background:#3d3530; transform:translateY(-1px); }
-.profile-popup__signed-primary span { font-size:18px; font-weight:400; line-height:1; }
 .profile-popup__signed-links { display:grid; gap:2px; }
 .dropdown__background_profile .profile-popup__signed-links a { display:flex; align-items:center; justify-content:space-between; min-height:37px; box-sizing:border-box; padding:8px 12px; border-radius:9px; color:#3d3530; font-size:12px; text-decoration:none; transition:background .18s; }
 .dropdown__background_profile .profile-popup__signed-links a:hover { background:#f5eee7; }
-.profile-popup__signed-links a span { color:#a46c45; font-size:16px; line-height:1; }
 .dropdown__background_profile a:focus-visible, .profile-popup__signed-foot button:focus-visible { outline:2px solid #a46c45; outline-offset:2px; }
 .profile-popup__signed-foot { padding:11px 18px 13px; border-top:1px solid #eee8df; }
 .profile-popup__signed-foot .logout { display:flex; align-items:center; justify-content:space-between; width:100%; padding:3px 0; color:#8d6356; font:600 12px 'Istok Web',sans-serif; }
-.profile-popup__signed-foot .logout span { font-size:16px; font-weight:400; }
 .profile-popup__signed-foot .logout:hover { color:#b45946; }
 
 .dropdown-content.profile-popup--guest { width:min(318px, calc(100vw - 24px)); padding:0; border:1px solid rgba(20,20,20,.08); border-radius:18px; background:#fffdfb; box-shadow:0 20px 50px rgba(22,18,12,.16); font-family:'Istok Web',sans-serif; }
@@ -40,7 +37,6 @@
 .profile-popup__guest-body a { display:flex; align-items:center; justify-content:space-between; min-height:42px; box-sizing:border-box; padding:10px 13px; border-radius:10px; font-size:13px; font-weight:600; text-decoration:none; transition:background .18s, transform .18s, border-color .18s; }
 .profile-popup__guest-body a:hover { transform:translateY(-1px); }
 .profile-popup__guest-body a:focus-visible { outline:2px solid #a46c45; outline-offset:2px; }
-.profile-popup__guest-body a span { font-size:18px; font-weight:400; line-height:1; }
 .profile-popup__guest-primary { background:#211f1c; color:#fffdfb; }
 .profile-popup__guest-primary:hover { background:#3d3530; }
 .profile-popup__guest-secondary { border:1px solid #ddd3c9; background:#fffdfb; color:#3d3530; }

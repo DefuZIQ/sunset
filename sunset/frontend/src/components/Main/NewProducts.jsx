@@ -2,12 +2,11 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useStore } from "../../contexts/StoreContext";
 import ProductCard from "../Main/ProductCard"; // проверь путь
+import ProductCardSkeleton from "./ProductCardSkeleton";
 import "./NewProducts.css";
 
 export default function NewProducts() {
   const { products, loading } = useStore();
-  if (loading) return <p className="container">Загрузка…</p>;
-
   return (
     <section className="container">
       <div className="new__card_title">
@@ -17,7 +16,7 @@ export default function NewProducts() {
       </div>
 
       <div className="new__card products">
-        {products.slice(0, 4).map((product) => (
+        {loading ? <ProductCardSkeleton count={4} /> : products.slice(0, 4).map((product) => (
           <div key={product.id} className="products__card_body">
             <ProductCard product={product} />
           </div>

@@ -2,27 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AddressGeocoder from "./AddressGeocoder";
 import { useCart } from "../components/HeaderParts/CartContext";
-import { createCustomerAddress, createOrder, deleteCustomerAddress, getLoyaltyAccount, quoteDelivery, syncCustomerAddresses, updateCustomerAddress, validatePromoCode } from "../api/client";
+import { createCustomerAddress, createOrder, deleteCustomerAddress, getLoyaltyAccount, listPickupStores, quoteDelivery, syncCustomerAddresses, updateCustomerAddress, validatePromoCode } from "../api/client";
 import "./ContentPages.css";
-
-const stores = [
-  {
-    id: "nn-center",
-    name: "SUNSET Нижний Новгород",
-    address: "Большая Покровская, 34",
-    hours: "Ежедневно, 10:00–21:00",
-    lat: 56.3269,
-    lon: 44.0059,
-  },
-  {
-    id: "nn-mall",
-    name: "SUNSET в ТРЦ НЕБО",
-    address: "Большая Покровская, 82",
-    hours: "Ежедневно, 10:00–22:00",
-    lat: 56.313,
-    lon: 43.997,
-  },
-];
 
 export default function Cart({ user }) {
   const { cartItems, addToCart, decreaseQuantity, removeFromCart, clearCart } =
@@ -48,7 +29,10 @@ export default function Cart({ user }) {
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [showAddressForm, setShowAddressForm] = useState(false);
-  const [selectedStore, setSelectedStore] = useState(stores[0].id);
+  const [stores, setStores] = useState([]);
+  const [selectedStore, setSelectedStore] = useState("");
+  const [storesError, setStoresError] = useState("");
+  const [storesReloadKey, setStoresReloadKey] = useState(0);
   const [addressDraft, setAddressDraft] = useState({
     label: "Дом",
     city: "",
@@ -84,6 +68,18 @@ export default function Cart({ user }) {
       .then(setLoyalty)
       .catch(() => {});
   }, [user]);
+  useEffect(() => {
+    const controller = new AbortController();
+    setStoresError("");
+    listPickupStores(controller.signal)
+      .then((items) => {
+        const active = items.filter((store) => store.active !== false);
+        setStores(active);
+        setSelectedStore((previous) => active.some((store) => store.id === previous) ? previous : active[0]?.id || "");
+      })
+      .catch((error) => { if (error.name !== "AbortError") setStoresError("Не удалось загрузить магазины для самовывоза."); });
+    return () => controller.abort();
+  }, [storesReloadKey]);
   useEffect(() => {
     if (!user) return;
     let active = true;
@@ -208,11 +204,14 @@ export default function Cart({ user }) {
       navigate("/login");
       return;
     }
-    const store =
-      stores.find((entry) => entry.id === selectedStore) || stores[0];
+    const store = stores.find((entry) => entry.id === selectedStore);
+    if (deliveryMode === "pickup" && !store) {
+      setState({ loading: false, error: "Выберите магазин для самовывоза" });
+      return;
+    }
     const address =
       deliveryMode === "pickup"
-        ? `${store.name}, ${store.address}`
+        ? `${store.name}, ${store.city}, ${store.address}`
         : formattedAddress;
     const phoneValid = /^\+?[0-9 ()-]{10,18}$/.test(form.phone.trim());
     if (!phoneValid || (deliveryMode === "delivery" && !formattedAddress)) {
@@ -232,6 +231,7 @@ export default function Cart({ user }) {
           customerPhone: form.phone,
           address,
           deliveryMethod: deliveryMode === "pickup" ? "pickup" : "courier",
+          storeId: deliveryMode === "pickup" ? selectedStore : null,
           paymentMethod: form.paymentMethod,
           idempotencyKey: checkoutKey,
           promoCode: form.promoCode || null,
@@ -410,6 +410,8 @@ export default function Cart({ user }) {
           </div>
           {deliveryMode === "pickup" ? (
             <div className="pickup-list">
+              {storesError && <p role="alert">{storesError} <button type="button" onClick={() => setStoresReloadKey((value) => value + 1)}>Повторить</button></p>}
+              {!storesError && !stores.length && <p>Доступных магазинов для самовывоза пока нет.</p>}
               {stores.map((store) => (
                 <button
                   type="button"

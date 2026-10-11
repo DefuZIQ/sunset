@@ -40,7 +40,7 @@ class AuthPostgresIntegrationTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.jpa.database", () -> "postgresql");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "update");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.liquibase.enabled", () -> "true");
         registry.add("spring.security.jwt.secret", () -> "test-secret-that-is-at-least-32-bytes");
     }

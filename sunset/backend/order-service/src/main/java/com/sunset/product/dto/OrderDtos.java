@@ -13,6 +13,7 @@ public final class OrderDtos {
             String customerName, String customerEmail, String customerPhone,
             String address, String deliveryMethod, String paymentMethod,
             String idempotencyKey, String promoCode, Integer bonusesToUse,
+            UUID storeId,
             List<OrderItemRequest> items) {}
     public record StatusRequest(String status) {}
     public record BonusAdjustmentRequest(Integer amount, String reason) {}

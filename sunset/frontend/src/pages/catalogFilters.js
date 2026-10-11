@@ -1,4 +1,4 @@
-const managedKeys = ["q", "min", "max", "category[]", "gender", "color[]", "size[]", "availability", "ratingMin", "ratingMax", "reviewed", "sort"];
+const managedKeys = ["q", "min", "max", "category[]", "gender", "color[]", "size[]", "availability", "store", "ratingMin", "ratingMax", "reviewed", "sort", "page"];
 const validSorts = new Set(["new", "price-asc", "price-desc", "rating-desc", "name"]);
 const validAvailability = new Set(["all", "in-stock", "low-stock"]);
 
@@ -9,6 +9,18 @@ const number = (value, maximum) => {
   if (!value || !/^\d+(?:\.\d*)?$/.test(value) || Number(value) > maximum) return "";
   return value;
 };
+
+export function readCatalogPage(params) {
+  const value = new URLSearchParams(params).get("page");
+  return value && /^[1-9]\d{0,3}$/.test(value) ? Number(value) : 1;
+}
+
+export function writeCatalogPage(params, page) {
+  const next = new URLSearchParams(params);
+  if (Number.isInteger(page) && page > 1) next.set("page", String(page));
+  else next.delete("page");
+  return next;
+}
 
 export function readCatalogFilters(params) {
   const source = new URLSearchParams(params);
@@ -24,6 +36,7 @@ export function readCatalogFilters(params) {
     colors: list(source, "color[]"),
     sizes: list(source, "size[]"),
     availability: validAvailability.has(availability) ? availability : "all",
+    storeId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(source.get("store") || "") ? source.get("store") : "",
     ratingMin: number(source.get("ratingMin"), 5),
     ratingMax: number(source.get("ratingMax"), 5),
     reviewedOnly: source.get("reviewed") === "1",
@@ -45,6 +58,7 @@ export function writeCatalogFilters(params, filter) {
   many("color[]", filter.colors);
   many("size[]", filter.sizes);
   one("availability", filter.availability === "all" ? "" : filter.availability);
+  one("store", filter.storeId);
   one("ratingMin", filter.ratingMin);
   one("ratingMax", filter.ratingMax);
   one("reviewed", filter.reviewedOnly ? "1" : "");

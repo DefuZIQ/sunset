@@ -1,0 +1,14 @@
+[Unit]
+Description=SUNSET reverse SSH tunnel from private VM to public VDS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=defuziq
+ExecStart=/usr/bin/ssh -NT -i /home/defuziq/.ssh/sunset_vds_tunnel_ed25519 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R 127.0.0.1:18080:127.0.0.1:80 sunset-tunnel@82.22.187.25
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

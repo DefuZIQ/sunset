@@ -1,0 +1,77 @@
+name: Quality gate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: sunset
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tracked credentials and required production secrets
+        run: sh scripts/check-secrets.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: sunset/pom.xml
+      - name: Test services and Liquibase migrations
+        run: bash ./mvnw -B --no-transfer-progress verify
+      - name: Verify safe web deployment and rollback
+        run: sh scripts/test-deploy-web.sh
+      - name: Verify PostgreSQL backup failure handling
+        run: sh scripts/test-backup-postgres.sh
+      - name: Verify OpenAPI contract
+        shell: pwsh
+        run: ./scripts/verify-openapi.ps1
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: sunset/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sunset/frontend/package-lock.json
+      - run: npm ci
+      - name: Check production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm run api:types:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload browser failures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: sunset/frontend/playwright-report/
+          if-no-files-found: ignore

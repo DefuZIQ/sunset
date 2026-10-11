@@ -18,5 +18,11 @@
     <changeSet id="201" author="codex-order">
         <sqlFile path="classpath:/db/migrations/V3__commerce_platform.sql"/>
     </changeSet>
+    <changeSet id="202" author="codex-stores">
+        <sqlFile path="classpath:/db/migrations/V4__store_coordinates.sql"/>
+    </changeSet>
+    <changeSet id="203" author="codex-inventory">
+        <sqlFile path="classpath:/db/migrations/V5__location_inventory.sql"/>
+    </changeSet>
 
 </databaseChangeLog>

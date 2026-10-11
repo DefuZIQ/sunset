@@ -56,6 +56,12 @@ CREATE TABLE IF NOT EXISTS product_stock (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS product_colors (
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    color_id UUID NOT NULL REFERENCES colors(id) ON DELETE CASCADE,
+    PRIMARY KEY (product_id, color_id)
+);
+
 CREATE TABLE IF NOT EXISTS images (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     url TEXT NOT NULL,

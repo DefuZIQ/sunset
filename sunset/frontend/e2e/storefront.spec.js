@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
 
+async function openReviewFormOnPhone(page) {
+  if (page.viewportSize()?.width <= 700) await page.getByRole('button', { name: 'Написать отзыв' }).click();
+}
+
 const products = [
   {
     id: '11111111-1111-1111-1111-111111111111',
@@ -38,10 +42,153 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/products/all', (route) => route.fulfill({ json: products }));
   await page.route('**/products/categories/tree', (route) => route.fulfill({ json: categoryTree }));
   await page.route('**/orders/promotions/public', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/order/stores/admin', (route) => route.fulfill({ json: [
+    { id: 'warehouse-1', name: 'Центральный склад', city: 'Нижний Новгород', address: '', kind: 'WAREHOUSE', active: true },
+    { id: 'store-1', name: 'SUNSET Центр', city: 'Нижний Новгород', address: 'Большая Покровская, 34', kind: 'STORE', active: true },
+  ] }));
+  await page.route('**/api/v1/order/stores', (route) => route.fulfill({ json: [
+    { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', name: 'SUNSET Центр', city: 'Нижний Новгород', address: 'Большая Покровская, 34', kind: 'STORE', active: true },
+    { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', name: 'SUNSET Небо', city: 'Нижний Новгород', address: 'Бетанкура, 1', kind: 'STORE', active: true },
+  ] }));
+  await page.route('**/api/v1/products/admin/*/stock?locationId=*', (route) => route.fulfill({ json: products.find((item) => route.request().url().includes(item.id))?.stock || [] }));
   await page.addInitScript(() => localStorage.clear());
 });
 
+const manyProducts = Array.from({ length: 110 }, (_, index) => ({
+  ...products[0],
+  id: `aaaaaaaa-aaaa-aaaa-aaaa-${String(index + 1).padStart(12, '0')}`,
+  name: `Рубашка ${index + 1}`,
+}));
+
+test('availability and review rating are the first catalog filter sections', async ({ page }) => {
+  await page.goto('/#/catalog');
+  await expect(page.locator('.filter-sidebar .filter-section h3').first()).toHaveText('Наличие');
+  await expect(page.locator('.filter-sidebar .filter-section h3').nth(1)).toHaveText('Рейтинг по отзывам');
+});
+
+test('catalog availability can be limited to a specific store', async ({ page }) => {
+  await page.route('**/api/v1/products/all/availability?storeId=*', (route) => route.fulfill({ json: [
+    { productId: products[1].id, sizeId: 'men-l', colorId: 'brown', quantity: 2 },
+  ] }));
+  await page.goto('/#/catalog');
+  await page.getByRole('combobox', { name: 'Наличие в магазине' }).selectOption('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+  await expect(page.locator('.catalog-grid .product-card')).toHaveCount(1);
+  await expect(page.locator('.catalog-grid')).toContainText('Мужское пальто');
+  await expect(page.locator('.catalog-grid')).not.toContainText('Льняная рубашка');
+  await expect(page).toHaveURL(/store=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/);
+  await page.getByLabel('Наличие в магазине').selectOption('');
+  await expect(page.locator('.catalog-grid .product-card')).toHaveCount(2);
+});
+
+test('every home category opens products from its catalog section', async ({ page }) => {
+  const sections = [
+    ['Верхняя одежда', ['Женская верхняя одежда', 'Мужская верхняя одежда']],
+    ['Платья', ['Женские платья']],
+    ['Пиджаки', ['Женские пиджаки', 'Мужские пиджаки']],
+    ['Джинсы', ['Женские джинсы', 'Мужские джинсы']],
+    ['Кофты', ['Женские кофты']],
+    ['Юбки', ['Женские юбки']],
+  ];
+  const categoryProducts = sections.flatMap(([, names]) => names).map((category, index) => ({
+    ...products[0],
+    id: `bbbbbbbb-bbbb-bbbb-bbbb-${String(index + 1).padStart(12, '0')}`,
+    name: `Товар раздела ${index + 1}`,
+    gender: category.startsWith('Муж') ? 'MEN' : 'WOMEN',
+    categories: [category],
+  }));
+  await page.route('**/products/all', (route) => route.fulfill({ json: categoryProducts }));
+
+  for (const [label, names] of sections) {
+    await page.goto('/#/');
+    await page.locator('.category-card').filter({ hasText: label }).click();
+    await expect(page).toHaveURL(/#\/catalog\?/);
+    await expect(page.locator('.catalog-grid .product-card')).toHaveCount(names.length);
+  }
+});
+
+test('product card keeps one row of quick sizes and links to remaining sizes', async ({ page }) => {
+  const longSizesProduct = {
+    ...products[0],
+    stock: Array.from({ length: 15 }, (_, index) => ({
+      sizeId: `waist-${index + 24}`,
+      sizeName: `W${index + 24}`,
+      sizeType: 'women_trousers',
+      colorId: 'white',
+      colorName: 'Белый',
+      quantity: 3,
+    })),
+  };
+  await page.route('**/products/all', (route) => route.fulfill({ json: [longSizesProduct] }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: longSizesProduct }));
+
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 700 });
+    await page.goto('/#/catalog');
+    const card = page.locator('.catalog-grid .product-card');
+    if (width > 760) await card.hover();
+    const sizes = card.locator('.product-card__sizes');
+    const sizeButtons = sizes.getByRole('button');
+    const sizeLink = sizes.getByRole('link', { name: /Ещё .* размеров/ });
+    await expect(sizeLink).toBeVisible();
+    const visibleCount = await sizeButtons.count();
+    expect(visibleCount, `Visible sizes at ${width}px`).toBeGreaterThan(0);
+    expect(visibleCount, `Visible sizes at ${width}px`).toBeLessThan(15);
+    await expect(sizeLink).toContainText(`Ещё ${15 - visibleCount}`);
+    await expect.poll(() => sizeLink.evaluate((element) => {
+      const link = element.getBoundingClientRect();
+      const card = element.closest('.product-card').getBoundingClientRect();
+      const buttons = [...element.parentElement.querySelectorAll('button')].map((button) => button.getBoundingClientRect());
+      return link.top >= card.top && link.bottom <= card.bottom + 1 && link.left >= card.left && link.right <= card.right + 1
+        && buttons.every((button) => Math.abs(button.top - link.top) <= 3 && button.right <= link.left);
+    }), `One size row at ${width}px`).toBe(true);
+    await sizeButtons.first().click();
+    await expect(sizeButtons.first()).toHaveClass(/selected/);
+    await sizeLink.click();
+    await expect(page).toHaveURL(/#\/catalog\/product\//);
+    await expect(page.locator('.sizes-list .size-btn')).toHaveCount(15);
+  }
+});
+
+test('desktop catalog paginates and keeps the page in the URL', async ({ page }) => {
+  test.skip(page.viewportSize().width <= 760, 'Desktop pagination');
+  await page.route('**/products/all', (route) => route.fulfill({ json: manyProducts }));
+  await page.goto('/#/catalog');
+  await expect(page.locator('.catalog-grid .product-card')).toHaveCount(48);
+  await page.getByRole('button', { name: 'Страница 2' }).click();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(page.locator('.catalog-grid .product-card')).toHaveCount(48);
+  await expect(page.locator('.catalog-grid').getByText('Рубашка 49', { exact: true })).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('.catalog-grid').getByText('Рубашка 1', { exact: true })).toBeVisible();
+  await expect(page).not.toHaveURL(/page=2/);
+});
+
+test('mobile catalog reveals more products and resets its page after filtering', async ({ page }) => {
+  test.skip(page.viewportSize().width > 760, 'Mobile load more');
+  await page.route('**/products/all', (route) => route.fulfill({ json: manyProducts }));
+  await page.goto('/#/catalog');
+  await expect(page.locator('.catalog-grid .product-card')).toHaveCount(20);
+  await page.getByRole('button', { name: 'Показать ещё' }).click();
+  await expect(page.locator('.catalog-grid .product-card')).toHaveCount(40);
+  await expect(page).toHaveURL(/page=2/);
+  await page.getByRole('button', { name: 'Для женщин' }).click();
+  await expect(page).not.toHaveURL(/page=/);
+  await expect(page.locator('.catalog-grid .product-card')).toHaveCount(20);
+});
+
+test('back-to-top button becomes available after scrolling', async ({ page }) => {
+  await page.route('**/products/all', (route) => route.fulfill({ json: manyProducts }));
+  await page.goto('/#/catalog');
+  await expect(page.locator('.catalog-grid .product-card').first()).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 900));
+  const backToTop = page.getByRole('button', { name: 'Прокрутить наверх' });
+  await expect(backToTop).toBeVisible();
+  await backToTop.click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(10);
+});
+
 test('guest account popup matches the profile style and keeps its actions on screen', async ({ page }) => {
+  test.skip(page.viewportSize().width <= 760, 'Phone layout opens the account from the bottom tab bar');
   await page.goto('/#/');
   await page.getByRole('button', { name: 'Профиль' }).click();
 
@@ -61,6 +208,7 @@ test('guest account popup matches the profile style and keeps its actions on scr
 });
 
 test('signed-in account popup keeps profile actions accessible on screen', async ({ page }) => {
+  test.skip(page.viewportSize().width <= 760, 'Phone layout opens the account from the bottom tab bar');
   const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', firstName: 'Анна', lastName: 'Тестовая', role: 'USER' };
   await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
   await page.addInitScript((user) => {
@@ -84,6 +232,7 @@ test('signed-in account popup keeps profile actions accessible on screen', async
 });
 
 test('empty cart popup uses the shared card style and opens the catalog', async ({ page }) => {
+  test.skip(page.viewportSize().width <= 760, 'Phone layout opens the cart from the bottom tab bar');
   await page.goto('/#/');
   await page.getByRole('button', { name: 'Корзина' }).click();
   const popup = page.getByRole('dialog', { name: 'Корзина' });
@@ -96,18 +245,55 @@ test('empty cart popup uses the shared card style and opens the catalog', async 
   await expect(page).toHaveURL(/#\/catalog$/);
 });
 
-test('cart popup stays below the header inside a 320px viewport', async ({ page }) => {
+test('phone navigation stays inside a 320px viewport', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await page.goto('/#/');
-  await page.getByRole('button', { name: 'Корзина' }).click();
-  const popup = await page.getByRole('dialog', { name: 'Корзина' }).boundingBox();
-  const header = await page.locator('.header-container').boundingBox();
-  expect(popup.x).toBeGreaterThanOrEqual(0);
-  expect(popup.x + popup.width).toBeLessThanOrEqual(320);
-  expect(popup.y).toBeGreaterThanOrEqual(header.y + header.height);
+  const tabs = page.getByRole('navigation', { name: 'Основная навигация' });
+  await expect(tabs).toBeVisible();
+  const bounds = await tabs.boundingBox();
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(320);
+  await expect(tabs.getByRole('link')).toHaveCount(5);
+});
+
+test('phone tabs and section menu navigate without horizontal overflow', async ({ page }) => {
+  test.skip(page.viewportSize().width > 760, 'Phone-only navigation');
+  await page.goto('/#/');
+  const tabs = page.getByRole('navigation', { name: 'Основная навигация' });
+  await tabs.getByRole('link', { name: 'Каталог' }).click();
+  await expect(page).toHaveURL(/#\/catalog$/);
+  await page.getByRole('button', { name: 'Открыть меню' }).click();
+  await expect(page.getByRole('link', { name: 'АКЦИИ' })).toBeVisible();
+  await page.getByRole('link', { name: 'АКЦИИ' }).click();
+  await expect(page).toHaveURL(/#\/promotions$/);
+  await expect(page.getByRole('button', { name: 'Открыть меню' })).toBeVisible();
+  await tabs.getByRole('link', { name: 'Корзина' }).click();
+  await expect(page).toHaveURL(/#\/profile\/basket$/);
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 700 });
+    for (const path of ['/catalog', '/profile/basket', '/about']) {
+      await page.goto(`/#${path}`);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      expect(overflow, `${path} at ${width}px`).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
+test('last home categories can scroll fully above the phone tabs', async ({ page }) => {
+  test.skip(page.viewportSize().width > 760, 'Phone-only layout');
+  for (const width of [320, 393]) {
+    await page.setViewportSize({ width, height: 760 });
+    await page.goto('/#/');
+    await expect(page.locator('.category-card')).toHaveCount(6);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const lastCard = await page.locator('.category-card').last().boundingBox();
+    const tabs = await page.getByRole('navigation', { name: 'Основная навигация' }).boundingBox();
+    expect(lastCard.y + lastCard.height, `Last category at ${width}px`).toBeLessThanOrEqual(tabs.y - 16);
+  }
 });
 
 test('filled cart popup keeps quantity and selected product navigation', async ({ page }) => {
+  test.skip(page.viewportSize().width <= 760, 'Phone layout uses a full cart page');
   const product = { ...products[0], selectedColorId: 'white', selectedColorName: 'Белый', selectedSizeId: 'women-m', selectedSizeName: 'M' };
   await page.addInitScript((item) => {
     localStorage.setItem('cartItems', JSON.stringify({ [`${item.id}::white::women-m`]: { product: item, quantity: 1 } }));
@@ -125,6 +311,7 @@ test('filled cart popup keeps quantity and selected product navigation', async (
 });
 
 test('guest newsletter signup uses the versioned API and shows confirmation', async ({ page }) => {
+  test.skip(page.viewportSize().width <= 760, 'Newsletter is inside the desktop-only footer');
   let submitted = false;
   await page.route('**/api/v1/subscriptions', async (route) => {
     submitted = true;
@@ -139,6 +326,17 @@ test('guest newsletter signup uses the versioned API and shows confirmation', as
   await page.getByRole('button', { name: 'Подписаться' }).click();
   await expect(page.getByText('Готово! Скидка и новости уже ваши.')).toBeVisible();
   expect(submitted).toBe(true);
+});
+
+test('phone uses navigation instead of a footer', async ({ page }) => {
+  test.skip(page.viewportSize().width > 760, 'Phone-only layout');
+  await page.goto('/#/');
+  await expect(page.locator('.app-shell > footer')).toBeHidden();
+  const tabs = page.getByRole('navigation', { name: 'Основная навигация' });
+  await expect(tabs).toBeVisible();
+  await page.getByRole('button', { name: 'Открыть меню' }).click();
+  await page.getByRole('link', { name: 'КОНТАКТЫ' }).click();
+  await expect(page).toHaveURL(/#\/contacts$/);
 });
 
 test('customer login uses the versioned API and opens the storefront', async ({ page }) => {
@@ -234,6 +432,39 @@ test('profile settings save phone and change password via the versioned API', as
   await expect(page.getByText('Пароль успешно изменён')).toBeVisible();
 });
 
+test('profile overview keeps its cards compact and aligned', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', firstName: 'Анна', lastName: 'Тестовая', role: 'USER' };
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.goto('/#/profile');
+  const stats = page.locator('.account-stats a');
+  await expect(stats).toHaveCount(3);
+  const first = await stats.nth(0).boundingBox();
+  const second = await stats.nth(1).boundingBox();
+  const last = await stats.nth(2).boundingBox();
+  const features = await page.locator('.account-feature').all();
+  const featureBoxes = await Promise.all(features.map((feature) => feature.boundingBox()));
+  if (page.viewportSize().width <= 640) {
+    const menu = await page.locator('.account-nav').boundingBox();
+    const firstTab = await page.locator('.account-nav a').first().boundingBox();
+    expect(firstTab.y - menu.y).toBeGreaterThanOrEqual(12);
+    expect(menu.y + menu.height - firstTab.y - firstTab.height).toBeGreaterThanOrEqual(11);
+    expect(Math.abs(first.y - second.y)).toBeLessThan(2);
+    expect(last.y).toBeGreaterThan(first.y);
+    expect(first.height).toBeLessThan(130);
+    expect(last.height).toBeLessThan(100);
+    expect(featureBoxes[0].height).toBeLessThan(240);
+  } else {
+    expect(Math.abs(featureBoxes[0].y - featureBoxes[1].y)).toBeLessThan(2);
+    expect(Math.abs(featureBoxes[0].width - featureBoxes[1].width)).toBeLessThan(2);
+    expect(first.height).toBeLessThan(155);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+});
+
 test('expired session is cleared after the versioned profile rejects it', async ({ page }) => {
   await page.route('**/api/v1/auth/profile', (route) => route.fulfill({
     status: 401, json: { code: 'UNAUTHORIZED', message: 'Необходим вход в аккаунт' },
@@ -257,6 +488,7 @@ test('admin dashboard loads protected data from the versioned API', async ({ pag
     '/api/v1/order/admin/users': [{ id: 'user-1', firstName: 'Анна', lastName: 'Тестовая', email: 'anna@example.test', role: 'USER', bonusBalance: 100, orderCount: 1, orderTotal: 3900 }],
     '/api/v1/order/admin/promotions': [],
     '/api/v1/products/admin/variants': { colors: [], sizes: [] },
+    '/api/v1/order/stores/admin': [{ id: 'warehouse-1', name: 'Центральный склад', city: 'Нижний Новгород', address: '', kind: 'WAREHOUSE', active: true }],
     '/api/v1/order/admin/returns': [],
     '/api/v1/order/admin/analytics': { orders: { total: 1, last30Days: 1, revenue: 3900 }, returns: { total: 0, requested: 0 }, lowStock: 0, topProducts: [] },
   };
@@ -369,6 +601,7 @@ test('admin product forms use versioned writes including empty-body deletion', a
       colors: [{ id: 'white', name: 'Белый', hexCode: '#f4f1eb' }],
       sizes: [{ id: 'women-m', name: 'M', type: 'women_clothing' }],
     } });
+    if (path.endsWith('/stock') && route.request().method() === 'GET') return route.fulfill({ json: products[0].stock });
     writes.push({ path, method: route.request().method(), body: route.request().postDataJSON() });
     if (route.request().method() === 'DELETE') return route.fulfill({ status: 204, body: '' });
     await route.fulfill({ json: path.endsWith('/stock')
@@ -409,6 +642,7 @@ test('admin product forms use versioned writes including empty-body deletion', a
   expect(writes[1].path).toBe(`/api/v1/products/admin/${products[0].id}`);
   expect(writes[2].path).toBe(`/api/v1/products/admin/${products[0].id}`);
   expect(writes[3].path).toBe(`/api/v1/products/admin/${products[0].id}/stock`);
+  expect(writes[3].body.locationId).toBe('warehouse-1');
   expect(writes[3].body.stock[0]).toMatchObject({ quantity: 6 });
 });
 
@@ -499,10 +733,226 @@ test('product page loads reviews from the versioned public API', async ({ page }
   expect(requested).toBe(true);
 });
 
+test('review photo opens fullscreen with its text and closes by Escape', async ({ page }) => {
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [{ id: 'review-photo', authorName: 'Анна', rating: 5, qualityRating: 5, fit: 'AS_EXPECTED', body: 'Фото и отзыв на весь экран', photoUrl: '/logo512.png', verifiedPurchase: true, createdAt: '2026-10-06T00:00:00Z' }] }));
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await page.getByRole('button', { name: /Открыть фото из отзыва Анна на весь экран/ }).click();
+  const viewer = page.getByRole('dialog', { name: 'Фото и отзыв Анна' });
+  await expect(viewer).toBeVisible();
+  await expect(viewer.getByText('Фото и отзыв на весь экран')).toBeVisible();
+  await expect(viewer.locator('img')).toHaveAttribute('src', '/logo512.png');
+  if (page.viewportSize().width < 700) {
+    const placement = await page.evaluate(() => {
+      const image = document.querySelector('.review-photo-viewer__stage img').getBoundingClientRect();
+      const caption = document.querySelector('.review-photo-viewer__caption').getBoundingClientRect();
+      return { overlayZ: Number(getComputedStyle(document.querySelector('.product-overlay')).zIndex), imageBottom: image.bottom, captionTop: caption.top, captionBottom: caption.bottom };
+    });
+    expect(placement.overlayZ).toBeGreaterThan(12000);
+    expect(placement.captionTop).toBeLessThan(placement.imageBottom);
+    expect(placement.captionBottom).toBeLessThanOrEqual(placement.imageBottom + 1);
+  }
+  await page.keyboard.press('Escape');
+  await expect(viewer).toHaveCount(0);
+});
+
+test('review photo carousel shows all photos, swipes and opens the matching review', async ({ page }) => {
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [
+    { id: 'photo-1', authorName: 'Анна', rating: 5, body: 'Первое фото', photoUrl: '/logo512.png', createdAt: '2026-10-06T00:00:00Z' },
+    { id: 'photo-2', authorName: 'Мария', rating: 4, body: 'Второе фото', photoUrl: '/logo192.png', createdAt: '2026-10-05T00:00:00Z' },
+    { id: 'photo-3', authorName: 'Ольга', rating: 3, body: 'Третье фото', photoUrl: '/logo512.png', createdAt: '2026-10-04T00:00:00Z' },
+    { id: 'photo-4', authorName: 'Елена', rating: 5, body: 'Четвёртое фото', photoUrl: '/logo512.png', createdAt: '2026-10-03T00:00:00Z' },
+    { id: 'photo-5', authorName: 'София', rating: 4, body: 'Пятое фото', photoUrl: '/logo512.png', createdAt: '2026-10-02T00:00:00Z' },
+    ...Array.from({ length: 9 }, (_, index) => ({ id: `photo-${index + 6}`, authorName: `Покупатель ${index + 6}`, rating: 5, body: `Фото ${index + 6}`, photoUrl: '/logo512.png', createdAt: '2026-10-01T00:00:00Z' })),
+  ] }));
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  const gallery = page.getByRole('region', { name: 'Фото с отзывами' });
+  await expect(gallery.locator('.review-gallery__item')).toHaveCount(14);
+  await expect(gallery.locator('..')).toHaveClass(/reviews-toolbar/);
+  await expect(gallery.locator('..').locator('.reviews-filters')).toBeVisible();
+  expect(await gallery.evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector('.reviews-filters')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+  expect(await gallery.locator('.review-gallery__item').first().evaluate((element) => element.getBoundingClientRect().width)).toBeLessThan(130);
+  await page.locator('.reviews-filters__ratings').getByRole('button', { name: /5 ★/ }).click();
+  await expect(gallery.locator('.review-gallery__item')).toHaveCount(14);
+  const track = gallery.locator('.review-gallery__track');
+  const initialScroll = await track.evaluate((element) => element.scrollLeft);
+  await gallery.getByRole('button', { name: 'Следующие фотоотзывы' }).click();
+  await expect.poll(() => track.evaluate((element) => element.scrollLeft)).toBeGreaterThan(initialScroll);
+  await gallery.getByRole('button', { name: 'Открыть фото и отзыв Мария' }).click();
+  const viewer = page.getByRole('dialog', { name: 'Фото и отзыв Мария' });
+  await expect(viewer.getByText('Второе фото')).toBeVisible();
+  await expect(viewer.locator('img')).toHaveAttribute('src', '/logo192.png');
+});
+
+test('contacts lists every active store and marks each located store on the map', async ({ page }) => {
+  await page.route('**/api/v1/order/stores', (route) => route.fulfill({ json: [
+    { id: 'store-1', name: 'SUNSET Центр', city: 'Нижний Новгород', address: 'Большая Покровская, 34', hours: '10:00–21:00', latitude: 56.3269, longitude: 44.0059, active: true },
+    { id: 'store-2', name: 'SUNSET Небо', city: 'Нижний Новгород', address: 'Большая Покровская, 82', phone: '+7 831 000-00-00', latitude: 56.313, longitude: 43.997, active: true },
+    { id: 'store-hidden', name: 'Закрытый магазин', city: 'Москва', address: 'Адрес', latitude: 55.75, longitude: 37.62, active: false },
+  ] }));
+  await page.route(/tile\.openstreetmap\.org/, (route) => route.abort());
+
+  await page.goto('/#/contacts');
+  await expect(page.getByRole('heading', { name: 'Наши магазины' })).toBeVisible();
+  await expect(page.locator('.store-card')).toHaveCount(2);
+  await expect(page.getByRole('img', { name: 'Карта магазинов SUNSET: 2 меток' })).toBeVisible();
+  await expect(page.locator('.stores-map .leaflet-interactive')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Показать SUNSET Небо на карте' }).click();
+  await expect(page.locator('.store-card').nth(1)).toHaveClass(/is-selected/);
+  await expect(page.getByText('Закрытый магазин')).toHaveCount(0);
+});
+
+test('customer can cancel or confirm deletion of only their own review', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
+  let reviews = [
+    { id: 'own-review', userId: account.id, authorName: 'Анна', rating: 5, body: 'Мой отзыв о рубашке', createdAt: '2026-10-06T00:00:00Z' },
+    { id: 'other-review', userId: '44444444-4444-4444-4444-444444444444', authorName: 'Мария', rating: 4, body: 'Чужой отзыв о рубашке', createdAt: '2026-10-05T00:00:00Z' },
+  ];
+  let deleteCalls = 0;
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: reviews }));
+  await page.route('**/api/v1/products/reviews/own-review', (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback();
+    deleteCalls += 1;
+    reviews = reviews.filter((item) => item.id !== 'own-review');
+    return route.fulfill({ status: 204, body: '' });
+  });
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await expect(page.getByRole('button', { name: 'Удалить отзыв' })).toHaveCount(1);
+  await page.getByRole('button', { name: 'Удалить отзыв' }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Удалить отзыв?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Оставить отзыв' }).click();
+  expect(deleteCalls).toBe(0);
+  await expect(page.getByText('Мой отзыв о рубашке')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Удалить отзыв' }).click();
+  await page.getByRole('button', { name: 'Удалить навсегда' }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Удалить отзыв?' })).toHaveCount(0);
+  await expect(page.getByText('Мой отзыв о рубашке')).toHaveCount(0);
+  await expect(page.getByText('Чужой отзыв о рубашке')).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('Ваш отзыв удалён');
+  expect(deleteCalls).toBe(1);
+});
+
+test('size guide uses product measurements and selects an available size', async ({ page }) => {
+  const product = { ...products[0], stock: [
+    { ...products[0].stock[0], sizeDescription: 'Обхват груди 88–92 см' },
+    { ...products[0].stock[0], sizeId: 'women-l', sizeName: 'L', sizeDescription: 'Обхват груди 96–100 см', quantity: 2 },
+  ] };
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: product }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [] }));
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await page.getByRole('button', { name: /Таблица размеров/ }).click();
+  const guide = page.getByRole('dialog', { name: 'Размерная таблица' });
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText('Обхват груди 96–100 см');
+  await guide.getByRole('row', { name: /L Обхват груди 96–100 см/ }).getByRole('button', { name: /Выбрать/ }).click();
+  await expect(guide).toHaveCount(0);
+  await expect(page.locator('.sizes-list .size-btn', { hasText: 'L' })).toHaveClass(/selected/);
+});
+
+test('large desktop product image aligns with details and mobile image stays uncropped', async ({ page }) => {
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [] }));
+
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+    const layout = await page.evaluate(() => {
+      const image = document.querySelector('.product-detail-image');
+      const picture = image.querySelector('img');
+      const details = document.querySelector('.product-detail-info');
+      return { image: image.getBoundingClientRect().toJSON(), details: details.getBoundingClientRect().toJSON(), fit: getComputedStyle(picture).objectFit };
+    });
+    if (width <= 700) {
+      expect(layout.fit).toBe('contain');
+      expect(Math.abs(layout.image.width - layout.details.width)).toBeLessThan(2);
+      expect(layout.image.top).toBeGreaterThanOrEqual(70);
+    } else {
+      expect(layout.fit).toBe('cover');
+      expect(layout.image.width).toBeGreaterThan(layout.details.width);
+      expect(layout.image.height).toBeGreaterThanOrEqual(850);
+      expect(Math.abs(layout.image.height - layout.details.height)).toBeLessThan(2);
+    }
+  }
+});
+
+test('mobile review composer opens on demand and preserves a draft', async ({ page }) => {
+  test.skip(page.viewportSize()?.width > 700, 'Mobile-only layout');
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [] }));
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  const form = page.locator('#review-form');
+  const toggle = page.getByRole('button', { name: 'Написать отзыв' });
+  await expect(toggle).toBeVisible();
+  await expect(form).toBeHidden();
+  await toggle.click();
+  await expect(form).toBeVisible();
+  await form.getByPlaceholder('Расскажите о посадке, ткани и впечатлениях').fill('Черновик отзыва');
+  await page.getByRole('button', { name: 'Свернуть форму' }).click();
+  await expect(form).toBeHidden();
+  await toggle.click();
+  await expect(form.getByPlaceholder('Расскажите о посадке, ткани и впечатлениях')).toHaveValue('Черновик отзыва');
+});
+
+test('customer rates a product and its quality with stars', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
+  let submitted = null;
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111', (route) => {
+    submitted = route.request().postDataJSON();
+    return route.fulfill({ json: { id: 'new-review', ...submitted, authorName: 'Анна' } });
+  });
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await openReviewFormOnPhone(page);
+  const overall = page.getByRole('group', { name: 'Общая оценка' });
+  const quality = page.getByRole('group', { name: 'Качество' });
+  await expect(overall.getByRole('radio')).toHaveCount(5);
+  await expect(quality.getByRole('radio')).toHaveCount(5);
+  await overall.getByRole('radio', { name: '3 из 5' }).check();
+  await quality.getByRole('radio', { name: '4 из 5' }).check();
+  await overall.getByRole('radio', { name: '3 из 5' }).press('ArrowRight');
+  await expect(overall.getByRole('radio', { name: '4 из 5' })).toBeChecked();
+  await overall.getByRole('radio', { name: '4 из 5' }).press('ArrowLeft');
+  await expect(overall.getByRole('radio', { name: '3 из 5' })).toBeChecked();
+  await expect(quality.getByRole('radio', { name: '4 из 5' })).toBeChecked();
+  await page.getByRole('combobox', { name: 'Как подошёл размер' }).selectOption('SMALL');
+  await page.getByPlaceholder('Расскажите о посадке, ткани и впечатлениях').fill('Удобная и качественная рубашка');
+  await expect(page.locator('.review-form__comment small')).toHaveText(`${'Удобная и качественная рубашка'.length} / 1500`);
+  await page.getByRole('button', { name: 'Опубликовать' }).click();
+  await expect(page.getByText('Спасибо! Отзыв опубликован.')).toBeVisible();
+  expect(submitted).toMatchObject({ rating: 3, qualityRating: 4, fit: 'SMALL', body: 'Удобная и качественная рубашка' });
+});
+
 test('customer uploads a review photo before publishing the review', async ({ page }) => {
   const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
   const photoUrl = '/api/v1/products/review-photos/55555555-5555-5555-5555-555555555555';
   let published = null;
+  const savedRequests = [];
   await page.addInitScript((user) => {
     localStorage.setItem('authToken', 'e2e-token');
     localStorage.setItem('user', JSON.stringify(user));
@@ -516,19 +966,144 @@ test('customer uploads a review photo before publishing the review', async ({ pa
     return route.fulfill({ json: { photoUrl } });
   });
   await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111', (route) => {
-    expect(route.request().postDataJSON()).toMatchObject({ body: 'Хорошая ткань', photoUrl });
-    published = { id: 'review-with-photo', authorName: 'Анна', rating: 5, body: 'Хорошая ткань', photoUrl, createdAt: '2026-10-09T00:00:00Z' };
+    const request = route.request().postDataJSON();
+    savedRequests.push(request);
+    published = { id: 'review-with-photo', userId: account.id, authorName: 'Анна', rating: 5, photoUrl: request.photoUrl ?? published?.photoUrl ?? null, createdAt: '2026-10-09T00:00:00Z', ...request };
     return route.fulfill({ json: published });
   });
   await page.route('**/api/v1/products/review-photos/55555555-5555-5555-5555-555555555555', (route) => route.fulfill({ body: Buffer.from('image'), contentType: 'image/png' }));
 
   await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await openReviewFormOnPhone(page);
   await page.getByLabel('Фото товара (необязательно)').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from('image') });
   await expect(page.getByAltText('Предпросмотр фотографии отзыва')).toBeVisible();
+  await expect(page.getByText('Фото загружено. Теперь опубликуйте отзыв.')).toBeVisible();
   await page.getByPlaceholder('Расскажите о посадке, ткани и впечатлениях').fill('Хорошая ткань');
   await page.getByRole('button', { name: 'Опубликовать' }).click();
-  await expect(page.getByText('Спасибо! Отзыв опубликован.')).toBeVisible();
+  await expect(page.getByText('Спасибо! Отзыв и фото опубликованы.')).toBeVisible();
   await expect(page.locator('.review-card .review-photo')).toHaveAttribute('src', photoUrl);
+  expect(savedRequests[0]).toMatchObject({ body: 'Хорошая ткань', photoUrl });
+  await page.getByRole('button', { name: 'Изменить отзыв и фото' }).click();
+  await expect(page.getByAltText('Текущее фото отзыва')).toHaveAttribute('src', photoUrl);
+  await page.getByPlaceholder('Расскажите о посадке, ткани и впечатлениях').fill('Хорошая ткань после стирки');
+  await page.getByRole('button', { name: 'Опубликовать' }).click();
+  await expect(page.locator('.review-card .review-photo')).toHaveAttribute('src', photoUrl);
+  expect(savedRequests[1]).not.toHaveProperty('photoUrl');
+});
+
+test('customer can attach a photo to an already published review', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
+  const photoUrl = '/api/v1/products/review-photos/55555555-5555-5555-5555-555555555555';
+  let published = { id: 'existing-review', userId: account.id, authorName: 'Анна', rating: 5, body: 'Хорошая ткань', photoUrl: null, createdAt: '2026-10-09T00:00:00Z' };
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [published] }));
+  await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111/photo', (route) => route.fulfill({ json: { photoUrl } }));
+  await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111', (route) => {
+    const request = route.request().postDataJSON();
+    expect(request).toMatchObject({ body: 'Хорошая ткань', photoUrl });
+    published = { ...published, ...request };
+    return route.fulfill({ json: published });
+  });
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await page.getByRole('button', { name: 'Изменить отзыв и фото' }).click();
+  await page.getByLabel('Фото товара (необязательно)').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from('image') });
+  await page.getByRole('button', { name: 'Опубликовать' }).click();
+  await expect(page.getByText('Спасибо! Отзыв и фото опубликованы.')).toBeVisible();
+  await expect(page.locator('.review-card .review-photo')).toHaveAttribute('src', photoUrl);
+});
+
+test('review form explains an oversized photo response without losing the draft', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
+  let reviewSubmitted = false;
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111/photo', (route) => route.fulfill({ status: 413, body: 'Request Entity Too Large' }));
+  await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111', (route) => {
+    reviewSubmitted = true;
+    return route.fulfill({ json: {} });
+  });
+
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await openReviewFormOnPhone(page);
+  await page.getByLabel('Фото товара (необязательно)').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: Buffer.from('image') });
+  await page.getByPlaceholder('Расскажите о посадке, ткани и впечатлениях').fill('Отзыв останется после ошибки');
+  await expect(page.getByRole('alert')).toContainText('Фото слишком большое для загрузки. Выберите другое изображение.');
+  await expect(page.getByRole('button', { name: 'Опубликовать' })).toBeDisabled();
+  await expect(page.getByPlaceholder('Расскажите о посадке, ткани и впечатлениях')).toHaveValue('Отзыв останется после ошибки');
+  expect(reviewSubmitted).toBe(false);
+});
+
+test('unsupported gallery photo cannot silently publish a text-only review', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
+  let reviewSubmitted = false;
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111', (route) => {
+    reviewSubmitted = true;
+    return route.fulfill({ json: {} });
+  });
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await openReviewFormOnPhone(page);
+  await page.getByLabel('Фото товара (необязательно)').setInputFiles({ name: 'gallery.heic', mimeType: 'image/heic', buffer: Buffer.from('not-a-decodable-image') });
+  await expect(page.getByRole('alert')).toContainText('Сохраните его как JPEG или PNG');
+  await expect(page.getByRole('button', { name: 'Опубликовать' })).toBeDisabled();
+  expect(reviewSubmitted).toBe(false);
+  await page.getByRole('button', { name: 'Продолжить без фото' }).click();
+  await expect(page.getByRole('button', { name: 'Опубликовать' })).toBeEnabled();
+});
+
+test('large gallery PNG is compressed before upload', async ({ page }) => {
+  const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
+  await page.addInitScript((user) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, account);
+  await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [] }));
+  let uploadedBytes = 0;
+  await page.route('**/api/v1/products/review/11111111-1111-1111-1111-111111111111/photo', (route) => {
+    uploadedBytes = route.request().postDataBuffer().length;
+    expect(uploadedBytes).toBeLessThan(5.5 * 1024 * 1024);
+    expect(route.request().postDataBuffer().toString('latin1')).toContain('Content-Type: image/jpeg');
+    return route.fulfill({ json: { photoUrl: '/api/v1/products/review-photos/compressed' } });
+  });
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await openReviewFormOnPhone(page);
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1500;
+    const context = canvas.getContext('2d');
+    const image = context.createImageData(1500, 1500);
+    for (let index = 0; index < image.data.length; index += 4) {
+      image.data[index] = Math.random() * 256;
+      image.data[index + 1] = Math.random() * 256;
+      image.data[index + 2] = Math.random() * 256;
+      image.data[index + 3] = 255;
+    }
+    context.putImageData(image, 0, 0);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  const buffer = Buffer.from(png, 'base64');
+  expect(buffer.length).toBeGreaterThan(5 * 1024 * 1024);
+  await page.getByLabel('Фото товара (необязательно)').setInputFiles({ name: 'gallery.png', mimeType: 'image/png', buffer });
+  await expect(page.getByText('Фото загружено. Теперь опубликуйте отзыв.')).toBeVisible();
+  expect(uploadedBytes).toBeGreaterThan(0);
 });
 
 test('product reviews filter by rating, photo and verified purchase', async ({ page }) => {
@@ -555,7 +1130,7 @@ test('product reviews filter by rating, photo and verified purchase', async ({ p
   await expect(page.locator('.review-card').first()).toContainText('Хорошая ткань');
 });
 
-test('signed-in customer can mark a review helpful once', async ({ page }) => {
+test('signed-in customer can like, dislike and remove a review reaction', async ({ page }) => {
   const account = { id: '33333333-3333-3333-3333-333333333333', email: 'anna@example.test', role: 'USER' };
   await page.addInitScript((user) => {
     localStorage.setItem('authToken', 'e2e-token');
@@ -564,23 +1139,33 @@ test('signed-in customer can mark a review helpful once', async ({ page }) => {
   await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
   await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
   await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [
-    { id: 'review-1', authorName: 'Ольга', rating: 5, body: 'Удобная рубашка', helpfulCount: 2, createdAt: '2026-09-01T00:00:00Z' },
+    { id: 'review-1', authorName: 'Ольга', rating: 5, body: 'Удобная рубашка', likeCount: 2, dislikeCount: 0, myVote: null, createdAt: '2026-09-01T00:00:00Z' },
   ] }));
-  let votes = 0;
-  await page.route('**/api/v1/products/reviews/review-1/helpful', (route) => {
-    votes += 1;
+  const votes = [];
+  await page.route('**/api/v1/products/reviews/review-1/vote', (route) => {
+    const vote = route.request().postDataJSON().vote;
+    votes.push(vote);
     expect(route.request().method()).toBe('PUT');
     expect(route.request().headers().authorization).toBe('Bearer e2e-token');
-    return route.fulfill({ json: { reviewId: 'review-1', helpfulCount: 3 } });
+    const result = votes.length === 1 ? { likeCount: 3, dislikeCount: 0, myVote: 'LIKE' }
+      : votes.length === 2 ? { likeCount: 2, dislikeCount: 1, myVote: 'DISLIKE' }
+        : { likeCount: 2, dislikeCount: 0, myVote: null };
+    return route.fulfill({ json: { reviewId: 'review-1', ...result } });
   });
 
   await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
-  const helpful = page.getByRole('button', { name: 'Отметить отзыв Ольга полезным' });
-  await expect(helpful).toContainText('2');
-  await helpful.click();
-  await expect(helpful).toContainText('3');
-  await expect(helpful).toBeDisabled();
-  expect(votes).toBe(1);
+  const like = page.getByRole('button', { name: /Лайк отзыву Ольга/ });
+  const dislike = page.getByRole('button', { name: /Дизлайк отзыву Ольга/ });
+  await expect(like).toContainText('2');
+  await like.click();
+  await expect(like).toHaveAttribute('aria-pressed', 'true');
+  await expect(like).toContainText('3');
+  await dislike.click();
+  await expect(dislike).toHaveAttribute('aria-pressed', 'true');
+  await expect(like).toContainText('2');
+  await dislike.click();
+  await expect(dislike).toHaveAttribute('aria-pressed', 'false');
+  expect(votes).toEqual(['LIKE', 'DISLIKE', 'DISLIKE']);
 });
 
 test('opens the catalog and filters products by audience', async ({ page }) => {
@@ -676,6 +1261,10 @@ async function openCheckout(page, { geocoderAvailable = false } = {}) {
   await page.route('**/auth/profile', (route) => route.fulfill({ json: user }));
   await page.route('**/order/loyalty', (route) => route.fulfill({ json: { balance: 0 } }));
   await page.route('**/order/delivery/quote', (route) => route.fulfill({ json: { cost: 390, estimatedDays: 3 } }));
+  await page.route('**/order/stores', (route) => route.fulfill({ json: [
+    { id: 'store-1', name: 'SUNSET Нижний Новгород', city: 'Нижний Новгород', address: 'Большая Покровская, 34', hours: '10:00–21:00', active: true },
+    { id: 'store-2', name: 'SUNSET в ТРЦ НЕБО', city: 'Нижний Новгород', address: 'Большая Покровская, 82', hours: '10:00–22:00', active: true },
+  ] }));
   await page.route('**/order/my', (route) => route.fulfill({ json: [] }));
   const savedAddresses = [];
   await page.route('**/auth/addresses', (route) => {

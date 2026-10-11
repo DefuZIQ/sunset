@@ -1,9 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../HeaderParts/CartContext";
+import PopupActionIcon from "./PopupActionIcon";
+import usePopupDismissal from "./usePopupDismissal";
 import "./BasketButton.css";
 
 export default function BasketButton() {
+  const { dismissed, dismiss, reopen } = usePopupDismissal();
   const {
     cartItems,
     addToCart,
@@ -24,13 +27,16 @@ export default function BasketButton() {
   };
 
   return (
-    <div className="dropdown dropdown--basket">
+    <div className={`dropdown dropdown--basket${dismissed ? " dropdown--dismissed" : ""}`} onClickCapture={(event) => { if (event.target.closest("a")) dismiss(); }}>
       <button
         className="basket cart"
         aria-haspopup="true"
         aria-expanded="false"
         aria-label="Корзина"
         type="button"
+        onMouseEnter={reopen}
+        onFocus={reopen}
+        onClick={reopen}
       >
         <svg
           width="22"
@@ -60,7 +66,7 @@ export default function BasketButton() {
         <div className="dropdown__background_basket">
           <div className="basket__mini basket__mini_scroll">
             {items.length === 0 ? (
-              <div className="cart-empty-state"><div className="cart-empty-state__art" aria-hidden="true">🛍️</div><strong>Корзина отдыхает</strong><span>Добавьте пару вещей — они будут ждать вас здесь</span><Link className="cart-empty-state__link" to="/catalog">Перейти в каталог <b aria-hidden="true">→</b></Link></div>
+              <div className="cart-empty-state"><div className="cart-empty-state__art" aria-hidden="true">🛍️</div><strong>Корзина отдыхает</strong><span>Добавьте пару вещей — они будут ждать вас здесь</span><Link className="cart-empty-state__link" to="/catalog">Перейти в каталог <PopupActionIcon name="catalog" /></Link></div>
             ) : (
               items.map(({ product, quantity }) => (
                 <div
@@ -109,7 +115,7 @@ export default function BasketButton() {
           {cartItemCount > 0 && (
             <div className="cart-popup__checkout">
               <div className="cart-popup__total"><span>Итого</span><strong>{totalPrice.toLocaleString("ru-RU")} ₽</strong></div>
-              <Link className="cart-popup__primary" to="/profile/basket">Перейти в корзину <span aria-hidden="true">→</span></Link>
+              <Link className="cart-popup__primary" to="/profile/basket">Перейти в корзину <PopupActionIcon name="basket" /></Link>
             </div>
           )}
         </div>

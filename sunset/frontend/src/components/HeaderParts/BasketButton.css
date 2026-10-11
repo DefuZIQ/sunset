@@ -57,7 +57,6 @@
 .cart-empty-state span { max-width:220px; color:#8b8076; font-size:12px; line-height:1.4; }
 .cart-popup .cart-empty-state__link, .cart-popup .cart-popup__primary { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:42px; box-sizing:border-box; margin-top:9px; padding:10px 13px; border-radius:10px; background:#211f1c; color:#fffdfb; font-size:13px; font-weight:600; text-decoration:none; transition:background .18s, transform .18s; }
 .cart-popup .cart-empty-state__link:hover, .cart-popup .cart-popup__primary:hover { background:#3d3530; transform:translateY(-1px); }
-.cart-empty-state__link b, .cart-popup__primary span { font-size:18px; font-weight:400; line-height:1; }
 @keyframes cartBagFloat { 0%,100% { transform:rotate(-5deg) translateY(0); } 50% { transform:rotate(3deg) translateY(-4px); } }
 .cart-popup__checkout { padding:13px 18px 18px; border-top:1px solid #eee8df; }
 .cart-popup__total { display:flex; justify-content:space-between; gap:10px; color:#6f655d; font-size:12px; }

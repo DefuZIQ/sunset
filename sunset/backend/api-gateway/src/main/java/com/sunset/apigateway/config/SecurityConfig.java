@@ -93,7 +93,8 @@ public class SecurityConfig {
                     auth.pathMatchers(HttpMethod.OPTIONS).permitAll();
                     auth.pathMatchers(HttpMethod.POST, "/subscriptions").permitAll();
                     auth.pathMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll();
-                    auth.pathMatchers(HttpMethod.GET, "/products/reviews/**", "/products/review-photos/**", "/products/categories/tree").permitAll();
+                    auth.pathMatchers(HttpMethod.GET, "/products/reviews/**", "/products/review-photos/**", "/products/categories/tree", "/products/all/availability").permitAll();
+                    auth.pathMatchers(HttpMethod.GET, "/order/stores").permitAll();
                     whitelistConfig.getWhitelistPaths()
                             .forEach(path -> auth.pathMatchers(path).permitAll());
                     auth.anyExchange().authenticated();
@@ -109,7 +110,12 @@ public class SecurityConfig {
         log.info("Настройка CORS...");
 
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        config.setAllowedOrigins(Arrays.asList(
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://192.168.1.186",
+                "https://t3ch.pro",
+                "https://www.t3ch.pro"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowCredentials(true);

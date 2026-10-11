@@ -1,6 +1,7 @@
 package com.sunset.product;
 
 import com.sunset.product.service.ProductService;
+import com.sunset.product.service.AdminProductService;
 import com.sunset.product.service.ReviewService;
 import com.sunset.product.service.ReviewPhotoService;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -42,18 +44,20 @@ class ProductPostgresIntegrationTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.jpa.database", () -> "postgresql");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "update");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.liquibase.enabled", () -> "true");
         registry.add("spring.security.jwt.secret", () -> "test-secret-that-is-at-least-32-bytes");
     }
 
     @Autowired private ProductService products;
+    @Autowired private AdminProductService adminProducts;
     @Autowired private ReviewService reviews;
     @Autowired private ReviewPhotoService photos;
     @Autowired private JdbcTemplate jdbc;
 
     @Test
     void migrationsSeedUsableCatalogAndCategoryTree() {
+        assertThat(jdbc.queryForObject("SELECT character_maximum_length FROM information_schema.columns WHERE table_name='colors' AND column_name='hex_code'", Integer.class)).isEqualTo(7);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM products", Integer.class)).isGreaterThanOrEqualTo(100);
         assertThat(products.getProducts()).hasSizeGreaterThanOrEqualTo(100);
         assertThat(reviews.categoryTree()).isNotEmpty();
@@ -64,6 +68,40 @@ class ProductPostgresIntegrationTest {
         assertThat(product.getGender()).isIn("WOMEN", "MEN", "UNISEX");
         assertThat(product.getCategories()).isNotEmpty();
         assertThat(product.getStock()).isNotEmpty();
+    }
+
+    @Test
+    @Transactional
+    void changingOneStoreStockKeepsWarehouseAndAggregateCorrect() {
+        UUID adminId = UUID.randomUUID();
+        UUID storeId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,first_name,role) VALUES (?,?,'ADMIN')", adminId, "Администратор");
+        jdbc.update("INSERT INTO stores(id,name,city,address,kind,active) VALUES (?,?,?,?, 'STORE',TRUE)", storeId, "Тестовый магазин", "Нижний Новгород", "Тестовая, 1");
+        UUID productId = (UUID) adminProducts.create(adminId, Map.of(
+                "name", "Тестовый товар для остатков", "price", 1000,
+                "quantity", 2, "category", "Женские боди", "gender", "WOMEN")).get("id");
+        Map<String,Object> variant = jdbc.queryForMap("SELECT size_id,color_id FROM product_stock WHERE product_id=? LIMIT 1", productId);
+        UUID sizeId = (UUID) variant.get("size_id");
+        UUID colorId = (UUID) variant.get("color_id");
+
+        adminProducts.updateStock(adminId, productId, Map.of("locationId", storeId.toString(),
+                "stock", List.of(Map.of("sizeId", sizeId.toString(), "colorId", colorId.toString(), "quantity", 3))));
+        assertThat(jdbc.queryForObject("SELECT quantity FROM product_stock WHERE product_id=? AND size_id=? AND color_id=?", Integer.class,
+                productId, sizeId, colorId)).isEqualTo(5);
+        assertThat(adminProducts.stock(adminId, productId, storeId)).hasSize(1);
+        assertThat(products.getStoreAvailability(storeId)).anySatisfy(row -> {
+            assertThat(row.get("productId")).isEqualTo(productId);
+            assertThat(row.get("quantity")).isEqualTo(3);
+        });
+        assertThatThrownBy(() -> products.getStoreAvailability(UUID.fromString("00000000-0000-4000-8000-000000000001")))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM location_stock WHERE location_id='00000000-0000-4000-8000-000000000001' AND product_id=? AND size_id=? AND color_id=?", Integer.class,
+                productId, sizeId, colorId)).isEqualTo(2);
+
+        adminProducts.updateStock(adminId, productId, Map.of("locationId", storeId.toString(), "stock", List.of()));
+        assertThat(jdbc.queryForObject("SELECT quantity FROM product_stock WHERE product_id=? AND size_id=? AND color_id=?", Integer.class,
+                productId, sizeId, colorId)).isEqualTo(2);
+        assertThat(products.getStoreAvailability(storeId)).noneMatch(row -> productId.equals(row.get("productId")));
     }
 
     @Test
@@ -80,6 +118,34 @@ class ProductPostgresIntegrationTest {
         assertThat(product.getReviewCount()).isEqualTo(originalCount + 1);
         List<Map<String, Object>> persisted = reviews.list(productId);
         assertThat(persisted).anyMatch(row -> userId.equals(row.get("userId")) && "Иван Соколов".equals(row.get("authorName")));
+    }
+
+    @Test
+    void reviewerCanDeleteOnlyOwnReviewTogetherWithVotesAndPhoto() throws IOException {
+        UUID productId = jdbc.queryForObject("SELECT id FROM products LIMIT 1", UUID.class);
+        UUID ownerId = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,first_name) VALUES (?,?)", ownerId, "Автор");
+        jdbc.update("INSERT INTO users(id,first_name) VALUES (?,?)", otherId, "Другой");
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(12, 12, BufferedImage.TYPE_INT_RGB), "png", output);
+        String photoUrl = photos.upload(ownerId, productId,
+                new MockMultipartFile("file", "review.png", "image/png", output.toByteArray())).get("photoUrl");
+        UUID photoId = UUID.fromString(photoUrl.substring(photoUrl.lastIndexOf('/') + 1));
+        UUID reviewId = (UUID) reviews.save(ownerId, productId,
+                Map.of("rating", 5, "body", "Отличное качество", "photoUrl", photoUrl)).get("id");
+        reviews.vote(otherId, reviewId, "LIKE");
+
+        assertThatThrownBy(() -> reviews.deleteOwn(otherId, reviewId))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(reviews.list(productId)).anyMatch(row -> reviewId.equals(row.get("id")));
+
+        reviews.deleteOwn(ownerId, reviewId);
+        assertThat(reviews.list(productId)).noneMatch(row -> reviewId.equals(row.get("id")));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM product_review_helpful_votes WHERE review_id=?", Integer.class, reviewId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM product_review_photos WHERE id=?", Integer.class, photoId)).isZero();
+        assertThatThrownBy(() -> reviews.deleteOwn(ownerId, reviewId)).isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
@@ -101,6 +167,29 @@ class ProductPostgresIntegrationTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("собственный");
         assertThatThrownBy(() -> reviews.markHelpful(voterId, UUID.randomUUID()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("не найден");
+    }
+
+    @Test
+    void reviewReactionsCanSwitchAndToggleWithoutLosingPreviousHelpfulVotes() {
+        UUID productId = jdbc.queryForObject("SELECT id FROM products LIMIT 1", UUID.class);
+        UUID authorId = UUID.randomUUID();
+        UUID voterId = UUID.randomUUID();
+        UUID secondVoterId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,first_name) VALUES (?,?)", authorId, "Автор");
+        jdbc.update("INSERT INTO users(id,first_name) VALUES (?,?)", voterId, "Читатель");
+        jdbc.update("INSERT INTO users(id,first_name) VALUES (?,?)", secondVoterId, "Другой читатель");
+        UUID reviewId = UUID.randomUUID();
+        jdbc.update("INSERT INTO product_reviews(id,product_id,user_id,author_name,rating,body) VALUES (?,?,?,?,?,?)",
+                reviewId, productId, authorId, "Автор", 5, "Хорошее качество");
+
+        reviews.markHelpful(secondVoterId, reviewId);
+        assertThat(reviews.vote(voterId, reviewId, "LIKE")).containsEntry("likeCount", 2L).containsEntry("dislikeCount", 0L).containsEntry("myVote", "LIKE");
+        assertThat(reviews.vote(voterId, reviewId, "DISLIKE")).containsEntry("likeCount", 1L).containsEntry("dislikeCount", 1L).containsEntry("myVote", "DISLIKE");
+        assertThat(reviews.list(productId, voterId).stream().filter(row -> reviewId.equals(row.get("id"))).findFirst().orElseThrow())
+                .containsEntry("myVote", "DISLIKE").containsEntry("likeCount", 1L).containsEntry("dislikeCount", 1L);
+        assertThat(reviews.vote(voterId, reviewId, "DISLIKE")).containsEntry("dislikeCount", 0L).containsEntry("myVote", null);
+        assertThatThrownBy(() -> reviews.vote(voterId, reviewId, "OTHER")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reviews.vote(authorId, reviewId, "LIKE")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -194,6 +283,9 @@ class ProductPostgresIntegrationTest {
         assertThatThrownBy(() -> photos.readPublished(photoId)).isInstanceOf(ResponseStatusException.class);
         reviews.setHidden(adminId, (UUID) saved.get("id"), Map.of("isHidden", false));
         assertThat(photos.readPublished(photoId).bytes()).isNotEmpty();
+        Map<String, Object> edited = reviews.save(userId, productId, Map.of("rating", 4, "body", "Обновлённый отзыв"));
+        assertThat(edited.get("photoUrl")).isEqualTo(photoUrl);
+        assertThat(photos.readPublished(photoId).bytes()).isNotEmpty();
 
         String unusedUrl = photos.upload(userId, productId,
                 new MockMultipartFile("file", "unused.png", "image/png", png)).get("photoUrl");
@@ -202,5 +294,7 @@ class ProductPostgresIntegrationTest {
         photos.cleanupOrphans();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM product_review_photos WHERE id=?", Integer.class, unusedId)).isZero();
         assertThat(photos.readPublished(photoId).bytes()).isNotEmpty();
+        assertThat(reviews.save(userId, productId, Map.of("rating", 4, "body", "Удаляю фотографию", "photoUrl", "")).get("photoUrl")).isNull();
+        assertThatThrownBy(() -> photos.readPublished(photoId)).isInstanceOf(ResponseStatusException.class);
     }
 }

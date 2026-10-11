@@ -146,6 +146,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/all/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Доступные варианты в выбранном магазине */
+        get: operations["getStoreAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/admin/variants": {
         parameters: {
             query?: never;
@@ -209,8 +226,9 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
-        /** Полностью заменить остатки вариантов товара */
+        /** Остатки товара в выбранном магазине или складе */
+        get: operations["getAdminLocationStock"];
+        /** Полностью заменить остатки товара в одной точке */
         put: operations["updateAdminStock"];
         post?: never;
         delete?: never;
@@ -266,7 +284,8 @@ export interface paths {
         get: operations["listProductReviews"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Удалить свой отзыв */
+        delete: operations["deleteOwnProductReview"];
         options?: never;
         head?: never;
         patch?: never;
@@ -341,6 +360,25 @@ export interface paths {
         get?: never;
         /** Отметить чужой отзыв полезным (повторный вызов идемпотентен) */
         put: operations["markProductReviewHelpful"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/reviews/{id}/vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Поставить, изменить или убрать лайк/дизлайк отзыва */
+        put: operations["voteProductReview"];
         post?: never;
         delete?: never;
         options?: never;
@@ -573,8 +611,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Доступные магазины для самовывоза */
+        /** Активные магазины и пункты самовывоза */
         get: operations["listPickupStores"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/order/stores/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Все магазины и склады для управления остатками */
+        get: operations["listAdminLocations"];
         put?: never;
         post?: never;
         delete?: never;
@@ -966,6 +1021,15 @@ export interface components {
             colorName?: string;
             quantity?: number;
         };
+        StoreAvailability: {
+            /** Format: uuid */
+            productId: string;
+            /** Format: uuid */
+            sizeId: string;
+            /** Format: uuid */
+            colorId: string;
+            quantity: number;
+        };
         AdminVariants: {
             colors: components["schemas"]["ProductColor"][];
             sizes: components["schemas"]["AdminSize"][];
@@ -999,6 +1063,8 @@ export interface components {
             imageUrl?: string;
         };
         AdminStockRequest: {
+            /** Format: uuid */
+            locationId: string;
             stock: {
                 /** Format: uuid */
                 sizeId: string;
@@ -1032,6 +1098,11 @@ export interface components {
             address: string;
             /** @enum {string} */
             deliveryMethod?: "courier" | "pickup";
+            /**
+             * Format: uuid
+             * @description Выбранный магазин самовывоза; при наличии его остаток резервируется первым
+             */
+            storeId?: string;
             /** @enum {string} */
             paymentMethod?: "CARD" | "SBP" | "ON_RECEIPT";
             /** @description Ключ идемпотентности передаётся в JSON-теле, не в HTTP-заголовке */
@@ -1260,6 +1331,10 @@ export interface components {
             photoUrl?: string | null;
             verifiedPurchase?: boolean;
             helpfulCount?: number;
+            likeCount?: number;
+            dislikeCount?: number;
+            /** @enum {string|null} */
+            myVote?: "LIKE" | "DISLIKE" | null;
             body?: string;
             storeReply?: string | null;
             /** Format: date-time */
@@ -1286,6 +1361,18 @@ export interface components {
             /** Format: uuid */
             reviewId: string;
             helpfulCount: number;
+        };
+        ReviewReactionRequest: {
+            /** @enum {string} */
+            vote: "LIKE" | "DISLIKE";
+        };
+        ReviewReactionVote: {
+            /** Format: uuid */
+            reviewId: string;
+            likeCount: number;
+            dislikeCount: number;
+            /** @enum {string|null} */
+            myVote: "LIKE" | "DISLIKE" | null;
         };
         LoyaltyAccount: {
             balance?: number;
@@ -1327,6 +1414,8 @@ export interface components {
             latitude?: number | null;
             longitude?: number | null;
             active?: boolean;
+            /** @enum {string} */
+            kind?: "STORE" | "WAREHOUSE";
         };
         Notification: {
             /** Format: uuid */
@@ -1693,6 +1782,35 @@ export interface operations {
             };
         };
     };
+    getStoreAvailability: {
+        parameters: {
+            query: {
+                storeId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Варианты с положительным остатком */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreAvailability"][];
+                };
+            };
+            /** @description Активный магазин не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listAdminVariants: {
         parameters: {
             query?: never;
@@ -1793,6 +1911,32 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getAdminLocationStock: {
+        parameters: {
+            query: {
+                locationId: string;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Остатки точки */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductStock"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     updateAdminStock: {
         parameters: {
             query?: never;
@@ -1888,6 +2032,28 @@ export interface operations {
                     "application/json": components["schemas"]["ProductReview"][];
                 };
             };
+        };
+    };
+    deleteOwnProductReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Отзыв удалён */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     saveProductReview: {
@@ -1991,6 +2157,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewHelpfulVote"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    voteProductReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewReactionRequest"];
+            };
+        };
+        responses: {
+            /** @description Актуальные реакции и голос пользователя */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewReactionVote"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -2336,7 +2530,28 @@ export interface operations {
                     "application/json": components["schemas"]["PickupStore"][];
                 };
             };
+        };
+    };
+    listAdminLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Магазины и склады */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickupStore"][];
+                };
+            };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listAdminOrders: {

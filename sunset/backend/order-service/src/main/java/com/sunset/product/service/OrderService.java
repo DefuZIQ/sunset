@@ -71,10 +71,23 @@ public class OrderService {
 
         jdbc.update("INSERT INTO loyalty_accounts(user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", userId);
         Integer balance = jdbc.queryForObject("SELECT balance FROM loyalty_accounts WHERE user_id=? FOR UPDATE", Integer.class, userId);
+        // Serialize retries from the same customer before reserving inventory. A second
+        // request can pass the first lookup while the first transaction is still open.
+        if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
+            List<UUID> existing = jdbc.query("SELECT id FROM orders WHERE user_id=? AND idempotency_key=?",
+                    (rs, n) -> rs.getObject(1, UUID.class), userId, request.idempotencyKey().trim());
+            if (!existing.isEmpty()) return getOrder(existing.get(0));
+        }
         int requestedBonuses = Math.max(0, Objects.requireNonNullElse(request.bonusesToUse(), 0));
         int bonusCap = afterDiscount.multiply(new BigDecimal("0.30")).setScale(0, RoundingMode.DOWN).intValue();
         int used = Math.min(Math.min(requestedBonuses, balance == null ? 0 : balance), bonusCap);
         String deliveryMethod = normalizeDeliveryMethod(request.deliveryMethod(), request.address());
+        UUID pickupStoreId = null;
+        if ("pickup".equals(deliveryMethod) && request.storeId() != null) {
+            Integer storeExists = jdbc.queryForObject("SELECT COUNT(*) FROM stores WHERE id=? AND kind='STORE' AND active=TRUE", Integer.class, request.storeId());
+            if (storeExists == null || storeExists == 0) throw new IllegalArgumentException("Выберите действующий магазин самовывоза");
+            pickupStoreId = request.storeId();
+        }
         BigDecimal deliveryCost = "pickup".equals(deliveryMethod) || afterDiscount.compareTo(BigDecimal.valueOf(7000)) >= 0
                 ? BigDecimal.ZERO : BigDecimal.valueOf(390);
         BigDecimal total = afterDiscount.subtract(BigDecimal.valueOf(used)).max(BigDecimal.ZERO).add(deliveryCost);
@@ -98,13 +111,9 @@ public class OrderService {
             UUID sizeId = (UUID) line.get("sizeId");
             int quantity = ((Number) line.get("quantity")).intValue();
             if (colorId == null || sizeId == null) throw new IllegalArgumentException("Выберите цвет и размер товара");
-            int reserved = jdbc.update("UPDATE product_stock SET quantity=quantity-?,updated_at=NOW() WHERE product_id=? AND size_id=? AND color_id=? AND quantity>=?",
-                    quantity, productId, sizeId, colorId, quantity);
-            if (reserved == 0) throw new IllegalArgumentException("Выбранного товара недостаточно в наличии");
+            reserveStock(orderId, productId, sizeId, colorId, quantity, pickupStoreId);
             jdbc.update("INSERT INTO order_items(id,order_id,product_id,color_id,size_id,quantity,price) VALUES (gen_random_uuid(),?,?,?,?,?,?)",
                     orderId, productId, colorId, sizeId, quantity, line.get("price"));
-            jdbc.update("INSERT INTO stock_reservations(order_id,product_id,size_id,color_id,quantity) VALUES (?,?,?,?,?)",
-                    orderId, productId, sizeId, colorId, quantity);
         }
         if (request.address() == null || request.address().isBlank()) throw new IllegalArgumentException("Укажите способ получения");
         jdbc.update("INSERT INTO deliveries(id,order_id,address,delivery_method,delivery_status,cost,estimated_at) VALUES (gen_random_uuid(),?,?,?,'preparing',?,NOW()+INTERVAL '3 days')",
@@ -358,12 +367,44 @@ public class OrderService {
     }
 
     private void releaseStock(UUID orderId) {
-        List<Map<String, Object>> reservations = jdbc.queryForList("SELECT product_id,size_id,color_id,quantity FROM stock_reservations WHERE order_id=? AND status='RESERVED' FOR UPDATE", orderId);
+        List<Map<String, Object>> reservations = jdbc.queryForList("SELECT product_id,size_id,color_id,quantity,location_id FROM stock_reservations WHERE order_id=? AND status='RESERVED' FOR UPDATE", orderId);
         for (Map<String, Object> reservation : reservations) {
-            jdbc.update("UPDATE product_stock SET quantity=quantity+?,updated_at=NOW() WHERE product_id=? AND size_id=? AND color_id=?",
-                    reservation.get("quantity"), reservation.get("product_id"), reservation.get("size_id"), reservation.get("color_id"));
+            jdbc.update("INSERT INTO product_colors(product_id,color_id) VALUES (?,?) ON CONFLICT DO NOTHING",
+                    reservation.get("product_id"), reservation.get("color_id"));
+            jdbc.update("INSERT INTO product_stock(product_id,size_id,color_id,quantity) VALUES (?,?,?,?) ON CONFLICT (product_id,size_id,color_id) DO UPDATE SET quantity=product_stock.quantity+EXCLUDED.quantity,updated_at=NOW()",
+                    reservation.get("product_id"), reservation.get("size_id"), reservation.get("color_id"), reservation.get("quantity"));
+            if (reservation.get("location_id") != null) {
+                jdbc.update("INSERT INTO location_stock(location_id,product_id,size_id,color_id,quantity) VALUES (?,?,?,?,?) ON CONFLICT (location_id,product_id,size_id,color_id) DO UPDATE SET quantity=location_stock.quantity+EXCLUDED.quantity,updated_at=NOW()",
+                        reservation.get("location_id"), reservation.get("product_id"), reservation.get("size_id"), reservation.get("color_id"), reservation.get("quantity"));
+            }
         }
         jdbc.update("UPDATE stock_reservations SET status='RELEASED',updated_at=NOW() WHERE order_id=? AND status='RESERVED'", orderId);
+    }
+
+    private void reserveStock(UUID orderId, UUID productId, UUID sizeId, UUID colorId, int quantity, UUID pickupStoreId) {
+        int reserved = jdbc.update("UPDATE product_stock SET quantity=quantity-?,updated_at=NOW() WHERE product_id=? AND size_id=? AND color_id=? AND quantity>=?",
+                quantity, productId, sizeId, colorId, quantity);
+        if (reserved == 0) throw new IllegalArgumentException("Выбранного товара недостаточно в наличии");
+        List<Map<String, Object>> locations = jdbc.queryForList("""
+                SELECT ls.location_id,ls.quantity FROM location_stock ls
+                JOIN stores s ON s.id=ls.location_id
+                WHERE ls.product_id=? AND ls.size_id=? AND ls.color_id=? AND ls.quantity>0
+                ORDER BY CASE WHEN ls.location_id=? THEN 0 WHEN s.kind='WAREHOUSE' THEN 1 ELSE 2 END,s.name
+                FOR UPDATE OF ls
+                """, productId, sizeId, colorId, pickupStoreId);
+        int remaining = quantity;
+        for (Map<String, Object> location : locations) {
+            int taken = Math.min(remaining, ((Number) location.get("quantity")).intValue());
+            if (taken == 0) continue;
+            UUID locationId = (UUID) location.get("location_id");
+            jdbc.update("UPDATE location_stock SET quantity=quantity-?,updated_at=NOW() WHERE location_id=? AND product_id=? AND size_id=? AND color_id=?",
+                    taken, locationId, productId, sizeId, colorId);
+            jdbc.update("INSERT INTO stock_reservations(order_id,product_id,size_id,color_id,quantity,location_id) VALUES (?,?,?,?,?,?)",
+                    orderId, productId, sizeId, colorId, taken, locationId);
+            remaining -= taken;
+            if (remaining == 0) break;
+        }
+        if (remaining > 0) throw new IllegalArgumentException("Выбранного товара недостаточно в наличии");
     }
 
     private void refundPayment(UUID orderId) {

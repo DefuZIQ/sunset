@@ -97,6 +97,9 @@ public class JwtFilter implements GlobalFilter, Ordered {
         if (HttpMethod.POST.equals(request.getMethod()) && "/subscriptions".equals(path)) {
             return true;
         }
+        if (HttpMethod.GET.equals(request.getMethod()) && "/order/stores".equals(path)) {
+            return true;
+        }
         if (whitelistConfig.getWhitelistPaths() == null) {
             return false;
         }

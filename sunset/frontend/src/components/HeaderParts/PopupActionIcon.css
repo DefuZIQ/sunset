@@ -1,0 +1,10 @@
+.popup-action-icon { display:grid; flex:0 0 28px; place-items:center; width:28px; height:28px; margin-left:8px; border-radius:9px; background:#f5eee7; color:#a46c45; transition:background .18s, color .18s; }
+.popup-action-icon svg { display:block; width:17px; height:17px; }
+.profile-popup__signed-primary .popup-action-icon,
+.profile-popup__guest-primary .popup-action-icon,
+.cart-popup .cart-empty-state__link .popup-action-icon,
+.cart-popup .cart-popup__primary .popup-action-icon { background:rgba(255,253,251,.13); color:#f6e5d3; }
+.profile-popup__signed-links a:hover .popup-action-icon { background:#eadbcd; color:#754a31; }
+.profile-popup__signed-foot .logout .popup-action-icon { background:#f9f0ec; color:#8d6356; }
+.profile-popup__signed-foot .logout:hover .popup-action-icon { background:#f2e1da; color:#b45946; }
+.profile-popup__guest-secondary:hover .popup-action-icon { background:#eadbcd; color:#754a31; }

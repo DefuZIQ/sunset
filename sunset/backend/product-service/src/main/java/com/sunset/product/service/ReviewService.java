@@ -1,8 +1,10 @@
 package com.sunset.product.service;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
@@ -10,12 +12,17 @@ import java.util.*;
 public class ReviewService {
     private final JdbcTemplate jdbc;
     private final ReviewPhotoService photos;
-    private static final String REVIEW_FIELDS = "r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",r.store_reply AS \"storeReply\",r.store_replied_at AS \"storeRepliedAt\",r.is_hidden AS \"isHidden\",r.moderated_at AS \"moderatedAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id) AS \"helpfulCount\"";
+    private static final String REVIEW_FIELDS = "r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",r.store_reply AS \"storeReply\",r.store_replied_at AS \"storeRepliedAt\",r.is_hidden AS \"isHidden\",r.moderated_at AS \"moderatedAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.vote='LIKE') AS \"helpfulCount\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.vote='LIKE') AS \"likeCount\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.vote='DISLIKE') AS \"dislikeCount\"";
 
     public ReviewService(JdbcTemplate jdbc, ReviewPhotoService photos) { this.jdbc = jdbc; this.photos = photos; }
 
     public List<Map<String, Object>> list(UUID productId) {
-        return jdbc.queryForList("SELECT " + REVIEW_FIELDS + " FROM product_reviews r WHERE r.product_id=? AND NOT r.is_hidden ORDER BY r.verified_purchase DESC,r.created_at DESC", productId);
+        return list(productId, null);
+    }
+
+    public List<Map<String, Object>> list(UUID productId, UUID viewerId) {
+        String sql = "SELECT " + REVIEW_FIELDS + ", (SELECT v.vote FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.user_id=?) AS \"myVote\" FROM product_reviews r WHERE r.product_id=? AND NOT r.is_hidden ORDER BY r.verified_purchase DESC,r.created_at DESC";
+        return jdbc.queryForList(sql, viewerId, productId);
     }
 
     @Transactional
@@ -28,12 +35,15 @@ public class ReviewService {
         try { qualityRating = Integer.parseInt(Objects.toString(request.get("qualityRating"), String.valueOf(rating))); }
         catch (NumberFormatException e) { qualityRating = rating; }
         String fit = Objects.toString(request.get("fit"), "AS_EXPECTED").toUpperCase(Locale.ROOT);
-        String photoUrl = Objects.toString(request.get("photoUrl"), "").trim();
+        boolean replacePhoto = request.containsKey("photoUrl");
+        String photoUrl = replacePhoto ? Objects.toString(request.get("photoUrl"), "").trim()
+                : jdbc.query("SELECT photo_url FROM product_reviews WHERE product_id=? AND user_id=?",
+                    (rs, row) -> Objects.toString(rs.getString(1), ""), productId, userId).stream().findFirst().orElse("");
         if (rating < 1 || rating > 5) throw new IllegalArgumentException("Укажите оценку от 1 до 5");
         if (qualityRating < 1 || qualityRating > 5) throw new IllegalArgumentException("Оценка качества должна быть от 1 до 5");
         if (!Set.of("SMALL", "AS_EXPECTED", "LARGE").contains(fit)) throw new IllegalArgumentException("Некорректная оценка посадки");
         if (photoUrl.length() > 1000) throw new IllegalArgumentException("Ссылка на фото слишком длинная");
-        if (!photoUrl.isBlank()) {
+        if (replacePhoto && !photoUrl.isBlank()) {
             try {
                 UUID photoId = UUID.fromString(photoUrl.replaceFirst("^/api/v1/products/review-photos/", ""));
                 if (!photoUrl.equals(ReviewPhotoService.path(photoId)) || !photos.ownedBy(userId, productId, photoId)) {
@@ -52,6 +62,14 @@ public class ReviewService {
         jdbc.update("INSERT INTO product_reviews(product_id,user_id,author_name,rating,quality_rating,fit,photo_url,verified_purchase,body) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT (product_id,user_id) DO UPDATE SET author_name=EXCLUDED.author_name,rating=EXCLUDED.rating,quality_rating=EXCLUDED.quality_rating,fit=EXCLUDED.fit,photo_url=EXCLUDED.photo_url,verified_purchase=EXCLUDED.verified_purchase,body=EXCLUDED.body,updated_at=NOW()", productId,userId,author,rating,qualityRating,fit,photoUrl.isBlank()?null:photoUrl,verified,body);
         photos.removeUnused(userId, productId, photoUrl);
         return jdbc.queryForMap("SELECT " + REVIEW_FIELDS + " FROM product_reviews r WHERE r.product_id=? AND r.user_id=?", productId,userId);
+    }
+
+    @Transactional
+    public void deleteOwn(UUID userId, UUID reviewId) {
+        List<UUID> productIds = jdbc.query("DELETE FROM product_reviews WHERE id=? AND user_id=? RETURNING product_id",
+                (rs, row) -> rs.getObject(1, UUID.class), reviewId, userId);
+        if (productIds.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Отзыв не найден");
+        photos.removeUnused(userId, productIds.get(0), "");
     }
 
     public List<Map<String, Object>> adminList(UUID adminId) {
@@ -85,8 +103,30 @@ public class ReviewService {
         if (authors.isEmpty()) throw new IllegalArgumentException("Отзыв не найден");
         if (authors.get(0).equals(userId)) throw new IllegalArgumentException("Нельзя оценить собственный отзыв");
         jdbc.update("INSERT INTO product_review_helpful_votes(review_id,user_id) VALUES (?,?) ON CONFLICT DO NOTHING", reviewId, userId);
-        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM product_review_helpful_votes WHERE review_id=?", Long.class, reviewId);
+        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM product_review_helpful_votes WHERE review_id=? AND vote='LIKE'", Long.class, reviewId);
         return Map.of("reviewId", reviewId, "helpfulCount", count == null ? 0L : count);
+    }
+
+    @Transactional
+    public Map<String, Object> vote(UUID userId, UUID reviewId, String vote) {
+        if (!Set.of("LIKE", "DISLIKE").contains(vote)) throw new IllegalArgumentException("Выберите лайк или дизлайк");
+        List<UUID> authors = jdbc.query("SELECT user_id FROM product_reviews WHERE id=? AND NOT is_hidden", (rs, row) -> rs.getObject(1, UUID.class), reviewId);
+        if (authors.isEmpty()) throw new IllegalArgumentException("Отзыв не найден");
+        if (authors.get(0).equals(userId)) throw new IllegalArgumentException("Нельзя оценить собственный отзыв");
+        List<String> existing = jdbc.query("SELECT vote FROM product_review_helpful_votes WHERE review_id=? AND user_id=? FOR UPDATE", (rs, row) -> rs.getString(1), reviewId, userId);
+        String myVote;
+        if (!existing.isEmpty() && vote.equals(existing.get(0))) {
+            jdbc.update("DELETE FROM product_review_helpful_votes WHERE review_id=? AND user_id=?", reviewId, userId);
+            myVote = null;
+        } else {
+            jdbc.update("INSERT INTO product_review_helpful_votes(review_id,user_id,vote) VALUES (?,?,?) ON CONFLICT (review_id,user_id) DO UPDATE SET vote=EXCLUDED.vote", reviewId, userId, vote);
+            myVote = vote;
+        }
+        Map<String, Object> counts = jdbc.queryForMap("SELECT COUNT(*) FILTER (WHERE vote='LIKE') AS \"likeCount\", COUNT(*) FILTER (WHERE vote='DISLIKE') AS \"dislikeCount\" FROM product_review_helpful_votes WHERE review_id=?", reviewId);
+        Map<String, Object> result = new LinkedHashMap<>(counts);
+        result.put("reviewId", reviewId);
+        result.put("myVote", myVote);
+        return result;
     }
 
     private void ensureAdmin(UUID userId) {

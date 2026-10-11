@@ -3,7 +3,7 @@ import { categoryMatches } from "../components/AdminCategoryTree";
 import AdminProductsPanel, { AdminEditProductDialog } from "./admin/AdminProductsPanel";
 import AdminStockPanel from "./admin/AdminStockPanel";
 import AdminReviewsPanel from "./admin/AdminReviewsPanel";
-import { adjustAdminBonuses, createAdminProduct, createAdminPromotion, deleteAdminProduct, getAdminAnalytics, getCategoryTree, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock } from "../api/client";
+import { adjustAdminBonuses, createAdminProduct, createAdminPromotion, deleteAdminProduct, getAdminAnalytics, getAdminLocationStock, getCategoryTree, listAdminLocations, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock } from "../api/client";
 import "./Admin.css";
 
 const adminToken = () => localStorage.getItem("authToken") || "";
@@ -15,14 +15,15 @@ const nextOrderStatuses={PENDING:["CONFIRMED","CANCELLED"],CONFIRMED:["ASSEMBLIN
 export default function Admin() {
   const [tab,setTab]=useState("overview"); const [orders,setOrders]=useState([]); const [users,setUsers]=useState([]); const [promos,setPromos]=useState([]); const [products,setProducts]=useState([]); const [categoryTree,setCategoryTree]=useState([]); const [returns,setReturns]=useState([]); const [analytics,setAnalytics]=useState(null); const [message,setMessage]=useState("");
   const [product,setProduct]=useState(blankProduct); const [editing,setEditing]=useState(null); const [productGender,setProductGender]=useState("ALL"); const [productCategoryFilter,setProductCategoryFilter]=useState(""); const [stockCategory,setStockCategory]=useState(""); const [stockProductId,setStockProductId]=useState(""); const [stockDraft,setStockDraft]=useState([]); const [stockOptions,setStockOptions]=useState({colors:[],sizes:[]}); const [newVariant,setNewVariant]=useState({colorId:"",sizeId:"",quantity:0}); const [bonusDraft,setBonusDraft]=useState({});
+  const [locations,setLocations]=useState([]); const [stockLocationId,setStockLocationId]=useState(""); const [stockLoading,setStockLoading]=useState(false); const [stockError,setStockError]=useState(""); const [stockReloadKey,setStockReloadKey]=useState(0);
   const [promo,setPromo]=useState({code:"",title:"",description:"",discountPercent:10,bonusMultiplier:1,minOrder:0,birthdayOnly:false,active:true});
 
   const load=useCallback(async()=>{
     const token=localStorage.getItem("authToken");
     if(!token){setMessage("Войдите в аккаунт администратора");return;}
-    const [ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult]=await Promise.allSettled([
+    const [ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult,locationsResult]=await Promise.allSettled([
       listAdminOrders(token),listAdminUsers(token),listAdminPromotions(token),listProducts(),
-      listAdminVariants(token),getCategoryTree(),listAdminReturns(token),getAdminAnalytics(token),
+      listAdminVariants(token),getCategoryTree(),listAdminReturns(token),getAdminAnalytics(token),listAdminLocations(token),
     ]);
     if(ordersResult.status==="fulfilled")setOrders(ordersResult.value);
     if(usersResult.status==="fulfilled")setUsers(usersResult.value);
@@ -41,7 +42,11 @@ export default function Admin() {
     if(treeResult.status==="fulfilled")setCategoryTree(treeResult.value);
     if(returnsResult.status==="fulfilled")setReturns(returnsResult.value);
     if(analyticsResult.status==="fulfilled")setAnalytics(analyticsResult.value);
-    const failed=[ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult]
+    if(locationsResult.status==="fulfilled"){
+      setLocations(locationsResult.value);
+      setStockLocationId((current)=>locationsResult.value.some((item)=>item.id===current)?current:locationsResult.value.find((item)=>item.kind==="WAREHOUSE")?.id||locationsResult.value[0]?.id||"");
+    }
+    const failed=[ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult,locationsResult]
       .find((result)=>result.status==="rejected");
     if(failed)setMessage(failed.reason?.message||"Часть данных магазина не загрузилась");
   },[]);
@@ -50,7 +55,16 @@ export default function Admin() {
   const selectedStock=useMemo(()=>stockCategoryProducts.find((item)=>String(item.id)===String(stockProductId)),[stockCategoryProducts,stockProductId]);
   const expectedSizeType=useMemo(()=>{const category=leafCategory(selectedStock).toLowerCase();if(category.match(/аксессуар|сумк|ремн|головн|кепк|очк|час/))return "accessory";if(category.includes("плать"))return "women_dress";if(category.includes("джинс"))return "jeans";if(category.includes("брюк"))return selectedStock?.gender==="MEN"?"men_trousers":"women_trousers";return selectedStock?.gender==="MEN"?"men_clothing":"women_clothing";},[selectedStock]);
   const allowedStockSizes=useMemo(()=>stockOptions.sizes.filter((size)=>size.type===expectedSizeType),[stockOptions.sizes,expectedSizeType]);
-  useEffect(()=>setStockDraft((selectedStock?.stock||[]).map((item)=>({...item}))),[selectedStock]);
+  useEffect(()=>{
+    if(!stockProductId||!stockLocationId){setStockDraft([]);return;}
+    let current=true;
+    setStockLoading(true);setStockError("");setStockDraft([]);
+    getAdminLocationStock(adminToken(),stockProductId,stockLocationId)
+      .then((rows)=>{if(current)setStockDraft(rows.map((item)=>({...item})));})
+      .catch((error)=>{if(current)setStockError(error.message||"Не удалось загрузить остатки точки");})
+      .finally(()=>{if(current)setStockLoading(false);});
+    return()=>{current=false;};
+  },[stockProductId,stockLocationId,stockReloadKey]);
   useEffect(()=>{if(stockCategoryProducts.length&&!stockCategoryProducts.some((item)=>String(item.id)===String(stockProductId)))setStockProductId(stockCategoryProducts[0].id);},[stockCategoryProducts,stockProductId]);
   useEffect(()=>{if(allowedStockSizes.length&&!allowedStockSizes.some((size)=>String(size.id)===String(newVariant.sizeId)))setNewVariant((current)=>({...current,sizeId:allowedStockSizes[0].id}));},[allowedStockSizes,newVariant.sizeId]);
   const notify=(value)=>{setMessage(value);window.setTimeout(()=>setMessage(""),3500);};
@@ -70,10 +84,11 @@ export default function Admin() {
     await deleteAdminProduct(adminToken(),item.id);notify("Товар удалён");load();
   }catch(error){notify(error.message||"Не удалось удалить товар");}};
   const saveStock=async()=>{try{
-    await updateAdminStock(adminToken(),stockProductId,{stock:stockDraft.map((item)=>({
+    if(!stockLocationId||stockLoading||stockError)throw new Error("Выберите точку и дождитесь загрузки остатков");
+    await updateAdminStock(adminToken(),stockProductId,{locationId:stockLocationId,stock:stockDraft.map((item)=>({
       sizeId:item.sizeId,colorId:item.colorId,quantity:Number(item.quantity),
     }))});
-    notify("Остатки сохранены");load();
+    notify("Остатки точки сохранены");setStockReloadKey((value)=>value+1);load();
   }catch(error){notify(error.message);}};
   const addStockVariant=()=>{const color=stockOptions.colors.find((item)=>String(item.id)===String(newVariant.colorId));const size=stockOptions.sizes.find((item)=>String(item.id)===String(newVariant.sizeId));if(!color||!size){notify("Выберите цвет и размер");return;}if(stockDraft.some((item)=>String(item.colorId)===String(color.id)&&String(item.sizeId)===String(size.id))){notify("Такая комбинация уже есть");return;}setStockDraft([...stockDraft,{colorId:color.id,colorName:color.name,sizeId:size.id,sizeName:size.name,sizeType:size.type,sizeGender:size.gender,sizeDescription:size.description,quantity:Number(newVariant.quantity)||0}]);};
   const removeStockVariant=(index)=>setStockDraft(stockDraft.filter((_,itemIndex)=>itemIndex!==index));
@@ -111,6 +126,7 @@ export default function Admin() {
       products={products} categoryTree={categoryTree} stockCategory={stockCategory} setStockCategory={setStockCategory}
       stockCategoryProducts={stockCategoryProducts} stockProductId={stockProductId} setStockProductId={setStockProductId}
       selectedStock={selectedStock} stockDraft={stockDraft} setStockDraft={setStockDraft}
+      locations={locations} stockLocationId={stockLocationId} setStockLocationId={setStockLocationId} stockLoading={stockLoading} stockError={stockError}
       stockOptions={stockOptions} newVariant={newVariant} setNewVariant={setNewVariant}
       expectedSizeType={expectedSizeType} allowedStockSizes={allowedStockSizes}
       onAddVariant={addStockVariant} onRemoveVariant={removeStockVariant} onSave={saveStock}

@@ -17,6 +17,8 @@ import Profile from "./pages/Profile";
 import Promotions from "./pages/Promotions";
 import Admin from "./pages/Admin";
 import AssistantWidget from "./components/AssistantWidget";
+import MobileTabBar from "./components/MobileTabBar";
+import BackToTop from "./components/BackToTop";
 import OrderDetail from "./pages/OrderDetail";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ApiHttpError, getProfile } from "./api/client";
@@ -123,6 +125,8 @@ function App() {
 
           <Footer />
           <AssistantWidget />
+          <BackToTop />
+          <MobileTabBar isAuthenticated={!!user} />
         </div>
       </Router>
     </CartProvider>

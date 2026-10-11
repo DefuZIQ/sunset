@@ -83,6 +83,13 @@
         "responses": { "200": { "description": "Список товаров", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } } } } } }
       }
     },
+    "/products/all/availability": {
+      "get": {
+        "tags": ["Products"], "operationId": "getStoreAvailability", "summary": "Доступные варианты в выбранном магазине",
+        "parameters": [{ "name": "storeId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Варианты с положительным остатком", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/StoreAvailability" } } } } }, "404": { "description": "Активный магазин не найден" } }
+      }
+    },
     "/products/admin/variants": {
       "get": {
         "tags": ["Administration"], "operationId": "listAdminVariants", "summary": "Справочник цветов и размеров для управления остатками", "security": [{ "bearerAuth": [] }],
@@ -110,8 +117,13 @@
     },
     "/products/admin/{id}/stock": {
       "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Administration"], "operationId": "getAdminLocationStock", "summary": "Остатки товара в выбранном магазине или складе", "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "locationId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Остатки точки", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ProductStock" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      },
       "put": {
-        "tags": ["Administration"], "operationId": "updateAdminStock", "summary": "Полностью заменить остатки вариантов товара", "security": [{ "bearerAuth": [] }],
+        "tags": ["Administration"], "operationId": "updateAdminStock", "summary": "Полностью заменить остатки товара в одной точке", "security": [{ "bearerAuth": [] }],
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminStockRequest" } } } },
         "responses": { "200": { "description": "Остатки сохранены", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminStockResult" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
       }
@@ -138,6 +150,10 @@
       "get": {
         "tags": ["Reviews"], "operationId": "listProductReviews", "summary": "Отзывы о товаре",
         "responses": { "200": { "description": "Отзывы", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ProductReview" } } } } } }
+      },
+      "delete": {
+        "tags": ["Reviews"], "operationId": "deleteOwnProductReview", "summary": "Удалить свой отзыв", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Отзыв удалён" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
     "/products/review/{id}": {
@@ -168,6 +184,14 @@
       "put": {
         "tags": ["Reviews"], "operationId": "markProductReviewHelpful", "summary": "Отметить чужой отзыв полезным (повторный вызов идемпотентен)", "security": [{ "bearerAuth": [] }],
         "responses": { "200": { "description": "Актуальный счётчик", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewHelpfulVote" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/products/reviews/{id}/vote": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Reviews"], "operationId": "voteProductReview", "summary": "Поставить, изменить или убрать лайк/дизлайк отзыва", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewReactionRequest" } } } },
+        "responses": { "200": { "description": "Актуальные реакции и голос пользователя", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewReactionVote" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
     "/products/admin/reviews": {
@@ -265,8 +289,14 @@
     },
     "/order/stores": {
       "get": {
-        "tags": ["Orders"], "operationId": "listPickupStores", "summary": "Доступные магазины для самовывоза", "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "Активные магазины", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PickupStore" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+        "tags": ["Orders"], "operationId": "listPickupStores", "summary": "Активные магазины и пункты самовывоза", "security": [],
+        "responses": { "200": { "description": "Активные магазины", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PickupStore" } } } } } }
+      }
+    },
+    "/order/stores/admin": {
+      "get": {
+        "tags": ["Administration"], "operationId": "listAdminLocations", "summary": "Все магазины и склады для управления остатками", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Магазины и склады", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PickupStore" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
       }
     },
     "/order/admin/orders": {
@@ -457,11 +487,12 @@
           "colorId": { "type": "string", "format": "uuid" }, "colorName": { "type": "string" }, "quantity": { "type": "integer" }
         }
       },
+      "StoreAvailability": { "type": "object", "required": ["productId", "sizeId", "colorId", "quantity"], "properties": { "productId": { "type": "string", "format": "uuid" }, "sizeId": { "type": "string", "format": "uuid" }, "colorId": { "type": "string", "format": "uuid" }, "quantity": { "type": "integer", "minimum": 1 } } },
       "AdminVariants": { "type": "object", "required": ["colors", "sizes"], "properties": { "colors": { "type": "array", "items": { "$ref": "#/components/schemas/ProductColor" } }, "sizes": { "type": "array", "items": { "$ref": "#/components/schemas/AdminSize" } } } },
       "AdminSize": { "type": "object", "required": ["id", "name", "type"], "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "type": { "type": "string" }, "gender": { "type": "string", "nullable": true }, "region": { "type": "string", "nullable": true }, "description": { "type": "string", "nullable": true } } },
       "AdminProductRequest": { "type": "object", "required": ["name", "price"], "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "price": { "type": "number", "exclusiveMinimum": 0 }, "quantity": { "type": "integer", "minimum": 0, "description": "Используется только при создании" }, "category": { "type": "string" }, "gender": { "type": "string", "enum": ["WOMEN", "MEN", "UNISEX"] }, "imageUrl": { "type": "string" } } },
       "AdminProductResult": { "type": "object", "required": ["id", "name", "price"], "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "price": { "type": "number" }, "quantity": { "type": "integer" }, "imageUrl": { "type": "string" } } },
-      "AdminStockRequest": { "type": "object", "required": ["stock"], "properties": { "stock": { "type": "array", "items": { "type": "object", "required": ["sizeId", "colorId", "quantity"], "properties": { "sizeId": { "type": "string", "format": "uuid" }, "colorId": { "type": "string", "format": "uuid" }, "quantity": { "type": "integer", "minimum": 0 } } } } } },
+      "AdminStockRequest": { "type": "object", "required": ["locationId", "stock"], "properties": { "locationId": { "type": "string", "format": "uuid" }, "stock": { "type": "array", "items": { "type": "object", "required": ["sizeId", "colorId", "quantity"], "properties": { "sizeId": { "type": "string", "format": "uuid" }, "colorId": { "type": "string", "format": "uuid" }, "quantity": { "type": "integer", "minimum": 0 } } } } } },
       "AdminStockResult": { "type": "object", "required": ["id", "totalQuantity", "totalVariants"], "properties": { "id": { "type": "string", "format": "uuid" }, "totalQuantity": { "type": "integer" }, "totalVariants": { "type": "integer" } } },
       "OrderItemRequest": {
         "type": "object", "required": ["productId", "colorId", "sizeId", "quantity"],
@@ -476,6 +507,7 @@
           "customerName": { "type": "string" }, "customerEmail": { "type": "string", "format": "email" }, "customerPhone": { "type": "string", "description": "Если не передан, сервер берёт телефон из профиля; в итоге телефон обязателен" },
           "address": { "type": "string", "description": "Адрес доставки или название/адрес магазина самовывоза" },
           "deliveryMethod": { "type": "string", "enum": ["courier", "pickup"] },
+          "storeId": { "type": "string", "format": "uuid", "description": "Выбранный магазин самовывоза; при наличии его остаток резервируется первым" },
           "paymentMethod": { "type": "string", "enum": ["CARD", "SBP", "ON_RECEIPT"] },
           "idempotencyKey": { "type": "string", "description": "Ключ идемпотентности передаётся в JSON-теле, не в HTTP-заголовке" },
           "promoCode": { "type": "string", "nullable": true }, "bonusesToUse": { "type": "integer", "minimum": 0 },
@@ -542,16 +574,18 @@
       "ValidatePromoRequest": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "subtotal": { "type": "number" } } },
       "SaveReviewRequest": { "type": "object", "required": ["rating", "body"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5 }, "qualityRating": { "type": "integer", "minimum": 1, "maximum": 5 }, "fit": { "type": "string", "enum": ["SMALL", "AS_EXPECTED", "LARGE"] }, "photoUrl": { "type": "string", "maxLength": 1000, "description": "Адрес, полученный от uploadProductReviewPhoto; внешние ссылки для новых отзывов не принимаются" }, "body": { "type": "string", "minLength": 3, "maxLength": 1500 } } },
       "ReviewPhotoUpload": { "type": "object", "required": ["photoUrl"], "properties": { "photoUrl": { "type": "string" } } },
-      "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "helpfulCount": { "type": "integer", "minimum": 0 }, "body": { "type": "string" }, "storeReply": { "type": "string", "nullable": true }, "storeRepliedAt": { "type": "string", "format": "date-time", "nullable": true }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "helpfulCount": { "type": "integer", "minimum": 0 }, "likeCount": { "type": "integer", "minimum": 0 }, "dislikeCount": { "type": "integer", "minimum": 0 }, "myVote": { "type": "string", "enum": ["LIKE", "DISLIKE"], "nullable": true }, "body": { "type": "string" }, "storeReply": { "type": "string", "nullable": true }, "storeRepliedAt": { "type": "string", "format": "date-time", "nullable": true }, "createdAt": { "type": "string", "format": "date-time" } } },
       "AdminReview": { "allOf": [{ "$ref": "#/components/schemas/ProductReview" }, { "type": "object", "required": ["productId", "productName", "isHidden"], "properties": { "productId": { "type": "string", "format": "uuid" }, "productName": { "type": "string" }, "isHidden": { "type": "boolean" }, "moderatedAt": { "type": "string", "format": "date-time", "nullable": true } } }] },
       "StoreReplyRequest": { "type": "object", "required": ["reply"], "properties": { "reply": { "type": "string", "maxLength": 1500, "description": "Пустая строка удаляет ответ" } } },
       "ModerateReviewRequest": { "type": "object", "required": ["isHidden"], "properties": { "isHidden": { "type": "boolean" } } },
       "ReviewHelpfulVote": { "type": "object", "required": ["reviewId", "helpfulCount"], "properties": { "reviewId": { "type": "string", "format": "uuid" }, "helpfulCount": { "type": "integer", "minimum": 0 } } },
+      "ReviewReactionRequest": { "type": "object", "required": ["vote"], "properties": { "vote": { "type": "string", "enum": ["LIKE", "DISLIKE"] } } },
+      "ReviewReactionVote": { "type": "object", "required": ["reviewId", "likeCount", "dislikeCount", "myVote"], "properties": { "reviewId": { "type": "string", "format": "uuid" }, "likeCount": { "type": "integer", "minimum": 0 }, "dislikeCount": { "type": "integer", "minimum": 0 }, "myVote": { "type": "string", "enum": ["LIKE", "DISLIKE"], "nullable": true } } },
       "LoyaltyAccount": { "type": "object", "properties": { "balance": { "type": "integer" }, "lifetimeEarned": { "type": "integer" }, "tier": { "type": "string" }, "updatedAt": { "type": "string", "format": "date-time" }, "birthdayToday": { "type": "boolean" }, "birthdayBenefit": { "type": "string" }, "transactions": { "type": "array", "items": { "$ref": "#/components/schemas/LoyaltyTransaction" } } } },
       "LoyaltyTransaction": { "type": "object", "properties": { "amount": { "type": "integer" }, "type": { "type": "string" }, "description": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
       "DeliveryQuoteRequest": { "type": "object", "properties": { "method": { "type": "string", "enum": ["courier", "pickup"] }, "subtotal": { "type": "number" } } },
       "DeliveryQuote": { "type": "object", "properties": { "method": { "type": "string", "enum": ["courier", "pickup"] }, "cost": { "type": "number" }, "estimatedDays": { "type": "integer" }, "provider": { "type": "string" } } },
-      "PickupStore": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "city": { "type": "string" }, "address": { "type": "string" }, "phone": { "type": "string", "nullable": true }, "hours": { "type": "string", "nullable": true }, "latitude": { "type": "number", "nullable": true }, "longitude": { "type": "number", "nullable": true }, "active": { "type": "boolean" } } },
+      "PickupStore": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "city": { "type": "string" }, "address": { "type": "string" }, "phone": { "type": "string", "nullable": true }, "hours": { "type": "string", "nullable": true }, "latitude": { "type": "number", "nullable": true }, "longitude": { "type": "number", "nullable": true }, "active": { "type": "boolean" }, "kind": { "type": "string", "enum": ["STORE", "WAREHOUSE"] } } },
       "Notification": { "type": "object", "required": ["id", "type", "title", "message", "read", "createdAt"], "properties": { "id": { "type": "string", "format": "uuid" }, "recipientUuid": { "type": "string" }, "type": { "type": "string" }, "title": { "type": "string" }, "message": { "type": "string" }, "read": { "type": "boolean" }, "createdAt": { "type": "string", "format": "date-time" } } },
       "UnreadNotificationCount": { "type": "object", "required": ["count"], "properties": { "count": { "type": "integer" } } },
       "MarkNotificationReadResult": { "type": "object", "required": ["read"], "properties": { "read": { "type": "boolean" } } },

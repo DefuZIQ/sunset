@@ -9,6 +9,7 @@ import java.util.*;
 
 @Service
 public class AdminProductService {
+    private static final UUID WAREHOUSE_ID = UUID.fromString("00000000-0000-4000-8000-000000000001");
     private final JdbcTemplate jdbc;
     public AdminProductService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
@@ -36,6 +37,7 @@ public class AdminProductService {
         String sizeType = sizeType(categoryId, gender);
         for (UUID sizeId : jdbc.query("SELECT id FROM sizes WHERE type=? ORDER BY sort_order NULLS LAST", (rs,n)->rs.getObject(1,UUID.class), sizeType)) {
             jdbc.update("INSERT INTO product_stock(product_id,size_id,color_id,quantity) VALUES (?,?,?,?)", productId,sizeId,colorId,quantity);
+            jdbc.update("INSERT INTO location_stock(location_id,product_id,size_id,color_id,quantity) VALUES (?,?,?,?,?)", WAREHOUSE_ID,productId,sizeId,colorId,quantity);
         }
         return Map.of("id",productId,"name",name,"price",price,"quantity",quantity,"imageUrl",imageUrl);
     }
@@ -67,6 +69,11 @@ public class AdminProductService {
     @Transactional
     public Map<String,Object> updateStock(UUID userId, UUID productId, Map<String,Object> request) {
         ensureAdmin(userId);
+        UUID locationId;
+        try { locationId = UUID.fromString(Objects.toString(request.get("locationId"), "")); }
+        catch (RuntimeException error) { throw new IllegalArgumentException("Выберите магазин или склад"); }
+        Integer locationExists = jdbc.queryForObject("SELECT COUNT(*) FROM stores WHERE id=?", Integer.class, locationId);
+        if (locationExists == null || locationExists == 0) throw new IllegalArgumentException("Магазин или склад не найден");
         Integer exists = jdbc.queryForObject("SELECT COUNT(*) FROM products WHERE id=?", Integer.class, productId);
         if (exists == null || exists == 0) throw new IllegalArgumentException("Товар не найден");
         Map<String,Object> productInfo = jdbc.queryForMap("SELECT p.gender,c.id AS category_id FROM products p JOIN product_categories pc ON pc.product_id=p.id JOIN categories c ON c.id=pc.category_id WHERE p.id=? ORDER BY c.name LIMIT 1", productId);
@@ -88,7 +95,8 @@ public class AdminProductService {
             }
             String key = sizeId + ":" + colorId;
             if (!uniqueVariants.add(key)) throw new IllegalArgumentException("Одинаковая комбинация размера и цвета добавлена дважды");
-            int quantity = Math.max(0, Integer.parseInt(Objects.toString(row.get("quantity"), "0")));
+            int quantity = Integer.parseInt(Objects.toString(row.get("quantity"), "0"));
+            if (quantity < 0) throw new IllegalArgumentException("Количество не может быть отрицательным");
             List<String> sizeTypes = jdbc.query("SELECT type FROM sizes WHERE id=?", (rs,n) -> rs.getString(1), sizeId);
             Integer colors = jdbc.queryForObject("SELECT COUNT(*) FROM colors WHERE id=?", Integer.class, colorId);
             if (sizeTypes.isEmpty() || colors == null || colors == 0) throw new IllegalArgumentException("Размер или цвет больше не существует");
@@ -100,16 +108,31 @@ public class AdminProductService {
             normalized.add(variant);
             total += quantity;
         }
-        jdbc.update("DELETE FROM product_stock WHERE product_id=?", productId);
-        jdbc.update("DELETE FROM product_colors WHERE product_id=?", productId);
+        jdbc.queryForList("SELECT product_id FROM product_stock WHERE product_id=? FOR UPDATE", productId);
+        jdbc.update("DELETE FROM location_stock WHERE location_id=? AND product_id=?", locationId, productId);
         for (Map<String,Object> variant : normalized) {
-            UUID sizeId = (UUID) variant.get("sizeId");
-            UUID colorId = (UUID) variant.get("colorId");
-            int quantity = (Integer) variant.get("quantity");
-            jdbc.update("INSERT INTO product_colors(product_id,color_id) VALUES (?,?) ON CONFLICT DO NOTHING", productId, colorId);
-            jdbc.update("INSERT INTO product_stock(product_id,size_id,color_id,quantity) VALUES (?,?,?,?)", productId, sizeId, colorId, quantity);
+            jdbc.update("INSERT INTO location_stock(location_id,product_id,size_id,color_id,quantity) VALUES (?,?,?,?,?)",
+                    locationId, productId, variant.get("sizeId"), variant.get("colorId"), variant.get("quantity"));
         }
+        jdbc.update("DELETE FROM product_stock WHERE product_id=?", productId);
+        jdbc.update("INSERT INTO product_stock(product_id,size_id,color_id,quantity) SELECT product_id,size_id,color_id,SUM(quantity)::integer FROM location_stock WHERE product_id=? GROUP BY product_id,size_id,color_id", productId);
+        jdbc.update("DELETE FROM product_colors WHERE product_id=?", productId);
+        jdbc.update("INSERT INTO product_colors(product_id,color_id) SELECT DISTINCT product_id,color_id FROM location_stock WHERE product_id=? ON CONFLICT DO NOTHING", productId);
         return Map.of("id",productId,"totalQuantity",total,"totalVariants",normalized.size());
+    }
+
+    public List<Map<String,Object>> stock(UUID userId, UUID productId, UUID locationId) {
+        ensureAdmin(userId);
+        return jdbc.queryForList("""
+                SELECT ls.size_id AS "sizeId", s.label AS "sizeName", s.type AS "sizeType",
+                       s.gender AS "sizeGender", s.description AS "sizeDescription",
+                       ls.color_id AS "colorId", c.name AS "colorName", ls.quantity
+                FROM location_stock ls
+                JOIN sizes s ON s.id=ls.size_id
+                JOIN colors c ON c.id=ls.color_id
+                WHERE ls.product_id=? AND ls.location_id=?
+                ORDER BY c.name,s.sort_order NULLS LAST,s.name
+                """, productId, locationId);
     }
 
     public Map<String,Object> variants(UUID userId) {

@@ -13,10 +13,20 @@ public class StoreController {
     private final StoreRepository repository;
     private final JdbcTemplate jdbc;
     public StoreController(StoreRepository repository, JdbcTemplate jdbc) { this.repository = repository; this.jdbc = jdbc; }
-    @GetMapping public List<Store> list() { return repository.findByActiveTrueOrderByCityAscNameAsc(); }
+    @GetMapping public List<Store> list() { return repository.findByActiveTrueAndKindOrderByCityAscNameAsc("STORE"); }
+    @GetMapping("/admin") public List<Store> listAdmin(@RequestHeader("user-id") UUID userId) {
+        ensureAdmin(userId);
+        return repository.findAllByOrderByKindAscCityAscNameAsc();
+    }
     @PostMapping public Store create(@RequestHeader("user-id") UUID userId, @RequestBody Store store) {
+        ensureAdmin(userId);
+        if (!"STORE".equals(store.getKind()) && !"WAREHOUSE".equals(store.getKind())) {
+            throw new IllegalArgumentException("Тип точки должен быть STORE или WAREHOUSE");
+        }
+        return repository.save(store);
+    }
+    private void ensureAdmin(UUID userId) {
         String role = jdbc.query("SELECT role FROM users WHERE id=?", rs -> rs.next() ? rs.getString(1) : null, userId);
         if (!"ADMIN".equalsIgnoreCase(role)) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Требуются права администратора");
-        return repository.save(store);
     }
 }

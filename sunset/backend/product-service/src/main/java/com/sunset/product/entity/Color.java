@@ -14,7 +14,7 @@ public class Color {
     @Column(nullable = false)
     private String name;
 
-    @Column(name = "hex_code", nullable = false)
+    @Column(name = "hex_code", nullable = false, length = 7)
     private String hexCode;
 
     // геттеры и сеттеры

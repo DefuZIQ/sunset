@@ -105,4 +105,14 @@
         <sqlFile path="classpath:/db/migrations/V18__review_photos.sql"/>
     </changeSet>
 
+    <changeSet id="123" author="codex-product">
+        <sqlFile path="classpath:/db/migrations/V19__review_reactions.sql"/>
+    </changeSet>
+    <changeSet id="124" author="codex-inventory">
+        <sqlFile path="classpath:/db/migrations/V20__location_inventory.sql"/>
+    </changeSet>
+    <changeSet id="125" author="codex-schema">
+        <sqlFile path="classpath:/db/migrations/V21__color_hex_varchar.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

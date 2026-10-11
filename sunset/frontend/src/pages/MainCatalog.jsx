@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/Main/ProductCard";
+import ProductCardSkeleton from "../components/Main/ProductCardSkeleton";
 import { useStore } from "../contexts/StoreContext";
-import { readCatalogFilters, writeCatalogFilters } from "./catalogFilters";
+import { getStoreAvailability, listPickupStores } from "../api/client";
+import { readCatalogFilters, readCatalogPage, writeCatalogFilters, writeCatalogPage } from "./catalogFilters";
 import { productSearchScore } from "./productSearch";
 import "./MainCatalog.css";
 
@@ -16,12 +18,64 @@ const sizeGroup = (type = "clothing") => type === "women_dress" ? "dresses"
     : ["accessory","belt","headwear"].includes(type) ? "accessories"
       : type === "shoes" ? "shoes" : type === "women_clothing" ? "womenClothing" : type === "men_clothing" ? "menClothing" : "clothing";
 const sizeKey = (stock) => `${stock.sizeType || "clothing"}:${stock.sizeName}`;
+const mobileQuery = "(max-width: 760px)";
+const pageNumbers = (current, count) => {
+  const pages = new Set([1, count]);
+  for (let page = Math.max(1, current - 2); page <= Math.min(count, current + 2); page += 1) pages.add(page);
+  return [...pages].sort((a, b) => a - b);
+};
 
 export default function MainCatalog() {
-  const { products, loading, categoryTree } = useStore();
+  const { products, loading, catalogError, categoryTree } = useStore();
   const [params, setParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia(mobileQuery).matches);
+  const [pickupStores, setPickupStores] = useState([]);
+  const [storesError, setStoresError] = useState("");
+  const [storesReloadKey, setStoresReloadKey] = useState(0);
+  const [storeStock, setStoreStock] = useState(null);
+  const [storeStockError, setStoreStockError] = useState("");
+  const [storeStockReloadKey, setStoreStockReloadKey] = useState(0);
   const filter = readCatalogFilters(params);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setStoresError("");
+    listPickupStores(controller.signal)
+      .then((rows) => setPickupStores(rows.filter((store) => store.kind === "STORE" && store.active !== false)))
+      .catch((error) => { if (!controller.signal.aborted) setStoresError(error.message || "Не удалось загрузить магазины"); });
+    return () => controller.abort();
+  }, [storesReloadKey]);
+
+  useEffect(() => {
+    if (!filter.storeId) { setStoreStock(null); setStoreStockError(""); return undefined; }
+    const controller = new AbortController();
+    setStoreStock(null);
+    setStoreStockError("");
+    getStoreAvailability(filter.storeId, controller.signal)
+      .then((rows) => { if (!controller.signal.aborted) setStoreStock({ storeId: filter.storeId, rows }); })
+      .catch((error) => { if (!controller.signal.aborted) setStoreStockError(error.message || "Не удалось загрузить остатки магазина"); });
+    return () => controller.abort();
+  }, [filter.storeId, storeStockReloadKey]);
+
+  const selectedStoreStock = storeStock?.storeId === filter.storeId ? storeStock.rows : null;
+  const storeStockLoading = Boolean(filter.storeId && !selectedStoreStock && !storeStockError);
+  const stockByProduct = useMemo(() => {
+    const result = new Map();
+    for (const row of selectedStoreStock || []) {
+      const key = String(row.productId);
+      if (!result.has(key)) result.set(key, []);
+      result.get(key).push(row);
+    }
+    return result;
+  }, [selectedStoreStock]);
+
+  useEffect(() => {
+    const media = window.matchMedia(mobileQuery);
+    const onChange = (event) => setIsMobile(event.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
   const changeFilters = (change, replace = false) => setParams((currentParams) => {
     const current = readCatalogFilters(currentParams);
@@ -64,7 +118,13 @@ export default function MainCatalog() {
   const filtered = useMemo(() => {
     const result = products.filter((product) => {
       const price = Number(product.price);
-      const totalStock = (product.stock || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      const productStock = filter.storeId
+        ? (stockByProduct.get(String(product.id)) || []).map((row) => ({
+          ...(product.stock || []).find((variant) => String(variant.sizeId) === String(row.sizeId) && String(variant.colorId) === String(row.colorId)),
+          ...row,
+        }))
+        : product.stock || [];
+      const totalStock = productStock.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
       return (!filter.search || productSearchScore(product, filter.search) > 0)
         && (filter.gender === "all" || product.gender === filter.gender || product.gender === "UNISEX")
         && (!filter.min || price >= Number(filter.min))
@@ -73,11 +133,14 @@ export default function MainCatalog() {
           const node = treeCategories.find((item) => item.name === category);
           return (node?.descendants || [category]).some((name) => product.categories?.includes(name));
         }))
-        && (!filter.colors.length || filter.colors.some((name) => product.colors?.some((color) => color.name === name)))
-        && (!filter.sizes.length || filter.sizes.some((key) => product.stock?.some((stock) => sizeKey(stock) === key && stock.quantity > 0)))
+        && (!filter.colors.length || filter.colors.some((name) => filter.storeId
+          ? productStock.some((stock) => stock.colorName === name && stock.quantity > 0)
+          : product.colors?.some((color) => color.name === name)))
+        && (!filter.sizes.length || filter.sizes.some((key) => productStock.some((stock) => sizeKey(stock) === key && stock.quantity > 0)))
         && (!filter.reviewedOnly || Number(product.reviewCount || 0) > 0)
         && (!filter.ratingMin || (Number(product.reviewCount || 0) > 0 && Number(product.rating || 0) >= Number(filter.ratingMin)))
         && (!filter.ratingMax || (Number(product.reviewCount || 0) > 0 && Number(product.rating || 0) <= Number(filter.ratingMax)))
+        && (!filter.storeId || totalStock > 0)
         && (filter.availability === "all" || (filter.availability === "in-stock" && totalStock > 0)
           || (filter.availability === "low-stock" && totalStock > 0 && totalStock <= 10));
     });
@@ -86,7 +149,32 @@ export default function MainCatalog() {
     if (filter.sort === "name") result.sort((a, b) => a.name.localeCompare(b.name, "ru"));
     if (filter.sort === "rating-desc") result.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
     return result;
-  }, [products, filter, treeCategories]);
+  }, [products, filter, treeCategories, stockByProduct]);
+
+  const pageSize = isMobile ? 20 : 48;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const requestedPage = readCatalogPage(params);
+  const currentPage = Math.min(requestedPage, pageCount);
+  const visibleProducts = isMobile
+    ? filtered.slice(0, currentPage * pageSize)
+    : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    if (!loading && !storeStockLoading && !storeStockError && requestedPage > pageCount) {
+      setParams((current) => writeCatalogPage(current, pageCount), { replace: true });
+    }
+  }, [loading, storeStockLoading, storeStockError, requestedPage, pageCount, setParams]);
+
+  const goToPage = (page, scrollToResults = false) => {
+    if (page < 1 || page > pageCount || page === currentPage) return;
+    setParams((current) => writeCatalogPage(current, page));
+    if (scrollToResults) {
+      requestAnimationFrame(() => document.querySelector(".catalog-results")?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      }));
+    }
+  };
 
   useEffect(() => {
     if (!filtersOpen) return undefined;
@@ -96,6 +184,8 @@ export default function MainCatalog() {
   }, [filtersOpen]);
 
   const update = (key, value, replace = false) => changeFilters((current) => ({ ...current, [key]: value }), replace);
+  const setStore = (storeId) => changeFilters((current) => ({ ...current, storeId, availability: storeId && current.availability === "all" ? "in-stock" : current.availability }));
+  const setAvailability = (availability) => changeFilters((current) => ({ ...current, availability, storeId: availability === "all" ? "" : current.storeId }));
   const setGender = (gender) => changeFilters((current) => ({ ...current, gender, categories: [], sizes: [] }));
   const toggle = (key, value) => changeFilters((current) => ({ ...current, [key]: toggleValue(current[key], value) }));
   const reset = () => changeFilters(() => readCatalogFilters(new URLSearchParams()));
@@ -106,7 +196,8 @@ export default function MainCatalog() {
     ...filter.colors.map((value) => ({ label: value, clear: () => toggle("colors", value) })),
     ...filter.sizes.map((value) => ({ label: `Размер ${options.sizes.find((size)=>size.key===value)?.name || value.split(":").pop()}`, clear: () => toggle("sizes", value) })),
     ...(filter.min || filter.max ? [{ label: `${filter.min || 0}–${filter.max || catalogMax} ₽`, clear: () => setPrice("", "") }] : []),
-    ...(filter.availability !== "all" ? [{ label: filter.availability === "in-stock" ? "В наличии" : "Заканчивается", clear: () => update("availability", "all") }] : []),
+    ...(filter.availability !== "all" ? [{ label: filter.availability === "in-stock" ? "В наличии" : "Заканчивается", clear: () => setAvailability("all") }] : []),
+    ...(filter.storeId ? [{ label: pickupStores.find((store) => store.id === filter.storeId)?.name || "Выбранный магазин", clear: () => setStore("") }] : []),
     ...(filter.ratingMin || filter.ratingMax ? [{ label: `Рейтинг ${filter.ratingMin || "0"}–${filter.ratingMax || "5"}`, clear: () => changeFilters((current) => ({ ...current, ratingMin: "", ratingMax: "" })) }] : []),
     ...(filter.reviewedOnly ? [{ label: "Есть отзывы", clear: () => update("reviewedOnly", false) }] : []),
   ];
@@ -116,7 +207,7 @@ export default function MainCatalog() {
       <header className="catalog-head">
         <div><p className="page-kicker">Коллекция SUNSET</p><h1>Каталог</h1></div>
         <div className="catalog-head__controls">
-          <span>{filtered.length} товаров</span>
+          <span>{storeStockLoading ? "Уточняем наличие…" : `${filtered.length} товаров`}</span>
           <select value={filter.sort} onChange={(event) => update("sort", event.target.value)} aria-label="Сортировка">
             <option value="new">Сначала новинки</option><option value="price-asc">Сначала дешевле</option>
             <option value="price-desc">Сначала дороже</option><option value="rating-desc">По рейтингу</option><option value="name">По названию</option>
@@ -137,8 +228,24 @@ export default function MainCatalog() {
       <div className="catalog-layout">
         {filtersOpen && <button className="filter-backdrop" aria-label="Закрыть фильтры" onClick={() => setFiltersOpen(false)} />}
         <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`} aria-label="Фильтры каталога">
-          <div className="filter-heading"><div><span>Подбор товара</span><h2>Фильтры</h2></div><button className="filter-close" onClick={() => setFiltersOpen(false)} aria-label="Закрыть">×</button></div>
+          <div className="filter-heading"><div><span>Подбор товара</span><h2>Фильтры</h2></div><div className="filter-heading__tools">{activeChips.length > 0 && <button type="button" className="filter-heading__reset" onClick={reset}>Сбросить</button>}<button className="filter-close" onClick={() => setFiltersOpen(false)} aria-label="Закрыть">×</button></div></div>
           <label className="filter-field"><span>Поиск в каталоге</span><input value={filter.search} onChange={(event) => update("search", event.target.value, true)} placeholder="Футболка, худи…" /></label>
+
+          <div className="filter-section filter-section--availability"><div className="filter-section__title"><h3>Наличие</h3><small>{filter.storeId ? "в магазине" : "во всей сети"}</small></div>
+            <label className="store-filter"><span>Где искать</span><select value={filter.storeId} onChange={(event) => setStore(event.target.value)} aria-label="Наличие в магазине"><option value="">Все магазины</option>{pickupStores.map((store) => <option key={store.id} value={store.id}>{store.name} · {store.city}</option>)}</select></label>
+            <div className="availability-options" role="radiogroup" aria-label="Наличие">
+              <label className="check-line"><input type="radio" name="availability" checked={filter.availability === "all"} onChange={() => setAvailability("all")} /><span>Любое</span></label>
+              <label className="check-line"><input type="radio" name="availability" checked={filter.availability === "in-stock"} onChange={() => setAvailability("in-stock")} /><span>В наличии</span></label>
+              <label className="check-line"><input type="radio" name="availability" checked={filter.availability === "low-stock"} onChange={() => setAvailability("low-stock")} /><span>Заканчивается</span></label>
+            </div>
+            {storesError && <div className="store-filter__error" role="alert">{storesError} <button type="button" onClick={() => setStoresReloadKey((value) => value + 1)}>Повторить</button></div>}
+          </div>
+          <div className="filter-section rating-filter"><div className="filter-section__title"><h3>Рейтинг по отзывам</h3><small>шаг 0,1</small></div>
+            <div className="rating-presets"><button className={filter.ratingMin === "4.8" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => changeFilters((current) => ({ ...current, ratingMin: "4.8", ratingMax: "5", reviewedOnly: true }))}>★ 4,8+</button><button className={filter.ratingMin === "4.5" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => changeFilters((current) => ({ ...current, ratingMin: "4.5", ratingMax: "5", reviewedOnly: true }))}>★ 4,5+</button><button className={filter.ratingMin === "4" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => changeFilters((current) => ({ ...current, ratingMin: "4", ratingMax: "5", reviewedOnly: true }))}>★ 4,0+</button></div>
+            <div className="rating-values"><label><span>От</span><input type="number" min="0" max="5" step="0.1" value={filter.ratingMin} placeholder="0,0" onChange={(event) => update("ratingMin", event.target.value, true)} /></label><label><span>До</span><input type="number" min="0" max="5" step="0.1" value={filter.ratingMax} placeholder="5,0" onChange={(event) => update("ratingMax", event.target.value, true)} /></label></div>
+            <input className="rating-range" type="range" min="0" max="5" step="0.1" value={filter.ratingMin || 0} onChange={(event) => update("ratingMin", event.target.value === "0" ? "" : event.target.value, true)} aria-label="Минимальный рейтинг" />
+            <label className="check-line"><input type="checkbox" checked={filter.reviewedOnly} onChange={(event) => update("reviewedOnly", event.target.checked)} /><span>Показывать только товары с отзывами</span></label>
+          </div>
 
           <div className="filter-section">
             <div className="filter-section__title"><h3>Раздел</h3><small>{filter.gender === "all" ? "Все" : filter.gender === "WOMEN" ? "Женский" : "Мужской"}</small></div>
@@ -167,22 +274,30 @@ export default function MainCatalog() {
             <div className="size-groups">{sizeGroupOrder.map((group)=><div className="size-group" key={group}>{options.sizes.some((size)=>size.group===group)&&<><span className="size-group__label">{sizeGroupLabels[group]}</span><div className="size-filter">{options.sizes.filter((size)=>size.group===group).map((size) => <button key={size.key} className={filter.sizes.includes(size.key) ? "selected" : ""} onClick={() => toggle("sizes", size.key)} title={size.description||sizeGroupLabels[group]}>{size.name}</button>)}</div></>}</div>)}</div>
           </div>
 
-          <div className="filter-section"><h3>Наличие</h3>
-            <label className="check-line"><input type="radio" name="availability" checked={filter.availability === "all"} onChange={() => update("availability", "all")} /><span>Любое</span></label>
-            <label className="check-line"><input type="radio" name="availability" checked={filter.availability === "in-stock"} onChange={() => update("availability", "in-stock")} /><span>В наличии</span></label>
-            <label className="check-line"><input type="radio" name="availability" checked={filter.availability === "low-stock"} onChange={() => update("availability", "low-stock")} /><span>Заканчивается</span></label>
-          </div>
-          <div className="filter-section rating-filter"><div className="filter-section__title"><h3>Рейтинг по отзывам</h3><small>шаг 0,1</small></div>
-            <div className="rating-presets"><button className={filter.ratingMin === "4.8" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => changeFilters((current) => ({ ...current, ratingMin: "4.8", ratingMax: "5", reviewedOnly: true }))}>4,8–5,0</button><button className={filter.ratingMin === "4.5" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => changeFilters((current) => ({ ...current, ratingMin: "4.5", ratingMax: "5", reviewedOnly: true }))}>4,5–5,0</button><button className={filter.ratingMin === "4" && filter.ratingMax === "5" ? "selected" : ""} onClick={() => changeFilters((current) => ({ ...current, ratingMin: "4", ratingMax: "5", reviewedOnly: true }))}>4,0–5,0</button></div>
-            <div className="rating-values"><label><span>От</span><input type="number" min="0" max="5" step="0.1" value={filter.ratingMin} placeholder="0,0" onChange={(event) => update("ratingMin", event.target.value, true)} /></label><label><span>До</span><input type="number" min="0" max="5" step="0.1" value={filter.ratingMax} placeholder="5,0" onChange={(event) => update("ratingMax", event.target.value, true)} /></label></div>
-            <input className="rating-range" type="range" min="0" max="5" step="0.1" value={filter.ratingMin || 0} onChange={(event) => update("ratingMin", event.target.value === "0" ? "" : event.target.value, true)} aria-label="Минимальный рейтинг" />
-            <label className="check-line"><input type="checkbox" checked={filter.reviewedOnly} onChange={(event) => update("reviewedOnly", event.target.checked)} /><span>Показывать только товары с отзывами</span></label>
-          </div>
-          <div className="filter-actions"><button className="filter-apply" onClick={() => setFiltersOpen(false)}>Показать {filtered.length}</button><button onClick={reset}>Сбросить</button></div>
+          <div className="filter-actions"><button className="filter-apply" onClick={() => setFiltersOpen(false)} disabled={storeStockLoading}>Показать {storeStockLoading ? "…" : filtered.length}</button><button onClick={reset}>Сбросить</button></div>
         </aside>
 
         <main className="catalog-results">
-          {loading ? <p>Загружаем коллекцию…</p> : filtered.length ? <div className="catalog-grid">{filtered.map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="empty-state"><h2>Таких товаров пока нет</h2><p>Измените параметры фильтрации.</p><button className="text-link" onClick={reset}>Сбросить фильтры</button></div>}
+          {catalogError && products.length > 0 && <p className="catalog-warning" role="status">Не удалось обновить каталог. Показаны ранее загруженные товары; наличие и цены уточняются при оформлении.</p>}
+          {storeStockError && <div className="catalog-warning" role="alert">Не удалось проверить наличие в выбранном магазине. <button type="button" className="text-link" onClick={() => setStoreStockReloadKey((value) => value + 1)}>Повторить</button></div>}
+          {loading || storeStockLoading ? <div className="catalog-grid" role="status" aria-label="Загружаем товары"><ProductCardSkeleton count={isMobile ? 4 : 6} /></div> : storeStockError ? null : filtered.length ? <>
+            <div className="catalog-grid">{visibleProducts.map((product) => <ProductCard key={product.id} product={product} />)}</div>
+            {pageCount > 1 && <>
+              <div className="catalog-load-more">
+                <p>Показано {visibleProducts.length} из {filtered.length}</p>
+                <div className="catalog-load-more__progress" role="progressbar" aria-label="Просмотренные товары" aria-valuenow={visibleProducts.length} aria-valuemin={0} aria-valuemax={filtered.length}><span style={{ width: `${visibleProducts.length / filtered.length * 100}%` }} /></div>
+                {currentPage < pageCount && <button onClick={() => goToPage(currentPage + 1)}>Показать ещё</button>}
+              </div>
+              <nav className="catalog-pagination" aria-label="Страницы каталога">
+                <button className="catalog-pagination__edge" disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1, true)} aria-label="Предыдущая страница">←</button>
+                {pageNumbers(currentPage, pageCount).map((page, index, numbers) => <React.Fragment key={page}>
+                  {index > 0 && page - numbers[index - 1] > 1 && <span className="catalog-pagination__ellipsis" aria-hidden="true">…</span>}
+                  <button className={page === currentPage ? "active" : ""} aria-label={`Страница ${page}`} aria-current={page === currentPage ? "page" : undefined} onClick={() => goToPage(page, true)}>{page}</button>
+                </React.Fragment>)}
+                <button className="catalog-pagination__edge" disabled={currentPage === pageCount} onClick={() => goToPage(currentPage + 1, true)} aria-label="Следующая страница">→</button>
+              </nav>
+            </>}
+          </> : catalogError ? <div className="empty-state"><h2>Не удалось загрузить каталог</h2><p>Проверьте соединение и попробуйте ещё раз.</p><button className="text-link" onClick={() => window.location.reload()}>Повторить</button></div> : filter.storeId ? <div className="empty-state"><h2>В этом магазине пока нет подходящих товаров</h2><p>Попробуйте другой магазин или посмотрите всю коллекцию.</p><button className="text-link" onClick={() => setStore("")}>Все магазины</button></div> : <div className="empty-state"><h2>Таких товаров пока нет</h2><p>Измените параметры фильтрации.</p><button className="text-link" onClick={reset}>Сбросить фильтры</button></div>}
         </main>
       </div>
     </div>

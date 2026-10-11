@@ -6,6 +6,7 @@ export type Promotion = components["schemas"]["Promotion"];
 export type ProductReview = components["schemas"]["ProductReview"];
 export type ReviewPhotoUpload = components["schemas"]["ReviewPhotoUpload"];
 export type ReviewHelpfulVote = components["schemas"]["ReviewHelpfulVote"];
+export type ReviewReactionVote = components["schemas"]["ReviewReactionVote"];
 export type AdminReview = components["schemas"]["AdminReview"];
 export type LoyaltyAccount = components["schemas"]["LoyaltyAccount"];
 export type DeliveryQuote = components["schemas"]["DeliveryQuote"];
@@ -27,6 +28,9 @@ export type AdminStockResult = components["schemas"]["AdminStockResult"];
 export type AdminBonusResult = components["schemas"]["AdminBonusResult"];
 export type CustomerAddress = components["schemas"]["CustomerAddress"];
 export type CustomerAddressInput = components["schemas"]["CustomerAddressInput"];
+export type PickupStore = components["schemas"]["PickupStore"];
+export type StoreAvailability = components["schemas"]["StoreAvailability"];
+export type LocationStock = components["schemas"]["ProductStock"];
 export type AddressLookupCandidate = components["schemas"]["AddressLookupCandidate"];
 type ProductUuidRequest = paths["/products/by-uuid"]["post"]["requestBody"]["content"]["application/json"];
 type SubscribeRequest = paths["/subscriptions"]["post"]["requestBody"]["content"]["application/json"];
@@ -71,6 +75,18 @@ async function readJson<T>(response: Response): Promise<T> {
 
 function bearer(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
+}
+
+export async function listPickupStores(signal?: AbortSignal): Promise<PickupStore[]> {
+  return readJson<PickupStore[]>(await fetch("/api/v1/order/stores", { signal }));
+}
+
+export async function getStoreAvailability(storeId: string, signal?: AbortSignal): Promise<StoreAvailability[]> {
+  return readJson<StoreAvailability[]>(await fetch(`/api/v1/products/all/availability?storeId=${encodeURIComponent(storeId)}`, { signal }));
+}
+
+export async function listAdminLocations(token: string): Promise<PickupStore[]> {
+  return readJson<PickupStore[]>(await fetch("/api/v1/order/stores/admin", { headers: bearer(token) }));
 }
 
 export async function listCustomerAddresses(token: string): Promise<CustomerAddress[]> {
@@ -200,6 +216,12 @@ export async function updateAdminStock(token: string, id: string, request: Admin
   }));
 }
 
+export async function getAdminLocationStock(token: string, id: string, locationId: string): Promise<LocationStock[]> {
+  return readJson<LocationStock[]>(await fetch(`/api/v1/products/admin/${encodeURIComponent(id)}/stock?locationId=${encodeURIComponent(locationId)}`, {
+    headers: bearer(token),
+  }));
+}
+
 export async function updateAdminOrderStatus(token: string, id: string, request: AdminStatusRequest): Promise<OrderDetail> {
   return readJson<OrderDetail>(await fetch(`/api/v1/order/admin/orders/${encodeURIComponent(id)}/status`, {
     method: "PATCH", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
@@ -248,8 +270,9 @@ export async function listPromotions(): Promise<Promotion[]> {
   return readJson<Promotion[]>(await fetch("/api/v1/order/promotions"));
 }
 
-export async function listProductReviews(id: string): Promise<ProductReview[]> {
-  return readJson<ProductReview[]>(await fetch(`/api/v1/products/reviews/${encodeURIComponent(id)}`));
+export async function listProductReviews(id: string, token?: string | null): Promise<ProductReview[]> {
+  const url = `/api/v1/products/reviews/${encodeURIComponent(id)}`;
+  return readJson<ProductReview[]>(await (token ? fetch(url, { headers: bearer(token) }) : fetch(url)));
 }
 
 export async function saveProductReview(token: string, id: string, review: SaveReviewRequest): Promise<ProductReview> {
@@ -258,6 +281,14 @@ export async function saveProductReview(token: string, id: string, review: SaveR
     headers: { "Content-Type": "application/json", ...bearer(token) },
     body: JSON.stringify(review),
   }));
+}
+
+export async function deleteOwnProductReview(token: string, reviewId: string): Promise<void> {
+  const response = await fetch(`/api/v1/products/reviews/${encodeURIComponent(reviewId)}`, {
+    method: "DELETE",
+    headers: bearer(token),
+  });
+  if (!response.ok) await readJson<never>(response);
 }
 
 export async function uploadProductReviewPhoto(token: string, id: string, file: File): Promise<ReviewPhotoUpload> {
@@ -274,6 +305,14 @@ export async function markProductReviewHelpful(token: string, reviewId: string):
   return readJson<ReviewHelpfulVote>(await fetch(`/api/v1/products/reviews/${encodeURIComponent(reviewId)}/helpful`, {
     method: "PUT",
     headers: bearer(token),
+  }));
+}
+
+export async function voteProductReview(token: string, reviewId: string, vote: "LIKE" | "DISLIKE"): Promise<ReviewReactionVote> {
+  return readJson<ReviewReactionVote>(await fetch(`/api/v1/products/reviews/${encodeURIComponent(reviewId)}/vote`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...bearer(token) },
+    body: JSON.stringify({ vote }),
   }));
 }
 

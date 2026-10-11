@@ -30,7 +30,12 @@ spring:
       globalcors:
         corsConfigurations:
           '[/**]':
-            allowedOrigins: "http://localhost:3000"
+            allowedOrigins:
+              - http://localhost:3000
+              - http://localhost:5173
+              - http://192.168.1.186
+              - https://t3ch.pro
+              - https://www.t3ch.pro
             allowedMethods:
               - GET
               - POST

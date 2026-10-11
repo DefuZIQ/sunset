@@ -1,0 +1,23 @@
+.contacts-page .contact-grid--support{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:2.5rem}
+.stores-section{margin-top:clamp(3rem,6vw,5rem)}
+.stores-section__head{display:flex;align-items:end;justify-content:space-between;gap:1rem;margin-bottom:1.5rem}
+.stores-section__head h2{margin:0;font:400 clamp(2rem,4vw,3.5rem)/1.1 'Istok Web',sans-serif;letter-spacing:-.035em}
+.stores-section__head>span{color:#8a796d;font-size:.85rem;white-space:nowrap}
+.stores-section__status{padding:1.5rem;border:1px solid #e0d6cc;background:#f7f1eb;color:#65564c;line-height:1.5}
+.stores-section__status button{margin-left:.8rem;border:0;border-bottom:1px solid currentColor;padding:.2rem 0;background:none;color:#765442;font:inherit;cursor:pointer}
+.stores-directory{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(310px,.8fr);min-height:470px;border:1px solid #ded3c8;border-radius:18px;overflow:hidden;background:#f3ebe3}
+.stores-map{z-index:0;min-width:0;min-height:470px;background:#e3d9cc}
+.stores-map--empty{display:grid;place-items:center;padding:2rem;color:#76665b;text-align:center}
+.stores-directory__list{display:grid;align-content:start;gap:.75rem;max-height:600px;overflow:auto;padding:1.25rem;scrollbar-color:#b79b86 transparent}
+.store-card{padding:1.15rem;border:1px solid #dfd0c2;border-radius:12px;background:#fffaf5;transition:border-color .2s,box-shadow .2s}
+.store-card.is-selected{border-color:#a67d62;box-shadow:0 0 0 2px rgba(166,125,98,.13)}
+.store-card__select{display:flex;align-items:start;justify-content:space-between;gap:.5rem;width:100%;border:0;padding:0;background:transparent;color:#49382e;font:400 1.25rem/1.25 'Istok Web',sans-serif;text-align:left;cursor:pointer}
+.store-card__select>span:last-child{flex:none;color:#a77c5e}
+.store-card p{margin:.7rem 0 .35rem;color:#635348;font-size:.9rem;line-height:1.5}
+.store-card small{color:#8b7a6e;font-size:.77rem}
+.store-card__links{display:flex;align-items:center;gap:.7rem 1.2rem;flex-wrap:wrap;margin-top:1rem}
+.store-card__links a{border-bottom:1px solid currentColor;padding-bottom:.15rem;color:#765442;font-size:.8rem;text-decoration:none}
+.store-card :is(button,a):focus-visible,.stores-section__status button:focus-visible{outline:2px solid #765442;outline-offset:3px}
+.stores-map .leaflet-popup-content{color:#4a3b31;font:400 .85rem/1.5 'Istok Web',sans-serif}
+.stores-map .leaflet-popup-content strong{display:block;margin-bottom:.2rem}
+@media(max-width:760px){.contacts-page .contact-grid--support{grid-template-columns:1fr}.stores-directory{grid-template-columns:minmax(0,1fr)}.stores-map{min-height:320px}.stores-directory__list{max-height:none;padding:1rem}.stores-section__head{align-items:end}.store-card__select{font-size:1.12rem}}
