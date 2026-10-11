@@ -57,21 +57,21 @@ class GatewayHttpContractTest {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("jwt.secret", () -> SECRET);
-        registry.add("spring.cloud.gateway.routes[0].id", () -> "auth-test");
-        registry.add("spring.cloud.gateway.routes[0].uri", () -> "http://localhost:" + DOWNSTREAM.port());
-        registry.add("spring.cloud.gateway.routes[0].predicates[0]", () -> "Path=/auth/**");
-        registry.add("spring.cloud.gateway.routes[1].id", () -> "order-test");
-        registry.add("spring.cloud.gateway.routes[1].uri", () -> "http://localhost:" + DOWNSTREAM.port());
-        registry.add("spring.cloud.gateway.routes[1].predicates[0]", () -> "Path=/order/**");
-        registry.add("spring.cloud.gateway.routes[2].id", () -> "notifications-test");
-        registry.add("spring.cloud.gateway.routes[2].uri", () -> "http://localhost:" + DOWNSTREAM.port());
-        registry.add("spring.cloud.gateway.routes[2].predicates[0]", () -> "Path=/notifications/**");
-        registry.add("spring.cloud.gateway.routes[3].id", () -> "subscriptions-test");
-        registry.add("spring.cloud.gateway.routes[3].uri", () -> "http://localhost:" + DOWNSTREAM.port());
-        registry.add("spring.cloud.gateway.routes[3].predicates[0]", () -> "Path=/subscriptions/**");
-        registry.add("spring.cloud.gateway.routes[4].id", () -> "products-test");
-        registry.add("spring.cloud.gateway.routes[4].uri", () -> "http://localhost:" + DOWNSTREAM.port());
-        registry.add("spring.cloud.gateway.routes[4].predicates[0]", () -> "Path=/products/**");
+        registry.add("spring.cloud.gateway.server.webflux.routes[0].id", () -> "auth-test");
+        registry.add("spring.cloud.gateway.server.webflux.routes[0].uri", () -> "http://localhost:" + DOWNSTREAM.port());
+        registry.add("spring.cloud.gateway.server.webflux.routes[0].predicates[0]", () -> "Path=/auth/**");
+        registry.add("spring.cloud.gateway.server.webflux.routes[1].id", () -> "order-test");
+        registry.add("spring.cloud.gateway.server.webflux.routes[1].uri", () -> "http://localhost:" + DOWNSTREAM.port());
+        registry.add("spring.cloud.gateway.server.webflux.routes[1].predicates[0]", () -> "Path=/order/**");
+        registry.add("spring.cloud.gateway.server.webflux.routes[2].id", () -> "notifications-test");
+        registry.add("spring.cloud.gateway.server.webflux.routes[2].uri", () -> "http://localhost:" + DOWNSTREAM.port());
+        registry.add("spring.cloud.gateway.server.webflux.routes[2].predicates[0]", () -> "Path=/notifications/**");
+        registry.add("spring.cloud.gateway.server.webflux.routes[3].id", () -> "subscriptions-test");
+        registry.add("spring.cloud.gateway.server.webflux.routes[3].uri", () -> "http://localhost:" + DOWNSTREAM.port());
+        registry.add("spring.cloud.gateway.server.webflux.routes[3].predicates[0]", () -> "Path=/subscriptions/**");
+        registry.add("spring.cloud.gateway.server.webflux.routes[4].id", () -> "products-test");
+        registry.add("spring.cloud.gateway.server.webflux.routes[4].uri", () -> "http://localhost:" + DOWNSTREAM.port());
+        registry.add("spring.cloud.gateway.server.webflux.routes[4].predicates[0]", () -> "Path=/products/**");
     }
 
     @AfterAll

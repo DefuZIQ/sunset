@@ -6,45 +6,47 @@ spring:
     name: sunset
   cloud:
     gateway:
-      routes:
-        - id: auth-service
-          uri: http://auth-service:8081
-          predicates:
-            - Path=/auth/**
-        - id: product-service
-          uri: http://product-service:8082
-          predicates:
-            - Path=/products/**
-        - id: order-service
-          uri: http://order-service:8083
-          predicates:
-            - Path=/order/**
-        - id: notification-service
-          uri: http://notification-service:8084
-          predicates:
-            - Path=/notifications/**
-        - id: subscription-service
-          uri: http://notification-service:8084
-          predicates:
-            - Path=/subscriptions/**
-      globalcors:
-        corsConfigurations:
-          '[/**]':
-            allowedOrigins:
-              - http://localhost:3000
-              - http://localhost:5173
-              - http://192.168.1.186
-              - https://t3ch.pro
-              - https://www.t3ch.pro
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-            allowCredentials: true
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: http://auth-service:8081
+              predicates:
+                - Path=/auth/**
+            - id: product-service
+              uri: http://product-service:8082
+              predicates:
+                - Path=/products/**
+            - id: order-service
+              uri: http://order-service:8083
+              predicates:
+                - Path=/order/**
+            - id: notification-service
+              uri: http://notification-service:8084
+              predicates:
+                - Path=/notifications/**
+            - id: subscription-service
+              uri: http://notification-service:8084
+              predicates:
+                - Path=/subscriptions/**
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origins:
+                  - http://localhost:3000
+                  - http://localhost:5173
+                  - http://192.168.1.186
+                  - https://t3ch.pro
+                  - https://www.t3ch.pro
+                allowed-methods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowed-headers: "*"
+                allow-credentials: true
 
 jwt:
   secret: ${JWT_SECRET}
