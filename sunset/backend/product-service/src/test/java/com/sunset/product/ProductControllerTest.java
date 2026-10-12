@@ -10,12 +10,16 @@ import com.sunset.product.service.ReviewPhotoService;
 import com.sunset.product.service.ReviewCommentService;
 import org.springframework.web.server.ResponseStatusException;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ProductControllerTest {
     private final ProductService products = mock(ProductService.class);
@@ -44,5 +48,16 @@ class ProductControllerTest {
         var response = controller.getProductByUuid(request);
         assertEquals(200, response.getStatusCode().value());
         assertSame(product, response.getBody());
+    }
+
+    @Test void bindsReviewCommentPagination() throws Exception {
+        UUID reviewId = UUID.randomUUID();
+        ReviewCommentService comments = mock(ReviewCommentService.class);
+        ProductController endpoint = new ProductController(products, mock(AdminProductService.class), mock(ReviewService.class), mock(ReviewPhotoService.class), comments);
+        when(comments.list(reviewId, 20)).thenReturn(Map.of("items", java.util.List.of(), "total", 0));
+        MockMvcBuilders.standaloneSetup(endpoint).build()
+                .perform(get("/products/reviews/{id}/comments", reviewId).param("offset", "20"))
+                .andExpect(status().isOk());
+        verify(comments).list(reviewId, 20);
     }
 }

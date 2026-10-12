@@ -105,7 +105,7 @@ public class ProductController {
     public Object reviews(@PathVariable("id") UUID id, @RequestHeader(value="user-id", required=false) UUID userId) { return reviewService.list(id, userId); }
 
     @GetMapping("/reviews/{id}/comments")
-    public Object reviewComments(@PathVariable("id") UUID id, @RequestParam(defaultValue="0") int offset) {
+    public Object reviewComments(@PathVariable("id") UUID id, @RequestParam(name="offset", defaultValue="0") int offset) {
         return reviewCommentService.list(id, offset);
     }
 
