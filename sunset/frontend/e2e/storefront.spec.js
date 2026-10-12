@@ -60,6 +60,31 @@ const manyProducts = Array.from({ length: 110 }, (_, index) => ({
   name: `Рубашка ${index + 1}`,
 }));
 
+test('catalog shows clean category names while keeping canonical category filters', async ({ page }) => {
+  const coat = {
+    ...products[1],
+    categories: ['Для мужчин', 'Мужская верхняя одежда', 'Мужские пальто'],
+  };
+  await page.route('**/products/all', (route) => route.fulfill({ json: [coat] }));
+  await page.route('**/products/categories/tree', (route) => route.fulfill({ json: [
+    { name: 'Для мужчин', children: [
+      { name: 'Мужская верхняя одежда', children: [
+        { name: 'Мужские пальто', children: [] },
+      ] },
+    ] },
+  ] }));
+  await page.goto('/#/catalog?gender=MEN');
+  await expect(page.locator('.category-tree')).toContainText('Верхняя одежда');
+  await expect(page.locator('.category-tree')).toContainText('Пальто');
+  await expect(page.locator('.category-tree')).not.toContainText('Мужская');
+  await expect(page.locator('.product-card__meta')).toContainText('Мужчинам');
+  await expect(page.locator('.product-card__meta')).not.toContainText('Мужские');
+  if (page.viewportSize()?.width <= 760) await page.locator('.filter-toggle').click();
+  await page.locator('.category-tree').getByRole('checkbox', { name: /Пальто/ }).click();
+  await expect(page).toHaveURL(/category%5B%5D=%D0%9C%D1%83%D0%B6%D1%81%D0%BA%D0%B8%D0%B5/);
+  await expect(page.locator('.catalog-grid .product-card')).toHaveCount(1);
+});
+
 test('availability and review rating are the first catalog filter sections', async ({ page }) => {
   await page.goto('/#/catalog');
   await expect(page.locator('.filter-sidebar .filter-section h3').first()).toHaveText('Наличие');

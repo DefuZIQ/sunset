@@ -1,10 +1,5 @@
 import React from "react";
-
-const rootForGender = (tree, gender) => {
-  if (gender === "WOMEN") return tree.filter((node) => node.name === "Для женщин");
-  if (gender === "MEN") return tree.filter((node) => node.name === "Для мужчин");
-  return tree;
-};
+import { categoryLabel, categoryRoots } from "../data/categoryLabels";
 
 export const categoryDescendants = (tree, categoryName) => {
   let result = [];
@@ -35,7 +30,7 @@ export const firstLeafCategory = (tree, gender) => {
     if (!(node.children || []).length) result = node.name;
     else node.children.forEach(visit);
   };
-  rootForGender(tree, gender).forEach(visit);
+  categoryRoots(tree, gender).forEach(visit);
   return result;
 };
 
@@ -51,7 +46,7 @@ function CategoryNode({ node, depth, selected, onSelect, selectBranches }) {
         disabled={!selectable}
         aria-pressed={selectable ? selected === node.name : undefined}
       >
-        <span>{depth > 0 ? "↳" : ""} {node.name}</span>
+        <span>{depth > 0 ? "↳" : ""} {categoryLabel(node.name)}</span>
         {children.length > 0 && <small>{children.length}</small>}
       </button>
       {children.length > 0 && <div className="admin-category-children">{children.map((child) => (
@@ -62,12 +57,12 @@ function CategoryNode({ node, depth, selected, onSelect, selectBranches }) {
 }
 
 export default function AdminCategoryTree({ tree = [], selected, onSelect, gender = "ALL", selectBranches = false, allowAll = false, title = "Категория" }) {
-  const visibleTree = rootForGender(tree, gender);
+  const visibleTree = categoryRoots(tree, gender);
   return (
     <div className="admin-category-picker">
       <div className="admin-category-picker__head">
         <span>{title}</span>
-        {selected && <small>{selected}</small>}
+        {selected && <small>{categoryLabel(selected)}</small>}
       </div>
       <div className="admin-category-tree" role="tree" aria-label={title}>
         {allowAll && <button type="button" className={`admin-category-all ${!selected ? "selected" : ""}`} onClick={() => onSelect("")}>Все категории</button>}

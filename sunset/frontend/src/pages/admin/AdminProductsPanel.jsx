@@ -1,4 +1,5 @@
 import AdminCategoryTree, { categoryMatches, firstLeafCategory } from "../../components/AdminCategoryTree";
+import { categoryPath } from "../../data/categoryLabels";
 
 const leafCategory = (item) => item?.categories?.[item.categories.length - 1] || "";
 
@@ -27,7 +28,7 @@ export default function AdminProductsPanel({
       <div className="admin-gender-tabs" aria-label="Раздел товаров">{[["ALL", "Все", products.length], ["WOMEN", "Для женщин", genderCount("WOMEN")], ["MEN", "Для мужчин", genderCount("MEN")], ["UNISEX", "Унисекс", genderCount("UNISEX")]].map(([key, label, count]) => <button type="button" className={productGender === key ? "active" : ""} onClick={() => { setProductGender(key); setProductCategoryFilter(""); }} key={key}><span>{label}</span><small>{count}</small></button>)}</div>
       <AdminCategoryTree tree={categoryTree} selected={productCategoryFilter} gender={productGender} onSelect={setProductCategoryFilter} selectBranches allowAll title="Фильтр по категориям" />
       {visibleProducts.length === 0 && <p className="admin-empty-list">В выбранной категории товаров нет.</p>}
-      {visibleProducts.map((item) => <article key={item.id}><img src={item.imageUrl} alt="" /><div><strong>{item.name}</strong><small>{item.gender === "MEN" ? "Для мужчин" : item.gender === "UNISEX" ? "Унисекс" : "Для женщин"} · {item.categories?.join(" · ")}</small><span>{Number(item.price).toLocaleString("ru-RU")} ₽</span></div><button onClick={() => onEdit({ ...item })}>Изменить</button><button className="danger" onClick={() => onDelete(item)}>Удалить</button></article>)}
+      {visibleProducts.map((item) => <article key={item.id}><img src={item.imageUrl} alt="" /><div><strong>{item.name}</strong><small>{item.gender === "MEN" ? "Для мужчин" : item.gender === "UNISEX" ? "Унисекс" : "Для женщин"} · {categoryPath(item.categories).join(" · ")}</small><span>{Number(item.price).toLocaleString("ru-RU")} ₽</span></div><button onClick={() => onEdit({ ...item })}>Изменить</button><button className="danger" onClick={() => onDelete(item)}>Удалить</button></article>)}
     </div>
   </div>;
 }

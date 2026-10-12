@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "../HeaderParts/CartContext";
 import { useFavorites } from "../../contexts/FavoritesContext";
+import { categoryPath } from "../../data/categoryLabels";
 import "./ProductCard.css";
 
 export default function ProductCard({ product }) {
@@ -81,7 +82,7 @@ export default function ProductCard({ product }) {
         {isFavorite(product.id) ? "♥" : "♡"}
       </button>
       <div className="product-card__overlay">
-        <div className="product-card__meta"><span>{product.gender === "MEN" ? "Мужчинам" : product.gender === "UNISEX" ? "Унисекс" : "Женщинам"}</span>{(product.categories || []).map((category) => <span key={category}>{category}</span>)}</div>
+        <div className="product-card__meta"><span>{product.gender === "MEN" ? "Мужчинам" : product.gender === "UNISEX" ? "Унисекс" : "Женщинам"}</span>{categoryPath(product.categories).map((category) => <span key={category}>{category}</span>)}</div>
         <div className="product-card__rating"><span>★ {Number(product.rating || 0).toFixed(1)}</span><small>{product.reviewCount || 0} отзывов</small></div>
         <Link to={`/catalog/product/${product.id}`} className="product-card__title"><h3>{product.name}</h3><strong>{Number(product.price).toLocaleString("ru-RU")} ₽</strong></Link>
         {totalStock > 0 && <>

@@ -7,6 +7,7 @@ import "../components/Main/ProductCard.css"; // Переиспользуем с�
 import "./ProductPage.css"; // Подключаем стили для страницы товара
 import { ApiHttpError, deleteOwnProductReview, getProductById, listProductReviews, voteProductReview, saveProductReview, uploadProductReviewPhoto } from "../api/client";
 import { defaultReviewFilter, reviewSummary, selectReviews } from "./reviewFilters";
+import { categoryPath } from "../data/categoryLabels";
 
 const ratingCaptions = ["", "Не понравилось", "Ниже ожиданий", "Нормально", "Хорошо", "Отлично"];
 const MAX_REVIEW_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -454,7 +455,7 @@ export default function ProductPage() {
         </div>
 
         <div className="product-detail-info">
-          <div className="product-category-path"><span>{product.gender === "MEN" ? "Для мужчин" : product.gender === "UNISEX" ? "Унисекс" : "Для женщин"}</span>{(product.categories || []).map((category) => <span key={category}>{category}</span>)}</div>
+          <div className="product-category-path"><span>{product.gender === "MEN" ? "Для мужчин" : product.gender === "UNISEX" ? "Унисекс" : "Для женщин"}</span>{categoryPath(product.categories).map((category) => <span key={category}>{category}</span>)}</div>
           <h1>{product.name}</h1>
           <button type="button" className="product-detail-rating" onClick={() => document.getElementById("product-reviews")?.scrollIntoView({ behavior: "smooth" })} aria-label={`Перейти к отзывам: ${reviews.length}`}><span aria-hidden="true">★</span> {(summary.count ? summary.average : Number(product.rating || 0)).toFixed(1)} <small>· {reviews.length} отзывов</small><span aria-hidden="true">↗</span></button>
           {product.description && <p className="product-detail-description">{product.description}</p>}

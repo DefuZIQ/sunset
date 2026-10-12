@@ -6,6 +6,7 @@ import { useStore } from "../contexts/StoreContext";
 import { getStoreAvailability, listPickupStores } from "../api/client";
 import { readCatalogFilters, readCatalogPage, writeCatalogFilters, writeCatalogPage } from "./catalogFilters";
 import { productSearchScore } from "./productSearch";
+import { categoryLabel, categoryRoots } from "../data/categoryLabels";
 import "./MainCatalog.css";
 
 const toggleValue = (items, value) =>
@@ -101,11 +102,7 @@ export default function MainCatalog() {
       flattened.push({ ...node, depth, descendants });
       walk(node.children, depth + 1);
     });
-    const visibleRoots = filter.gender === "WOMEN"
-      ? categoryTree.filter((node) => node.name === "Для женщин")
-      : filter.gender === "MEN"
-        ? categoryTree.filter((node) => node.name === "Для мужчин")
-        : categoryTree;
+    const visibleRoots = categoryRoots(categoryTree, filter.gender);
     walk(visibleRoots);
     return flattened.length ? flattened : options.categories.map((name) => ({ name, depth: 0, descendants: [name] }));
   }, [categoryTree, options.categories, filter.gender]);
@@ -192,7 +189,7 @@ export default function MainCatalog() {
   const setPrice = (min, max) => changeFilters((current) => ({ ...current, min, max }));
   const activeChips = [
     ...(filter.gender !== "all" ? [{ label: filter.gender === "WOMEN" ? "Для женщин" : "Для мужчин", clear: () => setGender("all") }] : []),
-    ...filter.categories.map((value) => ({ label: value, clear: () => toggle("categories", value) })),
+    ...filter.categories.map((value) => ({ label: categoryLabel(value), clear: () => toggle("categories", value) })),
     ...filter.colors.map((value) => ({ label: value, clear: () => toggle("colors", value) })),
     ...filter.sizes.map((value) => ({ label: `Размер ${options.sizes.find((size)=>size.key===value)?.name || value.split(":").pop()}`, clear: () => toggle("sizes", value) })),
     ...(filter.min || filter.max ? [{ label: `${filter.min || 0}–${filter.max || catalogMax} ₽`, clear: () => setPrice("", "") }] : []),
@@ -254,7 +251,7 @@ export default function MainCatalog() {
 
           <div className="filter-section">
             <div className="filter-section__title"><h3>Категория</h3><small>{filter.categories.length || "Все"}</small></div>
-            <div className="category-tree">{treeCategories.map((category) => <label className={`check-line category-tree__level-${Math.min(category.depth, 2)}`} key={category.name}><input type="checkbox" checked={filter.categories.includes(category.name)} onChange={() => toggle("categories", category.name)} /><span>{category.depth > 0 ? "↳ " : ""}{category.name}</span></label>)}</div>
+            <div className="category-tree">{treeCategories.map((category) => <label className={`check-line category-tree__level-${Math.min(category.depth, 2)}`} key={category.name}><input type="checkbox" checked={filter.categories.includes(category.name)} onChange={() => toggle("categories", category.name)} /><span>{category.depth > 0 ? "↳ " : ""}{categoryLabel(category.name)}</span></label>)}</div>
           </div>
 
           <div className="filter-section">
