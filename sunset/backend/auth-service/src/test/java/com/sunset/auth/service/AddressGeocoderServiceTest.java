@@ -1,6 +1,6 @@
 package com.sunset.auth.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.sunset.auth.dto.AddressLookup;
 import org.junit.jupiter.api.Test;
 

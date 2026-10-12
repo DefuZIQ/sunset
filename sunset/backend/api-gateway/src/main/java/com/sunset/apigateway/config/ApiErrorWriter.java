@@ -1,7 +1,7 @@
 package com.sunset.apigateway.config;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -34,7 +34,7 @@ public class ApiErrorWriter {
         final byte[] bytes;
         try {
             bytes = objectMapper.writeValueAsBytes(body);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             return Mono.error(exception);
         }
         return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)));

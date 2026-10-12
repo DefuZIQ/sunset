@@ -18,7 +18,7 @@
     <properties>
         <!-- можно убрать, если java.version и spring-boot.version заданы в родителе -->
         <java.version>17</java.version>
-        <spring-boot.version>3.5.16</spring-boot.version>
+        <spring-boot.version>4.1.1</spring-boot.version>
     </properties>
 
     <dependencies>
@@ -63,6 +63,10 @@
         </dependency>
 
         <!-- Liquibase -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-liquibase</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.liquibase</groupId>
             <artifactId>liquibase-core</artifactId>
