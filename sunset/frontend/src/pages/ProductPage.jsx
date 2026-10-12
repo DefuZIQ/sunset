@@ -5,7 +5,7 @@ import { useCart } from "../components/HeaderParts/CartContext";
 import "../App.css"; // Для .container
 import "../components/Main/ProductCard.css"; // Переиспользуем стили
 import "./ProductPage.css"; // Подключаем стили для страницы товара
-import { ApiHttpError, deleteOwnProductReview, getProductById, listProductReviews, voteProductReview, saveProductReview, uploadProductReviewPhoto } from "../api/client";
+import { ApiHttpError, createReviewComment, deleteOwnProductReview, deleteReviewComment, getProductById, listProductReviews, listReviewComments, voteProductReview, saveProductReview, uploadProductReviewPhoto } from "../api/client";
 import { defaultReviewFilter, reviewSummary, selectReviews } from "./reviewFilters";
 import { categoryPath } from "../data/categoryLabels";
 
@@ -84,6 +84,89 @@ const sizeTypeLabels = {
   accessory: "Аксессуары",
 };
 
+function ReviewComments({ reviewId, initialCount = 0, viewerId }) {
+  const [open, setOpen] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [total, setTotal] = useState(Number(initialCount) || 0);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const load = async (offset = 0) => {
+    setLoading(true);
+    setError("");
+    try {
+      const page = await listReviewComments(reviewId, offset);
+      setComments((current) => offset === 0 ? page.items : [
+        ...current,
+        ...page.items.filter((item) => !current.some((existing) => existing.id === item.id)),
+      ]);
+      setTotal(page.total);
+      setLoaded(true);
+    } catch (requestError) {
+      setError(requestError.message || "Не удалось загрузить комментарии");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggle = () => {
+    setOpen((current) => !current);
+    if (!open && !loaded) load();
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (draft.trim().length < 2 || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await createReviewComment(localStorage.getItem("authToken"), reviewId, draft.trim());
+      setDraft("");
+      await load(0);
+    } catch (requestError) {
+      setError(requestError instanceof ApiHttpError && requestError.status === 401 ? "Войдите в аккаунт ещё раз" : requestError.message || "Не удалось отправить комментарий");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (commentId) => {
+    setBusy(true);
+    setError("");
+    try {
+      await deleteReviewComment(localStorage.getItem("authToken"), commentId);
+      setDeleteTarget(null);
+      await load(0);
+    } catch (requestError) {
+      setError(requestError.message || "Не удалось удалить комментарий");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <section className="review-comments" aria-label="Комментарии к отзыву">
+    <button type="button" className="review-comments__toggle" onClick={toggle} aria-expanded={open} aria-controls={`review-comments-${reviewId}`}>
+      <span aria-hidden="true">↳</span> Комментарии <span className="review-comments__count">{total}</span><span aria-hidden="true">{open ? "−" : "+"}</span>
+    </button>
+    {open && <div id={`review-comments-${reviewId}`} className="review-comments__panel">
+      {comments.length > 0 ? <div className="review-comments__list">{comments.map((comment) => <article className="review-comment" key={comment.id}>
+        <div className="review-comment__avatar" aria-hidden="true">{(comment.authorName || "К").trim().slice(0, 1).toUpperCase()}</div>
+        <div className="review-comment__content"><div className="review-comment__meta"><strong>{comment.authorName || "Покупатель"}</strong><time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleDateString("ru-RU")}</time></div><p>{comment.body}</p>
+          {viewerId && String(comment.userId) === String(viewerId) && (deleteTarget === comment.id ? <div className="review-comment__delete-confirm"><span>Удалить комментарий?</span><button type="button" onClick={() => remove(comment.id)} disabled={busy}>Да, удалить</button><button type="button" onClick={() => setDeleteTarget(null)} disabled={busy}>Отмена</button></div> : <button type="button" className="review-comment__delete" onClick={() => setDeleteTarget(comment.id)}>Удалить</button>)}
+        </div>
+      </article>)}</div> : !loading && !error && <p className="review-comments__empty">Пока нет комментариев. Начните обсуждение.</p>}
+      {comments.length < total && <button type="button" className="review-comments__more" onClick={() => load(comments.length)} disabled={loading}>Показать ещё</button>}
+      {loading && <p className="review-comments__status" role="status">Загружаем комментарии…</p>}
+      {error && <p className="review-comments__error" role="alert">{error} <button type="button" onClick={() => load(0)}>Повторить</button></p>}
+      {viewerId ? <form className="review-comments__form" onSubmit={submit}><label htmlFor={`review-comment-${reviewId}`}>Написать комментарий</label><textarea id={`review-comment-${reviewId}`} value={draft} onChange={(event) => setDraft(event.target.value)} minLength={2} maxLength={1000} required placeholder="Задайте вопрос или поделитесь мнением" /><div><small>{draft.length} / 1000</small><button type="submit" disabled={busy || draft.trim().length < 2}>{busy ? "Отправляем…" : "Отправить ↗"}</button></div></form> : <p className="review-comments__login"><Link to="/login">Войдите в аккаунт</Link>, чтобы оставить комментарий.</p>}
+    </div>}
+  </section>;
+}
+
 function ReviewCard({ item, viewerId, busy, error, onVote, onEdit, onDelete, onOpenPhoto }) {
   const initials = (item.authorName || "К").trim().slice(0, 1).toUpperCase();
   return <article className="review-card">
@@ -97,6 +180,7 @@ function ReviewCard({ item, viewerId, busy, error, onVote, onEdit, onDelete, onO
     <div className="review-card__details"><span>Качество <strong>{item.qualityRating || item.rating}/5</strong></span><span>Посадка <strong>{({ SMALL: "маломерит", AS_EXPECTED: "по размеру", LARGE: "большемерит" })[item.fit] || "не указана"}</strong></span></div>
     {item.storeReply && <blockquote className="review-card__reply"><strong>SUNSET отвечает</strong><p>{item.storeReply}</p>{item.storeRepliedAt && <time dateTime={item.storeRepliedAt}>{new Date(item.storeRepliedAt).toLocaleDateString("ru-RU")}</time>}</blockquote>}
     <footer className="review-card__footer">{viewerId && String(item.userId) === String(viewerId) && <div className="review-card__owner-actions"><button type="button" className="review-card__edit" onClick={() => onEdit(item)}>Изменить отзыв и фото</button><button type="button" className="review-card__delete" onClick={() => onDelete(item)}>Удалить отзыв</button></div>}<ReviewReactions item={item} busy={busy} error={error} onVote={onVote} /></footer>
+    <ReviewComments reviewId={item.id} initialCount={item.commentCount} viewerId={viewerId} />
   </article>;
 }
 

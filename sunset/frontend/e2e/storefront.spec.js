@@ -758,6 +758,42 @@ test('product page loads reviews from the versioned public API', async ({ page }
   expect(requested).toBe(true);
 });
 
+test('customer can comment on a review and delete their own comment', async ({ page }) => {
+  const reviewId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const customerId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  let comments = [];
+  await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
+  await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [
+    { id: reviewId, authorName: 'Анна', userId: 'other-user', rating: 5, qualityRating: 5, fit: 'AS_EXPECTED', body: 'Отличная ткань', commentCount: 0, createdAt: '2026-10-06T00:00:00Z' },
+  ] }));
+  await page.route(`**/api/v1/products/reviews/${reviewId}/comments*`, async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON().body;
+      comments = [{ id: 'comment-1', reviewId, userId: customerId, authorName: 'Мария', body, createdAt: '2026-10-12T00:00:00Z' }];
+      await route.fulfill({ status: 201, json: comments[0] });
+    } else await route.fulfill({ json: { items: comments, total: comments.length } });
+  });
+  await page.route('**/api/v1/products/review-comments/comment-1', (route) => {
+    comments = [];
+    return route.fulfill({ status: 204, body: '' });
+  });
+  await page.goto('/');
+  await page.evaluate((id) => {
+    localStorage.setItem('authToken', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify({ id, firstName: 'Мария' }));
+  }, customerId);
+  await page.goto('/#/catalog/product/11111111-1111-1111-1111-111111111111');
+  await page.getByRole('button', { name: /Комментарии 0/ }).click();
+  await page.getByLabel('Написать комментарий').fill('Какой размер выбрать?');
+  await page.getByRole('button', { name: /Отправить/ }).click();
+  await expect(page.getByText('Какой размер выбрать?')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Комментарии 1/ })).toBeVisible();
+  await page.locator('.review-comment').getByRole('button', { name: 'Удалить' }).click();
+  await page.getByRole('button', { name: 'Да, удалить' }).click();
+  await expect(page.getByText('Какой размер выбрать?')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Комментарии 0/ })).toBeVisible();
+});
+
 test('review photo opens fullscreen with its text and closes by Escape', async ({ page }) => {
   await page.route('**/api/v1/products/by-uuid', (route) => route.fulfill({ json: products[0] }));
   await page.route('**/api/v1/products/reviews/11111111-1111-1111-1111-111111111111', (route) => route.fulfill({ json: [{ id: 'review-photo', authorName: 'Анна', rating: 5, qualityRating: 5, fit: 'AS_EXPECTED', body: 'Фото и отзыв на весь экран', photoUrl: '/logo512.png', verifiedPurchase: true, createdAt: '2026-10-06T00:00:00Z' }] }));

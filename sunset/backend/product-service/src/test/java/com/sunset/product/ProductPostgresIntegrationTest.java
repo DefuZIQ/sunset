@@ -4,6 +4,7 @@ import com.sunset.product.service.ProductService;
 import com.sunset.product.service.AdminProductService;
 import com.sunset.product.service.ReviewService;
 import com.sunset.product.service.ReviewPhotoService;
+import com.sunset.product.service.ReviewCommentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,6 +54,7 @@ class ProductPostgresIntegrationTest {
     @Autowired private AdminProductService adminProducts;
     @Autowired private ReviewService reviews;
     @Autowired private ReviewPhotoService photos;
+    @Autowired private ReviewCommentService comments;
     @Autowired private JdbcTemplate jdbc;
 
     @Test
@@ -118,6 +120,48 @@ class ProductPostgresIntegrationTest {
         assertThat(product.getReviewCount()).isEqualTo(originalCount + 1);
         List<Map<String, Object>> persisted = reviews.list(productId);
         assertThat(persisted).anyMatch(row -> userId.equals(row.get("userId")) && "Иван Соколов".equals(row.get("authorName")));
+    }
+
+    @Test
+    @Transactional
+    void commentsArePaginatedOwnedAndRemovedWithReview() {
+        UUID productId = jdbc.queryForObject("SELECT id FROM products LIMIT 1", UUID.class);
+        UUID reviewerId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        UUID strangerId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,first_name,last_name) VALUES (?,? ,?)", reviewerId, "Иван", "Соколов");
+        jdbc.update("INSERT INTO users(id,first_name,last_name) VALUES (?,? ,?)", authorId, "Анна", "Мирная");
+        jdbc.update("INSERT INTO users(id,first_name,last_name) VALUES (?,? ,?)", strangerId, "Пётр", "Петров");
+        jdbc.update("INSERT INTO users(id,first_name,role) VALUES (?,?,'ADMIN')", adminId, "Модератор");
+        UUID reviewId = jdbc.queryForObject("INSERT INTO product_reviews(product_id,user_id,author_name,rating,body) VALUES (?,?,?,?,?) RETURNING id",
+                UUID.class, productId, reviewerId, "Иван Соколов", 5, "Отличная вещь");
+
+        assertThatThrownBy(() -> comments.create(authorId, reviewId, Map.of("body", " ")))
+                .isInstanceOf(IllegalArgumentException.class);
+        UUID firstId = null;
+        for (int index = 0; index < 21; index++) {
+            Map<String, Object> saved = comments.create(authorId, reviewId, Map.of("body", "Вопрос " + index));
+            if (index == 0) firstId = (UUID) saved.get("id");
+        }
+        assertThat(comments.list(reviewId, 0).get("total")).isEqualTo(21L);
+        assertThat((List<?>) comments.list(reviewId, 0).get("items")).hasSize(20);
+        assertThat((List<?>) comments.list(reviewId, 20).get("items")).hasSize(1);
+        assertThat(reviews.list(productId)).filteredOn(row -> reviewId.equals(row.get("id")))
+                .singleElement().satisfies(row -> assertThat(row.get("commentCount")).isEqualTo(21L));
+
+        UUID commentId = firstId;
+        assertThatThrownBy(() -> comments.delete(strangerId, commentId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("403");
+        comments.delete(adminId, commentId);
+        assertThat(comments.list(reviewId, 0).get("total")).isEqualTo(20L);
+        jdbc.update("UPDATE product_reviews SET is_hidden=TRUE WHERE id=?", reviewId);
+        assertThatThrownBy(() -> comments.list(reviewId, 0)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("404");
+        assertThatThrownBy(() -> comments.create(authorId, reviewId, Map.of("body", "Новый вопрос")))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("404");
+        jdbc.update("DELETE FROM product_reviews WHERE id=?", reviewId);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM review_comments WHERE review_id=?", Integer.class, reviewId)).isZero();
     }
 
     @Test

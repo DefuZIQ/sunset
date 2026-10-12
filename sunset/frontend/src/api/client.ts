@@ -4,6 +4,8 @@ export type Product = components["schemas"]["Product"];
 export type CategoryNode = components["schemas"]["CategoryNode"];
 export type Promotion = components["schemas"]["Promotion"];
 export type ProductReview = components["schemas"]["ProductReview"];
+export type ReviewComment = components["schemas"]["ReviewComment"];
+export type ReviewCommentPage = components["schemas"]["ReviewCommentPage"];
 export type ReviewPhotoUpload = components["schemas"]["ReviewPhotoUpload"];
 export type ReviewHelpfulVote = components["schemas"]["ReviewHelpfulVote"];
 export type ReviewReactionVote = components["schemas"]["ReviewReactionVote"];
@@ -273,6 +275,23 @@ export async function listPromotions(): Promise<Promotion[]> {
 export async function listProductReviews(id: string, token?: string | null): Promise<ProductReview[]> {
   const url = `/api/v1/products/reviews/${encodeURIComponent(id)}`;
   return readJson<ProductReview[]>(await (token ? fetch(url, { headers: bearer(token) }) : fetch(url)));
+}
+
+export async function listReviewComments(reviewId: string, offset = 0): Promise<ReviewCommentPage> {
+  return readJson<ReviewCommentPage>(await fetch(`/api/v1/products/reviews/${encodeURIComponent(reviewId)}/comments?offset=${offset}`));
+}
+
+export async function createReviewComment(token: string, reviewId: string, body: string): Promise<ReviewComment> {
+  return readJson<ReviewComment>(await fetch(`/api/v1/products/reviews/${encodeURIComponent(reviewId)}/comments`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify({ body }),
+  }));
+}
+
+export async function deleteReviewComment(token: string, commentId: string): Promise<void> {
+  const response = await fetch(`/api/v1/products/review-comments/${encodeURIComponent(commentId)}`, {
+    method: "DELETE", headers: bearer(token),
+  });
+  if (!response.ok) await readJson<never>(response);
 }
 
 export async function saveProductReview(token: string, id: string, review: SaveReviewRequest): Promise<ProductReview> {

@@ -21,7 +21,7 @@ $controllerSources = @{
 $publicRoutes = @(
     'POST /auth/register', 'POST /auth/login',
     'GET /products/all', 'GET /products/all/availability', 'POST /products/by-uuid',
-    'GET /products/categories/tree', 'GET /products/reviews/{id}', 'GET /products/review-photos/{id}',
+    'GET /products/categories/tree', 'GET /products/reviews/{id}', 'GET /products/reviews/{id}/comments', 'GET /products/review-photos/{id}',
     'GET /order/promotions', 'GET /order/stores', 'POST /subscriptions'
 )
 $operationIds = [System.Collections.Generic.HashSet[string]]::new()

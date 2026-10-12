@@ -156,6 +156,26 @@
         "responses": { "204": { "description": "Отзыв удалён" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
+    "/products/reviews/{id}/comments": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Reviews"], "operationId": "listReviewComments", "summary": "Комментарии к отзыву, по 20 с новых",
+        "parameters": [{ "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 } }],
+        "responses": { "200": { "description": "Страница комментариев", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewCommentPage" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "post": {
+        "tags": ["Reviews"], "operationId": "createReviewComment", "summary": "Написать комментарий к видимому отзыву", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewCommentRequest" } } } },
+        "responses": { "201": { "description": "Комментарий создан", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewComment" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/products/review-comments/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "delete": {
+        "tags": ["Reviews"], "operationId": "deleteReviewComment", "summary": "Удалить свой комментарий; администратор может удалить любой", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Комментарий удалён" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
     "/products/review/{id}": {
       "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
       "post": {
@@ -574,7 +594,10 @@
       "ValidatePromoRequest": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "subtotal": { "type": "number" } } },
       "SaveReviewRequest": { "type": "object", "required": ["rating", "body"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5 }, "qualityRating": { "type": "integer", "minimum": 1, "maximum": 5 }, "fit": { "type": "string", "enum": ["SMALL", "AS_EXPECTED", "LARGE"] }, "photoUrl": { "type": "string", "maxLength": 1000, "description": "Адрес, полученный от uploadProductReviewPhoto; внешние ссылки для новых отзывов не принимаются" }, "body": { "type": "string", "minLength": 3, "maxLength": 1500 } } },
       "ReviewPhotoUpload": { "type": "object", "required": ["photoUrl"], "properties": { "photoUrl": { "type": "string" } } },
-      "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "helpfulCount": { "type": "integer", "minimum": 0 }, "likeCount": { "type": "integer", "minimum": 0 }, "dislikeCount": { "type": "integer", "minimum": 0 }, "myVote": { "type": "string", "enum": ["LIKE", "DISLIKE"], "nullable": true }, "body": { "type": "string" }, "storeReply": { "type": "string", "nullable": true }, "storeRepliedAt": { "type": "string", "format": "date-time", "nullable": true }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "helpfulCount": { "type": "integer", "minimum": 0 }, "likeCount": { "type": "integer", "minimum": 0 }, "dislikeCount": { "type": "integer", "minimum": 0 }, "commentCount": { "type": "integer", "minimum": 0 }, "myVote": { "type": "string", "enum": ["LIKE", "DISLIKE"], "nullable": true }, "body": { "type": "string" }, "storeReply": { "type": "string", "nullable": true }, "storeRepliedAt": { "type": "string", "format": "date-time", "nullable": true }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "ReviewCommentRequest": { "type": "object", "required": ["body"], "properties": { "body": { "type": "string", "minLength": 2, "maxLength": 1000 } } },
+      "ReviewComment": { "type": "object", "required": ["id", "reviewId", "userId", "authorName", "body", "createdAt"], "properties": { "id": { "type": "string", "format": "uuid" }, "reviewId": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "body": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "ReviewCommentPage": { "type": "object", "required": ["items", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/ReviewComment" } }, "total": { "type": "integer", "minimum": 0 } } },
       "AdminReview": { "allOf": [{ "$ref": "#/components/schemas/ProductReview" }, { "type": "object", "required": ["productId", "productName", "isHidden"], "properties": { "productId": { "type": "string", "format": "uuid" }, "productName": { "type": "string" }, "isHidden": { "type": "boolean" }, "moderatedAt": { "type": "string", "format": "date-time", "nullable": true } } }] },
       "StoreReplyRequest": { "type": "object", "required": ["reply"], "properties": { "reply": { "type": "string", "maxLength": 1500, "description": "Пустая строка удаляет ответ" } } },
       "ModerateReviewRequest": { "type": "object", "required": ["isHidden"], "properties": { "isHidden": { "type": "boolean" } } },

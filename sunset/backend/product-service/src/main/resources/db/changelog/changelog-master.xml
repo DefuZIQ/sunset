@@ -114,5 +114,8 @@
     <changeSet id="125" author="codex-schema">
         <sqlFile path="classpath:/db/migrations/V21__color_hex_varchar.sql"/>
     </changeSet>
+    <changeSet id="126" author="codex-reviews">
+        <sqlFile path="classpath:/db/migrations/V22__review_comments.sql"/>
+    </changeSet>
 
 </databaseChangeLog>

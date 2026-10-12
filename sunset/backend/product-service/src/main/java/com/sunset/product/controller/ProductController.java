@@ -5,6 +5,7 @@ import com.sunset.product.service.ProductService;
 import com.sunset.product.service.AdminProductService;
 import com.sunset.product.service.ReviewService;
 import com.sunset.product.service.ReviewPhotoService;
+import com.sunset.product.service.ReviewCommentService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,12 +38,14 @@ public class ProductController {
     private final AdminProductService adminProductService;
     private final ReviewService reviewService;
     private final ReviewPhotoService reviewPhotoService;
+    private final ReviewCommentService reviewCommentService;
 
-    public ProductController(ProductService productService, AdminProductService adminProductService, ReviewService reviewService, ReviewPhotoService reviewPhotoService) {
+    public ProductController(ProductService productService, AdminProductService adminProductService, ReviewService reviewService, ReviewPhotoService reviewPhotoService, ReviewCommentService reviewCommentService) {
         this.productService = productService;
         this.adminProductService = adminProductService;
         this.reviewService = reviewService;
         this.reviewPhotoService = reviewPhotoService;
+        this.reviewCommentService = reviewCommentService;
     }
 
     @GetMapping("/all")
@@ -100,6 +103,22 @@ public class ProductController {
 
     @GetMapping("/reviews/{id}")
     public Object reviews(@PathVariable("id") UUID id, @RequestHeader(value="user-id", required=false) UUID userId) { return reviewService.list(id, userId); }
+
+    @GetMapping("/reviews/{id}/comments")
+    public Object reviewComments(@PathVariable("id") UUID id, @RequestParam(defaultValue="0") int offset) {
+        return reviewCommentService.list(id, offset);
+    }
+
+    @PostMapping("/reviews/{id}/comments")
+    public ResponseEntity<?> createReviewComment(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody Map<String, Object> request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(reviewCommentService.create(userId, id, request));
+    }
+
+    @DeleteMapping("/review-comments/{id}")
+    public ResponseEntity<Void> deleteReviewComment(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id) {
+        reviewCommentService.delete(userId, id);
+        return ResponseEntity.noContent().build();
+    }
 
     @PostMapping("/review/{id}")
     public Object saveReview(@RequestHeader("user-id") UUID userId, @PathVariable("id") UUID id, @RequestBody Map<String,Object> request) { return reviewService.save(userId,id,request); }

@@ -291,6 +291,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/reviews/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /** Комментарии к отзыву, по 20 с новых */
+        get: operations["listReviewComments"];
+        put?: never;
+        /** Написать комментарий к видимому отзыву */
+        post: operations["createReviewComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/review-comments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Удалить свой комментарий; администратор может удалить любой */
+        delete: operations["deleteReviewComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/review/{id}": {
         parameters: {
             query?: never;
@@ -1333,6 +1372,7 @@ export interface components {
             helpfulCount?: number;
             likeCount?: number;
             dislikeCount?: number;
+            commentCount?: number;
             /** @enum {string|null} */
             myVote?: "LIKE" | "DISLIKE" | null;
             body?: string;
@@ -1341,6 +1381,25 @@ export interface components {
             storeRepliedAt?: string | null;
             /** Format: date-time */
             createdAt?: string;
+        };
+        ReviewCommentRequest: {
+            body: string;
+        };
+        ReviewComment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            reviewId: string;
+            /** Format: uuid */
+            userId: string;
+            authorName: string;
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ReviewCommentPage: {
+            items: components["schemas"]["ReviewComment"][];
+            total: number;
         };
         AdminReview: components["schemas"]["ProductReview"] & {
             /** Format: uuid */
@@ -2053,6 +2112,83 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listReviewComments: {
+        parameters: {
+            query?: {
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Страница комментариев */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCommentPage"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createReviewComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description Комментарий создан */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewComment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteReviewComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Комментарий удалён */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
