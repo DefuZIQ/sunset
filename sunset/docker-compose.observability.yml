@@ -5,6 +5,18 @@ x-log-rotation: &log-rotation
     max-file: "3"
 
 services:
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    restart: unless-stopped
+    logging: *log-rotation
+    pid: host
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro,rslave
+    security_opt:
+      - no-new-privileges:true
+
   prometheus:
     image: prom/prometheus:v2.55.1
     restart: unless-stopped
@@ -19,6 +31,8 @@ services:
     depends_on:
       api-gateway:
         condition: service_healthy
+      node-exporter:
+        condition: service_started
 
   grafana:
     image: grafana/grafana:11.3.1

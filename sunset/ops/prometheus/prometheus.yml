@@ -15,3 +15,8 @@ scrape_configs:
           - product-service:8082
           - order-service:8083
           - notification-service:8084
+
+  - job_name: sunset-host
+    static_configs:
+      - targets:
+          - node-exporter:9100
