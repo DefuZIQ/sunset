@@ -70,15 +70,15 @@ start_service auth backend/auth-service/target/auth-service.jar 8081
 start_service product backend/product-service/target/product-service.jar 8082
 start_service order backend/order-service/target/order-service.jar 8083
 
-export SPRING_CLOUD_GATEWAY_ROUTES_0_ID=auth-e2e
-export SPRING_CLOUD_GATEWAY_ROUTES_0_URI=http://127.0.0.1:8081
-export SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0='Path=/auth/**'
-export SPRING_CLOUD_GATEWAY_ROUTES_1_ID=product-e2e
-export SPRING_CLOUD_GATEWAY_ROUTES_1_URI=http://127.0.0.1:8082
-export SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0='Path=/products/**'
-export SPRING_CLOUD_GATEWAY_ROUTES_2_ID=order-e2e
-export SPRING_CLOUD_GATEWAY_ROUTES_2_URI=http://127.0.0.1:8083
-export SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0='Path=/order/**'
+export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_0_ID=auth-e2e
+export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_0_URI=http://127.0.0.1:8081
+export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_0_PREDICATES_0='Path=/auth/**'
+export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_1_ID=product-e2e
+export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_1_URI=http://127.0.0.1:8082
+export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_1_PREDICATES_0='Path=/products/**'
+export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_2_ID=order-e2e
+export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_2_URI=http://127.0.0.1:8083
+export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_2_PREDICATES_0='Path=/order/**'
 start_service gateway backend/api-gateway/target/api-gateway.jar 8080
 
 maven_args=(--batch-mode -q -pl backend/order-service -am
