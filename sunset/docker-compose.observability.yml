@@ -1,7 +1,14 @@
+x-log-rotation: &log-rotation
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   prometheus:
     image: prom/prometheus:v2.55.1
     restart: unless-stopped
+    logging: *log-rotation
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=15d
@@ -16,6 +23,7 @@ services:
   grafana:
     image: grafana/grafana:11.3.1
     restart: unless-stopped
+    logging: *log-rotation
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
@@ -33,6 +41,7 @@ services:
   tempo:
     image: grafana/tempo:2.6.1
     restart: unless-stopped
+    logging: *log-rotation
     command: ["-config.file=/etc/tempo/tempo.yml"]
     volumes:
       - ./ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
