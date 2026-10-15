@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/Main/ProductCard";
 import ProductCardSkeleton from "../components/Main/ProductCardSkeleton";
@@ -20,6 +20,7 @@ const sizeGroup = (type = "clothing") => type === "women_dress" ? "dresses"
       : type === "shoes" ? "shoes" : type === "women_clothing" ? "womenClothing" : type === "men_clothing" ? "menClothing" : "clothing";
 const sizeKey = (stock) => `${stock.sizeType || "clothing"}:${stock.sizeName}`;
 const mobileQuery = "(max-width: 760px)";
+const filterDrawerQuery = "(max-width: 900px)";
 const pageNumbers = (current, count) => {
   const pages = new Set([1, count]);
   for (let page = Math.max(1, current - 2); page <= Math.min(count, current + 2); page += 1) pages.add(page);
@@ -31,6 +32,9 @@ export default function MainCatalog() {
   const [params, setParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia(mobileQuery).matches);
+  const [isFilterDrawer, setIsFilterDrawer] = useState(() => window.matchMedia(filterDrawerQuery).matches);
+  const filterToggleRef = useRef(null);
+  const filterSidebarRef = useRef(null);
   const [pickupStores, setPickupStores] = useState([]);
   const [storesError, setStoresError] = useState("");
   const [storesReloadKey, setStoresReloadKey] = useState(0);
@@ -74,6 +78,16 @@ export default function MainCatalog() {
   useEffect(() => {
     const media = window.matchMedia(mobileQuery);
     const onChange = (event) => setIsMobile(event.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia(filterDrawerQuery);
+    const onChange = (event) => {
+      setIsFilterDrawer(event.matches);
+      if (!event.matches) setFiltersOpen(false);
+    };
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
   }, []);
@@ -174,11 +188,33 @@ export default function MainCatalog() {
   };
 
   useEffect(() => {
-    if (!filtersOpen) return undefined;
+    if (!filtersOpen || !isFilterDrawer) return undefined;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previous; };
-  }, [filtersOpen]);
+    const sidebar = filterSidebarRef.current;
+    sidebar?.querySelector(".filter-close")?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setFiltersOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !sidebar) return;
+      const focusable = [...sidebar.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter((element) => element.getClientRects().length > 0);
+      if (!focusable.length) { event.preventDefault(); sidebar.focus(); return; }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener("keydown", onKeyDown);
+      if (filterToggleRef.current?.getClientRects().length) filterToggleRef.current.focus();
+    };
+  }, [filtersOpen, isFilterDrawer]);
 
   const update = (key, value, replace = false) => changeFilters((current) => ({ ...current, [key]: value }), replace);
   const setStore = (storeId) => changeFilters((current) => ({ ...current, storeId, availability: storeId && current.availability === "all" ? "in-stock" : current.availability }));
@@ -209,7 +245,7 @@ export default function MainCatalog() {
             <option value="new">Сначала новинки</option><option value="price-asc">Сначала дешевле</option>
             <option value="price-desc">Сначала дороже</option><option value="rating-desc">По рейтингу</option><option value="name">По названию</option>
           </select>
-          <button className="filter-toggle" onClick={() => setFiltersOpen(true)}>Фильтры {activeChips.length ? `· ${activeChips.length}` : ""}</button>
+          <button ref={filterToggleRef} className="filter-toggle" aria-controls="catalog-filter-panel" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(true)}>Фильтры {activeChips.length ? `· ${activeChips.length}` : ""}</button>
         </div>
       </header>
 
@@ -223,8 +259,8 @@ export default function MainCatalog() {
       </div>}
 
       <div className="catalog-layout">
-        {filtersOpen && <button className="filter-backdrop" aria-label="Закрыть фильтры" onClick={() => setFiltersOpen(false)} />}
-        <aside className={`filter-sidebar ${filtersOpen ? "open" : ""}`} aria-label="Фильтры каталога">
+        {filtersOpen && isFilterDrawer && <button className="filter-backdrop" aria-label="Закрыть фильтры" tabIndex={-1} onClick={() => setFiltersOpen(false)} />}
+        <aside ref={filterSidebarRef} id="catalog-filter-panel" className={`filter-sidebar ${filtersOpen ? "open" : ""}`} role={isFilterDrawer ? "dialog" : undefined} aria-modal={isFilterDrawer && filtersOpen ? "true" : undefined} aria-label="Фильтры каталога" tabIndex={isFilterDrawer ? -1 : undefined} inert={isFilterDrawer && !filtersOpen}>
           <div className="filter-heading"><div><span>Подбор товара</span><h2>Фильтры</h2></div><div className="filter-heading__tools">{activeChips.length > 0 && <button type="button" className="filter-heading__reset" onClick={reset}>Сбросить</button>}<button className="filter-close" onClick={() => setFiltersOpen(false)} aria-label="Закрыть">×</button></div></div>
           <label className="filter-field"><span>Поиск в каталоге</span><input value={filter.search} onChange={(event) => update("search", event.target.value, true)} placeholder="Футболка, худи…" /></label>
 

@@ -91,6 +91,33 @@ test('availability and review rating are the first catalog filter sections', asy
   await expect(page.locator('.filter-sidebar .filter-section h3').nth(1)).toHaveText('Рейтинг по отзывам');
 });
 
+test('filter drawer keeps keyboard focus inside and restores it when closed', async ({ page }) => {
+  if (page.viewportSize()?.width > 900) await page.setViewportSize({ width: 800, height: 900 });
+  await page.goto('/#/catalog');
+  const toggle = page.locator('.filter-toggle');
+  const sidebar = page.locator('.filter-sidebar');
+  await expect(sidebar).toHaveAttribute('inert', '');
+  await toggle.focus();
+  await page.keyboard.press('Tab');
+  expect(await page.evaluate(() => Boolean(document.activeElement?.closest('.filter-sidebar')))).toBe(false);
+
+  await toggle.click();
+  await expect(page.getByRole('dialog', { name: 'Фильтры каталога' })).toBeVisible();
+  await expect(sidebar.locator('.filter-close')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  expect(await page.evaluate(() => Boolean(document.activeElement?.closest('.filter-sidebar')))).toBe(true);
+  await page.keyboard.press('Tab');
+  await expect(sidebar.locator('.filter-close')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(sidebar).toHaveAttribute('inert', '');
+  await expect(toggle).toBeFocused();
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await expect(sidebar).not.toHaveAttribute('inert', '');
+  await sidebar.getByPlaceholder('Футболка, худи…').focus();
+  await expect(sidebar.getByPlaceholder('Футболка, худи…')).toBeFocused();
+});
+
 test('catalog availability can be limited to a specific store', async ({ page }) => {
   await page.route('**/api/v1/products/all/availability?storeId=*', (route) => route.fulfill({ json: [
     { productId: products[1].id, sizeId: 'men-l', colorId: 'brown', quantity: 2 },
@@ -1427,6 +1454,7 @@ test('checkout blocks an empty phone number', async ({ page }) => {
   });
 
   await page.getByRole('button', { name: 'Самовывоз', exact: true }).click();
+  await expect(page.getByRole('button', { name: /SUNSET Нижний Новгород/ })).toHaveClass(/active/);
   await page.getByRole('button', { name: 'Изменить телефон' }).click();
   await page.locator('.checkout-phone input').fill('');
   await page.getByRole('button', { name: 'Оформить заказ' }).click();
