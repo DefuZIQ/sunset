@@ -157,6 +157,22 @@ export async function getProfile(token: string): Promise<UserProfile> {
   return readJson<UserProfile>(await fetch("/api/v1/auth/profile", { headers: bearer(token) }));
 }
 
+export type IamIdentity = { role: string; permissions: string[] };
+
+export async function getIamIdentity(token: string): Promise<IamIdentity> {
+  return readJson<IamIdentity>(await fetch("/api/v1/auth/iam/me", { headers: bearer(token) }));
+}
+
+export async function getIamUserPermissions(token: string, id: string): Promise<IamIdentity> {
+  return readJson<IamIdentity>(await fetch(`/api/v1/auth/iam/staff/${encodeURIComponent(id)}/permissions`, { headers: bearer(token) }));
+}
+
+export async function updateIamUserPermissions(token: string, id: string, permissions: string[]): Promise<IamIdentity> {
+  return readJson<IamIdentity>(await fetch(`/api/v1/auth/iam/staff/${encodeURIComponent(id)}/permissions`, {
+    method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify({ permissions }),
+  }));
+}
+
 export async function updateProfile(token: string, request: UpdateProfileRequest): Promise<UserProfile> {
   return readJson<UserProfile>(await fetch("/api/v1/auth/profile", {
     method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
@@ -167,6 +183,12 @@ export async function changePassword(token: string, request: ChangePasswordReque
   return readJson<components["schemas"]["Message"]>(await fetch("/api/v1/auth/profile/password", {
     method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
   }));
+}
+
+export async function revokeSession(token: string): Promise<void> {
+  const response = await fetch("/api/v1/auth/logout", { method: "POST", headers: bearer(token) });
+  // An expired or already revoked bearer is no longer a live server session.
+  if (!response.ok && response.status !== 401) throw new ApiHttpError(response.status, "Не удалось завершить сеанс на сервере");
 }
 
 export async function listAdminOrders(token: string): Promise<Order[]> {

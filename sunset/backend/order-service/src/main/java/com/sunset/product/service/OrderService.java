@@ -1,5 +1,7 @@
 package com.sunset.product.service;
 
+import com.sunset.contract.IamAccess;
+
 import com.sunset.product.dto.OrderDtos.CreateOrderRequest;
 import com.sunset.product.dto.OrderDtos.OrderItemRequest;
 import com.sunset.product.dto.OrderDtos.PromotionRequest;
@@ -24,10 +26,12 @@ public class OrderService {
     private static final Set<String> STATUSES = Set.of("PENDING", "CONFIRMED", "ASSEMBLING", "SHIPPED", "DELIVERED", "CANCELLED");
     private static final Set<String> RETURN_STATUSES = Set.of("REQUESTED", "APPROVED", "REJECTED", "RECEIVED", "REFUNDED");
     private final JdbcTemplate jdbc;
+    private final IamAccess access;
     private final PaymentProvider paymentProvider;
 
     public OrderService(JdbcTemplate jdbc, PaymentProvider paymentProvider) {
         this.jdbc = jdbc;
+        this.access = new IamAccess(jdbc);
         this.paymentProvider = paymentProvider;
     }
 
@@ -197,16 +201,16 @@ public class OrderService {
         return promo;
     }
 
-    public List<Map<String, Object>> adminOrders(UUID userId) { ensureAdmin(userId); return jdbc.query("SELECT * FROM orders ORDER BY created_at DESC", (rs,n) -> orderMap(rs)); }
+    public List<Map<String, Object>> adminOrders(UUID userId) { access.require(userId, "orders:read"); return jdbc.query("SELECT * FROM orders ORDER BY created_at DESC", (rs,n) -> orderMap(rs)); }
     public List<Map<String, Object>> adminUsers(UUID userId) {
-        ensureAdmin(userId);
+        access.require(userId, "customers:read");
         return jdbc.queryForList("SELECT u.id,u.email,u.first_name AS \"firstName\",u.last_name AS \"lastName\",u.phone,u.birthday,u.role,u.created_at AS \"createdAt\",COALESCE(l.balance,0) AS \"bonusBalance\",COUNT(o.id) AS \"orderCount\",COALESCE(SUM(o.total_amount),0) AS \"orderTotal\" FROM users u LEFT JOIN loyalty_accounts l ON l.user_id=u.id LEFT JOIN orders o ON o.user_id=u.id GROUP BY u.id,l.balance ORDER BY u.created_at DESC");
     }
-    public List<Map<String, Object>> adminPromotions(UUID userId) { ensureAdmin(userId); return jdbc.queryForList("SELECT * FROM promotions ORDER BY created_at DESC"); }
+    public List<Map<String, Object>> adminPromotions(UUID userId) { access.require(userId, "promotions:manage"); return jdbc.queryForList("SELECT * FROM promotions ORDER BY created_at DESC"); }
 
     @Transactional
     public Map<String, Object> adjustBonuses(UUID adminId, UUID targetUserId, BonusAdjustmentRequest request) {
-        ensureAdmin(adminId);
+        access.require(adminId, "customers:bonuses:write");
         int amount = request == null || request.amount() == null ? 0 : request.amount();
         if (amount == 0 || Math.abs(amount) > 100000) throw new IllegalArgumentException("Укажите изменение бонусов от −100 000 до 100 000");
         if (jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE id=?", Integer.class, targetUserId) == 0) throw new IllegalArgumentException("Клиент не найден");
@@ -222,7 +226,7 @@ public class OrderService {
 
     @Transactional
     public Map<String, Object> updateStatus(UUID userId, UUID orderId, String status) {
-        ensureAdmin(userId);
+        access.require(userId, "orders:manage");
         String normalized = status == null ? "" : status.toUpperCase(Locale.ROOT);
         if (!STATUSES.contains(normalized)) throw new IllegalArgumentException("Недопустимый статус");
         String previous = jdbc.queryForObject("SELECT status FROM orders WHERE id=? FOR UPDATE", String.class, orderId);
@@ -276,13 +280,13 @@ public class OrderService {
     }
 
     public List<Map<String, Object>> adminReturns(UUID adminId) {
-        ensureAdmin(adminId);
+        access.require(adminId, "orders:read");
         return jdbc.queryForList("SELECT r.*,o.order_number AS \"orderNumber\",u.email FROM return_requests r JOIN orders o ON o.id=r.order_id JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC");
     }
 
     @Transactional
     public Map<String, Object> updateReturn(UUID adminId, UUID returnId, ReturnStatusRequest request) {
-        ensureAdmin(adminId);
+        access.require(adminId, "orders:manage");
         String status = request == null || request.status() == null ? "" : request.status().toUpperCase(Locale.ROOT);
         if (!RETURN_STATUSES.contains(status)) throw new IllegalArgumentException("Недопустимый статус возврата");
         Map<String, Object> current = jdbc.queryForMap("SELECT order_id,refund_amount,status FROM return_requests WHERE id=? FOR UPDATE", returnId);
@@ -298,7 +302,7 @@ public class OrderService {
     }
 
     public Map<String, Object> adminAnalytics(UUID adminId) {
-        ensureAdmin(adminId);
+        access.require(adminId, "orders:read");
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("orders", jdbc.queryForMap("SELECT COUNT(*) AS total,COUNT(*) FILTER (WHERE created_at>=NOW()-INTERVAL '30 days') AS \"last30Days\",COALESCE(SUM(total_amount) FILTER (WHERE status<>'CANCELLED'),0) AS revenue FROM orders"));
         result.put("returns", jdbc.queryForMap("SELECT COUNT(*) AS total,COUNT(*) FILTER (WHERE status='REQUESTED') AS requested FROM return_requests"));
@@ -322,7 +326,7 @@ public class OrderService {
 
     @Transactional
     public Map<String, Object> createPromotion(UUID userId, PromotionRequest request) {
-        ensureAdmin(userId);
+        access.require(userId, "promotions:manage");
         if (request == null || request.code() == null || request.code().isBlank() || request.title() == null || request.title().isBlank()) throw new IllegalArgumentException("Укажите код и название акции");
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO promotions(id,code,title,description,discount_percent,bonus_multiplier,min_order,birthday_only,active,valid_from,valid_until,usage_limit) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -480,9 +484,5 @@ public class OrderService {
         return row;
     }
 
-    private void ensureAdmin(UUID userId) {
-        List<String> roles = jdbc.query("SELECT role FROM users WHERE id=?", (rs,n) -> rs.getString(1), userId);
-        if (roles.isEmpty() || !"ADMIN".equalsIgnoreCase(roles.get(0))) throw new SecurityException("Требуются права администратора");
-    }
     private String valueOr(String value, String fallback) { return value == null || value.isBlank() ? fallback : value.trim(); }
 }

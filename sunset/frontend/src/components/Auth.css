@@ -9,3 +9,4 @@
 .reg_info { display: none; }
 @media (max-width: 760px) { .login_background, .reg_background { min-height: 100svh; padding: calc(72px + 1rem) 0 1rem; } .login_form, .reg_form { padding: 2rem 1.5rem; } }
 @media (max-width: 380px) { .login_form, .reg_form { padding-inline: 1.1rem; } }
+.auth-notice { margin: 0 0 18px; color: #5f704e; font-size: 14px; line-height: 1.45; }

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { loginCustomer } from "../api/client";
 import "./Auth.css";
 
@@ -9,6 +9,7 @@ export default function Login({ setUser }) {
   const [error, setError] = useState(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -49,6 +50,7 @@ export default function Login({ setUser }) {
         <div className="login_inline row">
           <div className="login_form col-5">
             <h1>Вход</h1>
+            {location.state?.notice && <p className="auth-notice" role="status">{location.state.notice}</p>}
             <form onSubmit={handleSubmit}>
               <input
                 type="email"

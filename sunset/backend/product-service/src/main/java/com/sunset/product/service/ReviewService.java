@@ -1,5 +1,7 @@
 package com.sunset.product.service;
 
+import com.sunset.contract.IamAccess;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -130,8 +132,7 @@ public class ReviewService {
     }
 
     private void ensureAdmin(UUID userId) {
-        List<String> roles = jdbc.query("SELECT role FROM users WHERE id=?", (rs, row) -> rs.getString(1), userId);
-        if (roles.isEmpty() || !"ADMIN".equalsIgnoreCase(roles.get(0))) throw new SecurityException("Требуются права администратора");
+        new IamAccess(jdbc).require(userId, "reviews:moderate");
     }
 
     public List<Map<String, Object>> categoryTree() {

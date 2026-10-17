@@ -13,6 +13,7 @@ import com.sunset.auth.repository.UserRepository;
 import com.sunset.auth.security.JwtUtil;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -24,10 +25,12 @@ public class AuthService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final JwtUtil jwtUtil;
+    private final AuthSessionService sessions;
 
-    public AuthService(UserRepository userRepository, JwtUtil jwtUtil) {
+    public AuthService(UserRepository userRepository, JwtUtil jwtUtil, AuthSessionService sessions) {
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
+        this.sessions = sessions;
     }
 
     public AuthResponse registerUser(RegisterRequest request) {
@@ -48,6 +51,7 @@ public class AuthService {
         return new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhone(), user.getRole(), null);
     }
 
+    @Transactional
     public AuthResponse loginUser(LoginRequest request) {
         Optional<User> optionalUser = userRepository.findByEmail(request.getEmail());
         if (optionalUser.isEmpty()) {
@@ -60,7 +64,8 @@ public class AuthService {
         }
 
         // Преобразуем UUID в строку для генерации токена
-        String token = jwtUtil.generateToken(user.getId());
+        String token = jwtUtil.generateToken(user.getId(), user.getRole());
+        sessions.record(token, user.getId());
 
         return new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhone(), user.getRole(), token);
     }
@@ -100,6 +105,7 @@ public class AuthService {
         return UserDTO.fromUser(userRepository.save(user));
     }
 
+    @Transactional
     public void changePassword(UUID userId, ChangePasswordRequest request) {
         User user = findUser(userId);
         String currentPassword = request == null ? null : request.getCurrentPassword();
@@ -123,6 +129,7 @@ public class AuthService {
 
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+        sessions.revokeAll(userId);
     }
 
     private User findUser(UUID userId) {

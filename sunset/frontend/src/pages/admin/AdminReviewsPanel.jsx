@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { listAdminReviews, moderateAdminReview, saveAdminReviewReply } from "../../api/client";
 
 export default function AdminReviewsPanel() {
@@ -14,7 +13,7 @@ export default function AdminReviewsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listAdminReviews(localStorage.getItem("authToken"));
+      const data = await listAdminReviews(sessionStorage.getItem("adminAuthToken"));
       setReviews(data);
       setDrafts(Object.fromEntries(data.map((item) => [item.id, item.storeReply || ""])));
       setMessage("");
@@ -30,7 +29,7 @@ export default function AdminReviewsPanel() {
   const save = async (item, reply) => {
     setSaving(item.id);
     try {
-      const updated = await saveAdminReviewReply(localStorage.getItem("authToken"), item.id, { reply });
+      const updated = await saveAdminReviewReply(sessionStorage.getItem("adminAuthToken"), item.id, { reply });
       setReviews((current) => current.map((review) => review.id === item.id ? updated : review));
       setDrafts((current) => ({ ...current, [item.id]: updated.storeReply || "" }));
       setMessage(reply ? "Ответ магазина сохранён" : "Ответ магазина удалён");
@@ -43,7 +42,7 @@ export default function AdminReviewsPanel() {
   const moderate = async (item) => {
     setModerating(item.id);
     try {
-      const updated = await moderateAdminReview(localStorage.getItem("authToken"), item.id, { isHidden: !item.isHidden });
+      const updated = await moderateAdminReview(sessionStorage.getItem("adminAuthToken"), item.id, { isHidden: !item.isHidden });
       setReviews((current) => current.map((review) => review.id === item.id ? updated : review));
       setMessage(updated.isHidden ? "Отзыв скрыт из магазина и рейтинга" : "Отзыв снова опубликован");
     } catch (error) {
@@ -58,7 +57,7 @@ export default function AdminReviewsPanel() {
     <div className="admin-review-panel__filters" aria-label="Фильтр отзывов">{[["all", "Все"], ["published", "Опубликованы"], ["hidden", "Скрыты"], ["unanswered", "Без ответа"], ["answered", "С ответом"]].map(([value, label]) => <button type="button" key={value} className={filter === value ? "active" : ""} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div>
     {message && <p className="admin-review-panel__message" role="status">{message}</p>}
     {loading ? <p>Загружаем отзывы…</p> : visible.length ? <div className="admin-review-panel__list">{visible.map((item) => <article className="admin-review-card" key={item.id}>
-      <div className="admin-review-card__meta"><Link to={`/catalog/product/${item.productId}`}>{item.productName}</Link><span>{item.authorName} · {item.rating} ★{item.verifiedPurchase ? " · покупка подтверждена" : ""}</span><span className={`admin-review-card__status ${item.isHidden ? "is-hidden" : ""}`}>{item.isHidden ? "Скрыт" : "Опубликован"}</span><time>{item.createdAt ? new Date(item.createdAt).toLocaleDateString("ru-RU") : ""}</time></div>
+      <div className="admin-review-card__meta"><a href={`/#/catalog/product/${item.productId}`}>{item.productName}</a><span>{item.authorName} · {item.rating} ★{item.verifiedPurchase ? " · покупка подтверждена" : ""}</span><span className={`admin-review-card__status ${item.isHidden ? "is-hidden" : ""}`}>{item.isHidden ? "Скрыт" : "Опубликован"}</span><time>{item.createdAt ? new Date(item.createdAt).toLocaleDateString("ru-RU") : ""}</time></div>
       <p>{item.body}</p>
       {item.photoUrl && !item.isHidden && <img className="admin-review-card__photo" src={item.photoUrl} alt="Фото покупателя к отзыву" loading="lazy" />}
       {item.storeReply && <blockquote><strong>SUNSET отвечает</strong><span>{item.storeReply}</span></blockquote>}

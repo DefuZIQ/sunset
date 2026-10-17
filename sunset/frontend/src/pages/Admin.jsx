@@ -3,27 +3,29 @@ import { categoryMatches } from "../components/AdminCategoryTree";
 import AdminProductsPanel, { AdminEditProductDialog } from "./admin/AdminProductsPanel";
 import AdminStockPanel from "./admin/AdminStockPanel";
 import AdminReviewsPanel from "./admin/AdminReviewsPanel";
+import AdminAccessPanel from "./admin/AdminAccessPanel";
 import { adjustAdminBonuses, createAdminProduct, createAdminPromotion, deleteAdminProduct, getAdminAnalytics, getAdminLocationStock, getCategoryTree, listAdminLocations, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock } from "../api/client";
 import "./Admin.css";
 
-const adminToken = () => localStorage.getItem("authToken") || "";
+const adminToken = () => sessionStorage.getItem("adminAuthToken") || "";
 const blankProduct = { name:"",description:"",price:"",quantity:10,category:"Женские боди",gender:"WOMEN",imageUrl:"/images/products/1.png" };
 const leafCategory = (item) => item?.categories?.[item.categories.length-1] || "";
 const orderStatusLabels={PENDING:"Новый",CONFIRMED:"Подтверждён",ASSEMBLING:"Собирается",SHIPPED:"Доставка",DELIVERED:"Доставлен",CANCELLED:"Отменён"};
 const nextOrderStatuses={PENDING:["CONFIRMED","CANCELLED"],CONFIRMED:["ASSEMBLING","CANCELLED"],ASSEMBLING:["SHIPPED","CANCELLED"],SHIPPED:["DELIVERED"],DELIVERED:[],CANCELLED:[]};
 
-export default function Admin() {
+export default function Admin({ identity = { role: "ADMIN", permissions: [] } }) {
+  const can = useCallback((permission) => identity.role === "ADMIN" || identity.permissions?.includes(permission), [identity]);
   const [tab,setTab]=useState("overview"); const [orders,setOrders]=useState([]); const [users,setUsers]=useState([]); const [promos,setPromos]=useState([]); const [products,setProducts]=useState([]); const [categoryTree,setCategoryTree]=useState([]); const [returns,setReturns]=useState([]); const [analytics,setAnalytics]=useState(null); const [message,setMessage]=useState("");
   const [product,setProduct]=useState(blankProduct); const [editing,setEditing]=useState(null); const [productGender,setProductGender]=useState("ALL"); const [productCategoryFilter,setProductCategoryFilter]=useState(""); const [stockCategory,setStockCategory]=useState(""); const [stockProductId,setStockProductId]=useState(""); const [stockDraft,setStockDraft]=useState([]); const [stockOptions,setStockOptions]=useState({colors:[],sizes:[]}); const [newVariant,setNewVariant]=useState({colorId:"",sizeId:"",quantity:0}); const [bonusDraft,setBonusDraft]=useState({});
   const [locations,setLocations]=useState([]); const [stockLocationId,setStockLocationId]=useState(""); const [stockLoading,setStockLoading]=useState(false); const [stockError,setStockError]=useState(""); const [stockReloadKey,setStockReloadKey]=useState(0);
   const [promo,setPromo]=useState({code:"",title:"",description:"",discountPercent:10,bonusMultiplier:1,minOrder:0,birthdayOnly:false,active:true});
 
   const load=useCallback(async()=>{
-    const token=localStorage.getItem("authToken");
+    const token=adminToken();
     if(!token){setMessage("Войдите в аккаунт администратора");return;}
     const [ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult,locationsResult]=await Promise.allSettled([
-      listAdminOrders(token),listAdminUsers(token),listAdminPromotions(token),listProducts(),
-      listAdminVariants(token),getCategoryTree(),listAdminReturns(token),getAdminAnalytics(token),listAdminLocations(token),
+      can("orders:read")?listAdminOrders(token):[],can("customers:read")?listAdminUsers(token):[],can("promotions:manage")?listAdminPromotions(token):[],listProducts(),
+      can("stock:write")?listAdminVariants(token):{colors:[],sizes:[]},getCategoryTree(),can("orders:read")?listAdminReturns(token):[],can("orders:read")?getAdminAnalytics(token):null,can("stock:write")?listAdminLocations(token):[],
     ]);
     if(ordersResult.status==="fulfilled")setOrders(ordersResult.value);
     if(usersResult.status==="fulfilled")setUsers(usersResult.value);
@@ -49,8 +51,9 @@ export default function Admin() {
     const failed=[ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult,locationsResult]
       .find((result)=>result.status==="rejected");
     if(failed)setMessage(failed.reason?.message||"Часть данных магазина не загрузилась");
-  },[]);
+  },[can]);
   useEffect(()=>{load();},[load]);
+  useEffect(()=>{if(!can("orders:read"))setTab(can("catalog:write")?"products":can("stock:write")?"stock":can("reviews:moderate")?"reviews":can("promotions:manage")?"promos":can("customers:read")?"users":"overview");},[can]);
   const stockCategoryProducts=useMemo(()=>products.filter((item)=>categoryMatches(categoryTree,stockCategory,item.categories||[])),[products,categoryTree,stockCategory]);
   const selectedStock=useMemo(()=>stockCategoryProducts.find((item)=>String(item.id)===String(stockProductId)),[stockCategoryProducts,stockProductId]);
   const expectedSizeType=useMemo(()=>{const category=leafCategory(selectedStock).toLowerCase();if(category.match(/аксессуар|сумк|ремн|головн|кепк|очк|час/))return "accessory";if(category.includes("плать"))return "women_dress";if(category.includes("джинс"))return "jeans";if(category.includes("брюк"))return selectedStock?.gender==="MEN"?"men_trousers":"women_trousers";return selectedStock?.gender==="MEN"?"men_clothing":"women_clothing";},[selectedStock]);
@@ -59,12 +62,12 @@ export default function Admin() {
     if(!stockProductId||!stockLocationId){setStockDraft([]);return;}
     let current=true;
     setStockLoading(true);setStockError("");setStockDraft([]);
-    getAdminLocationStock(adminToken(),stockProductId,stockLocationId)
+    (can("stock:write") ? getAdminLocationStock(adminToken(),stockProductId,stockLocationId) : Promise.resolve([]))
       .then((rows)=>{if(current)setStockDraft(rows.map((item)=>({...item})));})
       .catch((error)=>{if(current)setStockError(error.message||"Не удалось загрузить остатки точки");})
       .finally(()=>{if(current)setStockLoading(false);});
     return()=>{current=false;};
-  },[stockProductId,stockLocationId,stockReloadKey]);
+  },[stockProductId,stockLocationId,stockReloadKey,can]);
   useEffect(()=>{if(stockCategoryProducts.length&&!stockCategoryProducts.some((item)=>String(item.id)===String(stockProductId)))setStockProductId(stockCategoryProducts[0].id);},[stockCategoryProducts,stockProductId]);
   useEffect(()=>{if(allowedStockSizes.length&&!allowedStockSizes.some((size)=>String(size.id)===String(newVariant.sizeId)))setNewVariant((current)=>({...current,sizeId:allowedStockSizes[0].id}));},[allowedStockSizes,newVariant.sizeId]);
   const notify=(value)=>{setMessage(value);window.setTimeout(()=>setMessage(""),3500);};
@@ -107,13 +110,13 @@ export default function Admin() {
   }catch(error){notify(error.message);}};
 
   return <div className="page-shell container admin-page"><div className="admin-heading"><div><p className="page-kicker">SUNSET CONTROL</p><h1 className="page-title">Управление магазином</h1></div><span>{products.length} товаров · {users.length} клиентов</span></div>
-    <div className="admin-tabs">{[["overview","Обзор"],["orders","Заказы"],["returns","Возвраты"],["products","Товары"],["stock","Остатки"],["reviews","Отзывы"],["promos","Акции"],["users","Клиенты"]].map(([key,label])=><button className={tab===key?"active":""} onClick={()=>setTab(key)} key={key}>{label}</button>)}</div>{message&&<p className="admin-message">{message}</p>}
+    <div className="admin-tabs">{[["overview","Обзор","orders:read"],["orders","Заказы","orders:read"],["returns","Возвраты","orders:read"],["products","Товары","catalog:write"],["stock","Остатки","stock:write"],["reviews","Отзывы","reviews:moderate"],["promos","Акции","promotions:manage"],["users","Клиенты","customers:read"],["access","Доступ","staff:manage"]].filter(([, ,permission])=>permission==="staff:manage"?identity.role==="ADMIN":can(permission)).map(([key,label])=><button className={tab===key?"active":""} onClick={()=>setTab(key)} key={key}>{label}</button>)}</div>{message&&<p className="admin-message">{message}</p>}
 
     {tab==="overview"&&<><div className="admin-metrics"><article><span>Заказов</span><strong>{analytics?.orders?.total||0}</strong><small>За 30 дней: {analytics?.orders?.last30Days||0}</small></article><article><span>Выручка</span><strong>{Number(analytics?.orders?.revenue||0).toLocaleString("ru-RU")} ₽</strong><small>Без отменённых заказов</small></article><article><span>Возвраты</span><strong>{analytics?.returns?.requested||0}</strong><small>Ожидают решения</small></article><article><span>Низкий остаток</span><strong>{analytics?.lowStock||0}</strong><small>Вариантов по 0–3 шт.</small></article></div><div className="admin-top-products"><h2>Популярные товары</h2>{analytics?.topProducts?.map((item,index)=><div key={item.id}><i>{index+1}</i><span><strong>{item.name}</strong><small>{item.quantity} шт.</small></span><b>{Number(item.revenue).toLocaleString("ru-RU")} ₽</b></div>)}</div></>}
 
-    {tab==="orders"&&<div className="admin-table"><div className="admin-row admin-row--head"><span>Заказ</span><span>Клиент</span><span>Сумма</span><span>Статус</span></div>{orders.map((order)=><div className="admin-row" key={order.id}><span><strong>{order.orderNumber}</strong><small>{new Date(order.createdAt).toLocaleString("ru-RU")}</small></span><span>{order.customerName}<small>{order.customerPhone}</small></span><span>{Number(order.totalAmount).toLocaleString("ru-RU")} ₽</span><select value={order.status} disabled={!nextOrderStatuses[order.status]?.length} onChange={(event)=>changeStatus(order.id,event.target.value)}><option value={order.status}>{orderStatusLabels[order.status]||order.status}</option>{(nextOrderStatuses[order.status]||[]).map((status)=><option value={status} key={status}>{orderStatusLabels[status]}</option>)}</select></div>)}</div>}
+    {tab==="orders"&&<div className="admin-table"><div className="admin-row admin-row--head"><span>Заказ</span><span>Клиент</span><span>Сумма</span><span>Статус</span></div>{orders.map((order)=><div className="admin-row" key={order.id}><span><strong>{order.orderNumber}</strong><small>{new Date(order.createdAt).toLocaleString("ru-RU")}</small></span><span>{order.customerName}<small>{order.customerPhone}</small></span><span>{Number(order.totalAmount).toLocaleString("ru-RU")} ₽</span><select value={order.status} disabled={!can("orders:manage")||!nextOrderStatuses[order.status]?.length} onChange={(event)=>changeStatus(order.id,event.target.value)}><option value={order.status}>{orderStatusLabels[order.status]||order.status}</option>{(nextOrderStatuses[order.status]||[]).map((status)=><option value={status} key={status}>{orderStatusLabels[status]}</option>)}</select></div>)}</div>}
 
-    {tab==="returns"&&<div className="admin-table"><div className="admin-row admin-row--head"><span>Заказ</span><span>Клиент и причина</span><span>Сумма</span><span>Статус</span></div>{returns.map((item)=><div className="admin-row" key={item.id}><span><strong>{item.orderNumber}</strong><small>{new Date(item.created_at).toLocaleString("ru-RU")}</small></span><span>{item.email}<small>{item.reason}{item.comment?` · ${item.comment}`:""}</small></span><span>{Number(item.refund_amount).toLocaleString("ru-RU")} ₽</span><select value={item.status} onChange={(event)=>changeReturnStatus(item.id,event.target.value)}><option value="REQUESTED">Новая заявка</option><option value="APPROVED">Одобрено</option><option value="REJECTED">Отклонено</option><option value="RECEIVED">Товар получен</option><option value="REFUNDED">Деньги возвращены</option></select></div>)}</div>}
+    {tab==="returns"&&<div className="admin-table"><div className="admin-row admin-row--head"><span>Заказ</span><span>Клиент и причина</span><span>Сумма</span><span>Статус</span></div>{returns.map((item)=><div className="admin-row" key={item.id}><span><strong>{item.orderNumber}</strong><small>{new Date(item.created_at).toLocaleString("ru-RU")}</small></span><span>{item.email}<small>{item.reason}{item.comment?` · ${item.comment}`:""}</small></span><span>{Number(item.refund_amount).toLocaleString("ru-RU")} ₽</span><select value={item.status} disabled={!can("orders:manage")} onChange={(event)=>changeReturnStatus(item.id,event.target.value)}><option value="REQUESTED">Новая заявка</option><option value="APPROVED">Одобрено</option><option value="REJECTED">Отклонено</option><option value="RECEIVED">Товар получен</option><option value="REFUNDED">Деньги возвращены</option></select></div>)}</div>}
 
     {tab==="products"&&<AdminProductsPanel
       products={products} categoryTree={categoryTree} product={product} setProduct={setProduct}
@@ -134,9 +137,11 @@ export default function Admin() {
 
     {tab==="reviews"&&<AdminReviewsPanel />}
 
+    {tab==="access"&&identity.role==="ADMIN"&&<AdminAccessPanel users={users} />}
+
     {tab==="promos"&&<><form className="admin-form" onSubmit={createPromo}><p className="page-kicker">Маркетинг</p><h2>Запустить промокод</h2><div><label>Код<input required value={promo.code} onChange={(e)=>setPromo({...promo,code:e.target.value.toUpperCase()})}/></label><label>Название<input required value={promo.title} onChange={(e)=>setPromo({...promo,title:e.target.value})}/></label></div><label>Описание<textarea value={promo.description} onChange={(e)=>setPromo({...promo,description:e.target.value})}/></label><div><label>Скидка, %<input type="number" min="0" max="100" value={promo.discountPercent} onChange={(e)=>setPromo({...promo,discountPercent:e.target.value})}/></label><label>Минимальный заказ<input type="number" min="0" value={promo.minOrder} onChange={(e)=>setPromo({...promo,minOrder:e.target.value})}/></label></div><button className="primary-action">Запустить акцию</button></form><div className="promo-admin-list">{promos.map((item)=><article key={item.id}><strong>{item.code}</strong><span>{item.title}</span><small>{item.active?"Активен":"Остановлен"} · использований: {item.usage_count}</small></article>)}</div></>}
 
-    {tab==="users"&&<div className="admin-table admin-client-table"><div className="admin-row admin-users admin-row--head"><span>Клиент</span><span>Контакты</span><span>Заказы</span><span>Бонусы</span></div>{users.map((user)=><div className="admin-row admin-users" key={user.id}><span><strong>{user.firstName} {user.lastName}</strong><small>{user.role}</small></span><span>{user.email}<small>{user.phone||"Телефон не указан"}</small></span><span>{user.orderCount} · {Number(user.orderTotal).toLocaleString("ru-RU")} ₽</span><div className="bonus-control"><strong>{user.bonusBalance}</strong><input type="number" placeholder="+100 / −50" value={bonusDraft[user.id]||""} onChange={(e)=>setBonusDraft({...bonusDraft,[user.id]:e.target.value})}/><button onClick={()=>adjustBonus(user)}>Применить</button></div></div>)}</div>}
+    {tab==="users"&&<div className="admin-table admin-client-table"><div className="admin-row admin-users admin-row--head"><span>Клиент</span><span>Контакты</span><span>Заказы</span><span>Бонусы</span></div>{users.map((user)=><div className="admin-row admin-users" key={user.id}><span><strong>{user.firstName} {user.lastName}</strong><small>{user.role}</small></span><span>{user.email}<small>{user.phone||"Телефон не указан"}</small></span><span>{user.orderCount} · {Number(user.orderTotal).toLocaleString("ru-RU")} ₽</span><div className="bonus-control"><strong>{user.bonusBalance}</strong>{can("customers:bonuses:write")&&<><input type="number" placeholder="+100 / −50" value={bonusDraft[user.id]||""} onChange={(e)=>setBonusDraft({...bonusDraft,[user.id]:e.target.value})}/><button onClick={()=>adjustBonus(user)}>Применить</button></>}</div></div>)}</div>}
 
     <AdminEditProductDialog editing={editing} setEditing={setEditing} categoryTree={categoryTree} onSave={saveProduct} />
   </div>;

@@ -28,9 +28,11 @@ public class JwtFilter implements GlobalFilter, Ordered {
     private String secretKey;
 
     private final WhitelistConfig whitelistConfig;
+    private final AuthSessionVerifier sessionVerifier;
 
-    public JwtFilter(WhitelistConfig whitelistConfig) {
+    public JwtFilter(WhitelistConfig whitelistConfig, AuthSessionVerifier sessionVerifier) {
         this.whitelistConfig = whitelistConfig;
+        this.sessionVerifier = sessionVerifier;
     }
 
     @Override
@@ -62,7 +64,19 @@ public class JwtFilter implements GlobalFilter, Ordered {
             String userId = claims.getSubject();
             log.debug("JWT валиден. user-id: {}", userId);
 
-            return chain.filter(withTrustedUserId(exchange, userId));
+            return sessionVerifier.isActive(token)
+                    .onErrorResume(error -> {
+                        log.error("Проверка сеанса в Auth Service недоступна: {}", error.toString());
+                        exchange.getResponse().setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
+                        return Mono.empty();
+                    })
+                    .flatMap(active -> {
+                        if (!active) {
+                            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                            return exchange.getResponse().setComplete();
+                        }
+                        return chain.filter(withTrustedUserId(exchange, userId));
+                    });
 
         } catch (ExpiredJwtException e) {
             log.warn("JWT просрочен: {}", e.getMessage());

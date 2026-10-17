@@ -1,8 +1,16 @@
 :80 {
     encode zstd gzip
 
-    @legacyAdmin path /admin /admin/
-    redir @legacyAdmin /#/admin 302
+    @adminRoot path /admin
+    redir @adminRoot /admin/ 308
+
+    @adminEntry path /admin/ /admin/*
+    handle @adminEntry {
+        root * /srv
+        try_files /admin/index.html
+        file_server
+        header Cache-Control "no-cache"
+    }
 
   @api path /api/v1/* /auth /auth/* /products /products/* /order /order/* /notifications /notifications/* /subscriptions /subscriptions/* /assistant /assistant/* /actuator/health /actuator/health/*
     handle @api {

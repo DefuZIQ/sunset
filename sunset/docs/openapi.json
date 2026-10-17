@@ -25,6 +25,36 @@
         "responses": { "200": { "description": "Выдан JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
+    "/auth/session/validate": {
+      "get": {
+        "tags": ["Auth"], "operationId": "validateSession", "summary": "Проверить действующий сеанс", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Сеанс активен" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"], "operationId": "revokeSession", "summary": "Отозвать текущий сеанс", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Сеанс завершён" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/iam/me": {
+      "get": {
+        "tags": ["Auth", "Administration"], "operationId": "getIamIdentity", "summary": "Текущая роль и действующие разрешения", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "IAM-доступ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/iam/staff/{id}/permissions": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Administration"], "operationId": "getIamUserPermissions", "summary": "Права пользователя для администратора", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Права пользователя", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      },
+      "put": {
+        "tags": ["Administration"], "operationId": "updateIamUserPermissions", "summary": "Назначить точечные права сотруднику", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamPermissionUpdate" } } } },
+        "responses": { "200": { "description": "Права сохранены", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
     "/auth/profile": {
       "get": {
         "tags": ["Auth"], "operationId": "getProfile", "summary": "Профиль текущего клиента", "security": [{ "bearerAuth": [] }],
@@ -433,6 +463,8 @@
       "NotFound": { "description": "Ресурс не найден", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
     },
     "schemas": {
+      "IamIdentity": { "type": "object", "required": ["role", "permissions"], "properties": { "role": { "type": "string" }, "permissions": { "type": "array", "items": { "type": "string" } } } },
+      "IamPermissionUpdate": { "type": "object", "required": ["permissions"], "properties": { "permissions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true } } },
       "Message": { "type": "object", "properties": { "message": { "type": "string" } } },
       "ApiError": {
         "type": "object", "required": ["code", "message", "fieldErrors", "requestId", "timestamp"],

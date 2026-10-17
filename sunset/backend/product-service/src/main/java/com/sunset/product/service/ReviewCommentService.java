@@ -1,5 +1,7 @@
 package com.sunset.product.service;
 
+import com.sunset.contract.IamAccess;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -54,8 +56,7 @@ public class ReviewCommentService {
         List<UUID> authors = jdbc.query("SELECT user_id FROM review_comments WHERE id=?", (rs, row) -> rs.getObject(1, UUID.class), commentId);
         if (authors.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Комментарий не найден");
         if (!authors.get(0).equals(userId)) {
-            List<String> roles = jdbc.query("SELECT role FROM users WHERE id=?", (rs, row) -> rs.getString(1), userId);
-            if (roles.isEmpty() || !"ADMIN".equalsIgnoreCase(roles.get(0))) {
+            if (!new IamAccess(jdbc).permissions(userId).contains("reviews:moderate")) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Можно удалить только свой комментарий");
             }
         }

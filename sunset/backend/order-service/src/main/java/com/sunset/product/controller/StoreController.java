@@ -1,4 +1,5 @@
 package com.sunset.product.controller;
+import com.sunset.contract.IamAccess;
 import com.sunset.product.model.Store;
 import com.sunset.product.repository.StoreRepository;
 import org.springframework.http.HttpStatus;
@@ -15,18 +16,16 @@ public class StoreController {
     public StoreController(StoreRepository repository, JdbcTemplate jdbc) { this.repository = repository; this.jdbc = jdbc; }
     @GetMapping public List<Store> list() { return repository.findByActiveTrueAndKindOrderByCityAscNameAsc("STORE"); }
     @GetMapping("/admin") public List<Store> listAdmin(@RequestHeader("user-id") UUID userId) {
-        ensureAdmin(userId);
+        List<String> permissions = new IamAccess(jdbc).permissions(userId);
+        if (!permissions.contains("stores:manage") && !permissions.contains("stock:write"))
+            throw new SecurityException("Недостаточно прав для просмотра точек");
         return repository.findAllByOrderByKindAscCityAscNameAsc();
     }
     @PostMapping public Store create(@RequestHeader("user-id") UUID userId, @RequestBody Store store) {
-        ensureAdmin(userId);
+        new IamAccess(jdbc).require(userId, "stores:manage");
         if (!"STORE".equals(store.getKind()) && !"WAREHOUSE".equals(store.getKind())) {
             throw new IllegalArgumentException("Тип точки должен быть STORE или WAREHOUSE");
         }
         return repository.save(store);
-    }
-    private void ensureAdmin(UUID userId) {
-        String role = jdbc.query("SELECT role FROM users WHERE id=?", rs -> rs.next() ? rs.getString(1) : null, userId);
-        if (!"ADMIN".equalsIgnoreCase(role)) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Требуются права администратора");
     }
 }

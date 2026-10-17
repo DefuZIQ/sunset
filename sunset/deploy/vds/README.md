@@ -8,13 +8,19 @@ remain on the private VM at `192.168.1.186`.
 `/api/` (plus the legacy assistant route) to `127.0.0.1:18080`. That loopback
 port is supplied by a reverse SSH tunnel initiated by the private VM. The VDS
 must never expose port `18080` publicly.
+The admin frontend is a separate entry at `https://t3ch.pro/admin/`, deployed
+on 2026-10-16 with the updated `nginx-sunset.conf`, `admin/index.html`, and Auth
+Service IAM migration/API. The admin frontend shares the origin with the
+storefront; API authorization is enforced by backend permissions, not the URL.
+The admin UI uses a separate tab-scoped token; signing out of it does not sign
+out of the customer storefront.
 Both public `/api/` locations allow a 6 MiB request body so a review photo of
 up to 5 MiB plus multipart framing reaches the product service. The service
 still validates the file type and 5 MiB file limit.
 
 TLS is provided by the Certbot certificate named `sunset-t3ch-pro`; `certbot.timer`
 renews it and `nginx-reload-after-renewal.sh` reloads nginx after renewal. The deployed static release is
-`/srv/sunset/releases/filter-design-20261011`, with `current` as a symlink. The
+`/srv/sunset/releases/sessions-20261017`, with `current` as a symlink. The
 previous releases remain under `/srv/sunset/releases/`. Test any
 replacement nginx configuration with `nginx -t` before reloading.
 

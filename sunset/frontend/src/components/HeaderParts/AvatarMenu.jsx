@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PopupActionIcon from "./PopupActionIcon";
 import usePopupDismissal from "./usePopupDismissal";
@@ -7,12 +7,22 @@ import "./AvatarMenu.css";
 export default function AvatarMenu({ isAuthenticated, user, onLogout, isPopupOpen }) {
   const navigate = useNavigate();
   const { dismissed, dismiss, reopen } = usePopupDismissal();
+  const [logoutError, setLogoutError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleLogoutClick = (e) => {
+  const handleLogoutClick = async (e) => {
     e.preventDefault();
-    dismiss();
-    onLogout();
-    navigate("/");
+    setLogoutError("");
+    setLoggingOut(true);
+    try {
+      await onLogout();
+      dismiss();
+      navigate("/");
+    } catch (error) {
+      setLogoutError(error.message || "Не удалось завершить сеанс. Попробуйте ещё раз.");
+    } finally {
+      setLoggingOut(false);
+    }
   };
   const displayName = [user?.firstName || user?.name, user?.lastName || user?.surname].filter(Boolean).join(" ") || "Клиент SUNSET";
   const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
@@ -47,11 +57,12 @@ export default function AvatarMenu({ isAuthenticated, user, onLogout, isPopupOpe
               <Link to="/profile/orders" role="menuitem">Мои заказы <PopupActionIcon name="orders" /></Link>
               <Link to="/profile/notifications" role="menuitem">Уведомления <PopupActionIcon name="notifications" /></Link>
               <Link to="/profile/settings#password" role="menuitem">Изменить пароль <PopupActionIcon name="password" /></Link>
-              {user?.role === "ADMIN" && <Link to="/admin" role="menuitem">Управление магазином <PopupActionIcon name="admin" /></Link>}
+              {["ADMIN", "STAFF"].includes(user?.role) && <a href="/admin/" role="menuitem">Управление магазином <PopupActionIcon name="admin" /></a>}
             </div>
           </div>
           <div className="profile-popup__signed-foot">
-            <button onClick={handleLogoutClick} className="logout" aria-label="Выйти">Выйти <PopupActionIcon name="logout" /></button>
+            <button onClick={handleLogoutClick} className="logout" aria-label="Выйти" disabled={loggingOut}>{loggingOut ? "Выходим…" : "Выйти"} <PopupActionIcon name="logout" /></button>
+            {logoutError && <small className="profile-popup__logout-error" role="alert">{logoutError}</small>}
           </div>
         </div>
       ) : (

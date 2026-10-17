@@ -17,6 +17,8 @@
 - [Этап эксплуатации и автоматизации](improvements/OPERATIONS_STAGE.md)
 - [Чек-лист проверки улучшений](improvements/VALIDATION_CHECKLIST.md)
 - [Безопасность и эксплуатация](improvements/SECURITY_AND_OPERATIONS.md)
+- [IAM и отдельная админка — проект и состояние внедрения](improvements/IAM_ARCHITECTURE.md)
+- [Публикация IAM и отдельной админки 16 октября](improvements/RELEASE_20261016_IAM.md)
 
 ## Сервисы
 

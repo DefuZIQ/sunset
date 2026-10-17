@@ -2,6 +2,7 @@ package com.sunset.apigateway;
 
 import com.sunset.apigateway.config.WhitelistConfig;
 import com.sunset.apigateway.security.JwtFilter;
+import com.sunset.apigateway.security.AuthSessionVerifier;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
@@ -22,10 +23,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class JwtFilterTest {
+    private final AuthSessionVerifier sessions = mock(AuthSessionVerifier.class);
+
     @Test void publicPathPassesWithoutToken() {
         WhitelistConfig config = new WhitelistConfig();
         config.setWhitelistPaths(List.of("/auth/login"));
-        JwtFilter filter = new JwtFilter(config);
+        JwtFilter filter = new JwtFilter(config, sessions);
         GatewayFilterChain chain = mock(GatewayFilterChain.class);
         when(chain.filter(any())).thenReturn(Mono.empty());
         var exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login").build());
@@ -36,7 +39,7 @@ class JwtFilterTest {
     @Test void publicPathRemovesSpoofedUserId() {
         WhitelistConfig config = new WhitelistConfig();
         config.setWhitelistPaths(List.of("/auth/login"));
-        JwtFilter filter = new JwtFilter(config);
+        JwtFilter filter = new JwtFilter(config, sessions);
         GatewayFilterChain chain = mock(GatewayFilterChain.class);
         when(chain.filter(any())).thenReturn(Mono.empty());
         var exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login")
@@ -52,12 +55,13 @@ class JwtFilterTest {
         String secret = "test-secret-that-is-at-least-32-bytes";
         WhitelistConfig config = new WhitelistConfig();
         config.setWhitelistPaths(List.of("/auth/login"));
-        JwtFilter filter = new JwtFilter(config);
+        JwtFilter filter = new JwtFilter(config, sessions);
         ReflectionTestUtils.setField(filter, "secretKey", secret);
         GatewayFilterChain chain = mock(GatewayFilterChain.class);
         when(chain.filter(any())).thenReturn(Mono.empty());
         String token = Jwts.builder().setSubject("trusted-user")
                 .signWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8))).compact();
+        when(sessions.isActive(token)).thenReturn(Mono.just(true));
         var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/order/my")
                 .header("user-id", "intruder")
                 .header("Authorization", "Bearer " + token).build());
@@ -77,7 +81,7 @@ class JwtFilterTest {
     @Test void protectedPathWithoutTokenReturnsUnauthorized() {
         WhitelistConfig config = new WhitelistConfig();
         config.setWhitelistPaths(List.of("/auth/login"));
-        JwtFilter filter = new JwtFilter(config);
+        JwtFilter filter = new JwtFilter(config, sessions);
         GatewayFilterChain chain = mock(GatewayFilterChain.class);
         var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/order/my").build());
         filter.filter(exchange, chain).block();
@@ -85,10 +89,44 @@ class JwtFilterTest {
         verifyNoInteractions(chain);
     }
 
+    @Test void revokedSessionNeverReachesBackend() {
+        String secret = "test-secret-that-is-at-least-32-bytes";
+        JwtFilter filter = new JwtFilter(new WhitelistConfig(), sessions);
+        ReflectionTestUtils.setField(filter, "secretKey", secret);
+        String token = Jwts.builder().setSubject("trusted-user")
+                .signWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8))).compact();
+        when(sessions.isActive(token)).thenReturn(Mono.just(false));
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/order/my")
+                .header("Authorization", "Bearer " + token).build());
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        verifyNoInteractions(chain);
+    }
+
+    @Test void unavailableSessionStoreFailsClosed() {
+        String secret = "test-secret-that-is-at-least-32-bytes";
+        JwtFilter filter = new JwtFilter(new WhitelistConfig(), sessions);
+        ReflectionTestUtils.setField(filter, "secretKey", secret);
+        String token = Jwts.builder().setSubject("trusted-user")
+                .signWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8))).compact();
+        when(sessions.isActive(token)).thenReturn(Mono.error(new IllegalStateException("offline")));
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/order/my")
+                .header("Authorization", "Bearer " + token).build());
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, exchange.getResponse().getStatusCode());
+        verifyNoInteractions(chain);
+    }
+
     @Test void similarPathIsNotAccidentallyPublic() {
         WhitelistConfig config = new WhitelistConfig();
         config.setWhitelistPaths(List.of("/auth/login"));
-        JwtFilter filter = new JwtFilter(config);
+        JwtFilter filter = new JwtFilter(config, sessions);
         GatewayFilterChain chain = mock(GatewayFilterChain.class);
         var exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/auth/login-evil").build());
 

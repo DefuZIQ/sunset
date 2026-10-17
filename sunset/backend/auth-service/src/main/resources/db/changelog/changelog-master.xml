@@ -23,4 +23,12 @@
         <sqlFile path="classpath:/db/migrations/V4__customer_addresses.sql"/>
     </changeSet>
 
+    <changeSet id="11" author="codex">
+        <sqlFile path="classpath:/db/migrations/V5__iam_permissions.sql"/>
+    </changeSet>
+
+    <changeSet id="12" author="codex">
+        <sqlFile path="classpath:/db/migrations/V6__auth_sessions.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

@@ -15,13 +15,12 @@ import SearchResults from "./pages/SearchResults";
 import Cart from "./pages/Cart";
 import Profile from "./pages/Profile";
 import Promotions from "./pages/Promotions";
-import Admin from "./pages/Admin";
 import AssistantWidget from "./components/AssistantWidget";
 import MobileTabBar from "./components/MobileTabBar";
 import BackToTop from "./components/BackToTop";
 import OrderDetail from "./pages/OrderDetail";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { ApiHttpError, getProfile } from "./api/client";
+import { ApiHttpError, getProfile, revokeSession } from "./api/client";
 
 import { CartProvider } from "./components/HeaderParts/CartContext";
 import { StoreProvider } from "./contexts/StoreContext";
@@ -32,9 +31,13 @@ function PageBoundary({ children }) {
   return <ErrorBoundary resetKey={`${location.pathname}${location.search}`}>{children}</ErrorBoundary>;
 }
 
+function LegacyAdminRedirect() {
+  useEffect(() => { window.location.replace("/admin/"); }, []);
+  return <p className="container">Панель управления переехала. <a href="/admin/">Открыть панель</a></p>;
+}
+
 function App() {
   const [user, setUser] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("authToken");
@@ -46,7 +49,6 @@ function App() {
       } catch {
         localStorage.removeItem("authToken");
         localStorage.removeItem("user");
-        setAuthReady(true);
         return;
       }
       setUser(cachedUser);
@@ -62,14 +64,13 @@ function App() {
             localStorage.removeItem("user");
             setUser(null);
           }
-        })
-        .finally(() => setAuthReady(true));
-    } else {
-      setAuthReady(true);
+        });
     }
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const token = localStorage.getItem("authToken");
+    if (token) await revokeSession(token);
     localStorage.removeItem("authToken");
     localStorage.removeItem("user");
     localStorage.removeItem("cartItems");
@@ -117,8 +118,8 @@ function App() {
                 path="/register"
                 element={<Registration setUser={setUser} />}
               />
-              <Route path="/admin" element={!authReady ? null : user?.role === "ADMIN" ? <Admin /> : <Navigate to="/profile" replace />} />
-              <Route path="/admin/products/new" element={<Navigate to="/admin" replace />} />
+              <Route path="/admin" element={<LegacyAdminRedirect />} />
+              <Route path="/admin/products/new" element={<LegacyAdminRedirect />} />
             </Routes>
             </PageBoundary>
           </main>

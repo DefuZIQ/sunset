@@ -8,6 +8,7 @@ import com.sunset.auth.model.User;
 import com.sunset.auth.repository.UserRepository;
 import com.sunset.auth.security.JwtUtil;
 import com.sunset.auth.service.AuthService;
+import com.sunset.auth.service.AuthSessionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -23,12 +24,14 @@ import static org.mockito.Mockito.*;
 class AuthServiceTest {
     private UserRepository repository;
     private JwtUtil jwt;
+    private AuthSessionService sessions;
     private AuthService service;
 
     @BeforeEach void setUp() {
         repository = Mockito.mock(UserRepository.class);
         jwt = Mockito.mock(JwtUtil.class);
-        service = new AuthService(repository, jwt);
+        sessions = Mockito.mock(AuthSessionService.class);
+        service = new AuthService(repository, jwt, sessions);
     }
 
     @Test void registersUserWithHashedPassword() {
@@ -56,8 +59,9 @@ class AuthServiceTest {
         UUID id = UUID.randomUUID();
         User user = user(id, "secret123");
         when(repository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-        when(jwt.generateToken(id)).thenReturn("jwt-token");
+        when(jwt.generateToken(id, "CUSTOMER")).thenReturn("jwt-token");
         assertEquals("jwt-token", service.loginUser(new LoginRequest(user.getEmail(), "secret123")).getToken());
+        verify(sessions).record("jwt-token", id);
     }
 
     @Test void rejectsWrongPassword() {
@@ -85,6 +89,7 @@ class AuthServiceTest {
         user.setFirstName("Иван");
         user.setLastName("Иванов");
         user.setPassword(new BCryptPasswordEncoder().encode(password));
+        user.setRole("CUSTOMER");
         return user;
     }
 }

@@ -8,18 +8,23 @@ import com.sunset.auth.dto.UpdateProfileRequest;
 import com.sunset.auth.exceptions.InvalidPasswordException;
 import com.sunset.auth.security.JwtUtil;
 import com.sunset.auth.service.AuthService;
+import com.sunset.auth.service.AuthSessionService;
 import com.sunset.auth.service.CustomerAddressService;
+import com.sunset.auth.controller.IamController;
+import com.sunset.contract.IamAccess;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,12 +52,48 @@ class AuthPostgresIntegrationTest {
 
     @Autowired private AuthService service;
     @Autowired private JwtUtil jwt;
+    @Autowired private AuthSessionService sessions;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private CustomerAddressService addresses;
+    @Autowired private IamController iam;
 
     @BeforeEach
     void clearUsers() {
         jdbc.execute("TRUNCATE TABLE user_roles, users CASCADE");
+    }
+
+    @Test
+    void adminCanGrantAndRevokeOnlyExplicitPermissions() {
+        UUID adminId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "admin@sunset.test", "initial-pass-123", "Анна", "Админ")).getUuid());
+        UUID staffId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "staff@sunset.test", "initial-pass-123", "Иван", "Сотрудник")).getUuid());
+        jdbc.update("UPDATE users SET role='ADMIN' WHERE id=?", adminId);
+        var adminAuth = new UsernamePasswordAuthenticationToken(adminId, null);
+        var staffAuth = new UsernamePasswordAuthenticationToken(staffId, null);
+        IamAccess access = new IamAccess(jdbc);
+
+        assertThatThrownBy(() -> access.require(staffId, "stock:write")).isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> iam.updatePermissions(staffAuth, staffId,
+                new IamController.PermissionUpdate(List.of("stock:write")))).isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> iam.updatePermissions(adminAuth, adminId,
+                new IamController.PermissionUpdate(List.of("stock:write")))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> iam.updatePermissions(adminAuth, staffId,
+                new IamController.PermissionUpdate(List.of("unknown:write")))).isInstanceOf(IllegalArgumentException.class);
+
+        iam.updatePermissions(adminAuth, staffId, new IamController.PermissionUpdate(List.of("stock:write")));
+        assertThat(access.permissions(staffId)).containsExactly("stock:write");
+        assertThat(jdbc.queryForObject("SELECT role FROM users WHERE id=?", String.class, staffId)).isEqualTo("STAFF");
+        access.require(staffId, "stock:write");
+        assertThatThrownBy(() -> access.require(staffId, "catalog:write")).isInstanceOf(SecurityException.class);
+
+        iam.updatePermissions(adminAuth, staffId, new IamController.PermissionUpdate(List.of("orders:manage")));
+        assertThat(access.permissions(staffId)).containsExactly("orders:manage", "orders:read");
+
+        iam.updatePermissions(adminAuth, staffId, new IamController.PermissionUpdate(List.of()));
+        assertThat(access.permissions(staffId)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT role FROM users WHERE id=?", String.class, staffId)).isEqualTo("CUSTOMER");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM iam_access_audit WHERE target_id=?", Integer.class, staffId)).isEqualTo(3);
     }
 
     @Test
@@ -96,6 +137,39 @@ class AuthPostgresIntegrationTest {
                 .isInstanceOf(InvalidPasswordException.class);
         assertThat(jwt.extractUserId(service.loginUser(new LoginRequest("new@sunset.test", "replacement-pass-456")).getToken()))
                 .isEqualTo(userId);
+    }
+
+    @Test
+    void logoutAndPasswordChangeRevokeServerSideSessions() {
+        UUID userId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "sessions@sunset.test", "initial-pass-123", "Анна", "Сеанс")).getUuid());
+        String first = service.loginUser(new LoginRequest("sessions@sunset.test", "initial-pass-123")).getToken();
+        String second = service.loginUser(new LoginRequest("sessions@sunset.test", "initial-pass-123")).getToken();
+        assertThat(sessions.authenticatedUser(first)).isEqualTo(userId);
+        assertThat(sessions.authenticatedUser(second)).isEqualTo(userId);
+
+        sessions.revoke(first, userId);
+        assertThat(sessions.authenticatedUser(first)).isNull();
+        assertThat(sessions.authenticatedUser(second)).isEqualTo(userId);
+
+        ChangePasswordRequest password = new ChangePasswordRequest();
+        password.setCurrentPassword("initial-pass-123");
+        password.setNewPassword("replacement-pass-456");
+        service.changePassword(userId, password);
+        assertThat(sessions.authenticatedUser(second)).isNull();
+        assertThat(sessions.authenticatedUser(service.loginUser(
+                new LoginRequest("sessions@sunset.test", "replacement-pass-456")).getToken())).isEqualTo(userId);
+    }
+
+    @Test
+    void staffTokensHaveFifteenMinuteLifetime() {
+        UUID userId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "staff-session@sunset.test", "initial-pass-123", "Иван", "Сотрудник")).getUuid());
+        jdbc.update("UPDATE users SET role='STAFF' WHERE id=?", userId);
+        String token = service.loginUser(new LoginRequest("staff-session@sunset.test", "initial-pass-123")).getToken();
+        assertThat(jwt.parse(token).getExpiration().getTime() - jwt.parse(token).getIssuedAt().getTime())
+                .isEqualTo(15 * 60 * 1000L);
+        assertThat(sessions.authenticatedUser(token)).isEqualTo(userId);
     }
 
     @Test

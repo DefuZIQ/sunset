@@ -5,9 +5,23 @@ import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotificat
   listAdminReviews, listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
     markNotificationRead, markProductReviewHelpful, moderateAdminReview, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview, voteProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
-  updateCustomerAddress, uploadProductReviewPhoto, validatePromoCode, getProfile, syncCustomerAddresses } from "./client";
+  updateCustomerAddress, uploadProductReviewPhoto, validatePromoCode, getProfile, syncCustomerAddresses, revokeSession } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("logout revokes the bearer session and accepts 204", async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, status: 204 });
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(revokeSession("jwt")).resolves.toBeUndefined();
+  expect(fetchMock).toHaveBeenCalledWith("/api/v1/auth/logout", {
+    method: "POST", headers: { Authorization: "Bearer jwt" },
+  });
+});
+
+test("logout clears an already expired server session", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({ ok: false, status: 401 }));
+  await expect(revokeSession("expired-jwt")).resolves.toBeUndefined();
+});
 
 test("deleting an own review uses the protected endpoint and accepts 204", async () => {
   const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, status: 204, json: async () => { throw new Error("204 must not be parsed"); } });

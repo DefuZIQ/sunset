@@ -39,6 +39,7 @@ const categoryTree = [
 ];
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/auth/iam/me', (route) => route.fulfill({ json: { role: 'ADMIN', permissions: ['catalog:write', 'stock:write', 'orders:read', 'orders:manage', 'reviews:moderate', 'promotions:manage', 'customers:read', 'customers:bonuses:write', 'stores:manage'] } }));
   await page.route('**/products/all', (route) => route.fulfill({ json: products }));
   await page.route('**/products/categories/tree', (route) => route.fulfill({ json: categoryTree }));
   await page.route('**/orders/promotions/public', (route) => route.fulfill({ json: [] }));
@@ -481,7 +482,9 @@ test('profile settings save phone and change password via the versioned API', as
   await passwordInputs.nth(1).fill('new-password');
   await passwordInputs.nth(2).fill('new-password');
   await page.getByRole('button', { name: 'Изменить пароль' }).click();
-  await expect(page.getByText('Пароль успешно изменён')).toBeVisible();
+  await expect(page.getByText('Пароль изменён. Войдите снова.')).toBeVisible();
+  await expect(page).toHaveURL(/#\/login$/);
+  expect(await page.evaluate(() => localStorage.getItem('authToken'))).toBeNull();
 });
 
 test('profile overview keeps its cards compact and aligned', async ({ page }) => {
@@ -553,11 +556,11 @@ test('admin dashboard loads protected data from the versioned API', async ({ pag
     });
   }
   await page.addInitScript((user) => {
-    localStorage.setItem('authToken', 'admin-token');
+    sessionStorage.setItem('adminAuthToken', 'admin-token');
     localStorage.setItem('user', JSON.stringify(user));
   }, account);
 
-  await page.goto('/#/admin');
+  await page.goto('/admin/');
   await expect(page.getByRole('heading', { name: 'Управление магазином' })).toBeVisible();
   await expect(page.getByText('2 товаров · 1 клиентов')).toBeVisible();
   await page.getByRole('button', { name: 'Заказы', exact: true }).click();
@@ -569,7 +572,7 @@ test('admin replies to a review and the reply appears on the product page', asyn
   const account = { id: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN' };
   const review = { id: 'review-1', productId: products[0].id, productName: products[0].name, authorName: 'Анна', rating: 5, body: 'Удобная рубашка', storeReply: null, isHidden: false, createdAt: '2026-10-06T00:00:00Z' };
   await page.addInitScript((user) => {
-    localStorage.setItem('authToken', 'admin-token');
+    sessionStorage.setItem('adminAuthToken', 'admin-token');
     localStorage.setItem('user', JSON.stringify(user));
   }, account);
   await page.route('**/api/v1/auth/profile', (route) => route.fulfill({ json: account }));
@@ -590,7 +593,7 @@ test('admin replies to a review and the reply appears on the product page', asyn
     review.isHidden = route.request().postDataJSON().isHidden;
     return route.fulfill({ json: review });
   });
-  await page.goto('/#/admin');
+  await page.goto('/admin/');
   await page.getByRole('button', { name: 'Отзывы', exact: true }).click();
   await expect(page.getByText('Удобная рубашка')).toBeVisible();
   await page.getByRole('textbox', { name: 'Ответ магазина' }).fill('Спасибо за отзыв!');
@@ -627,11 +630,11 @@ test('admin dashboard keeps available sections visible if one API call fails', a
   });
   await page.route('**/api/v1/products/admin/variants', (route) => route.fulfill({ json: { colors: [], sizes: [] } }));
   await page.addInitScript((user) => {
-    localStorage.setItem('authToken', 'admin-token');
+    sessionStorage.setItem('adminAuthToken', 'admin-token');
     localStorage.setItem('user', JSON.stringify(user));
   }, account);
 
-  await page.goto('/#/admin');
+  await page.goto('/admin/');
   await expect(page.getByText('Требуются права администратора')).toBeVisible();
   await expect(page.getByText('2 товаров · 0 клиентов')).toBeVisible();
   await expect(page.getByText('3 900 ₽')).toBeVisible();
@@ -661,12 +664,12 @@ test('admin product forms use versioned writes including empty-body deletion', a
       : { id: products[0].id, name: 'Льняная рубашка', price: 4500 } });
   });
   await page.addInitScript((user) => {
-    localStorage.setItem('authToken', 'admin-token');
+    sessionStorage.setItem('adminAuthToken', 'admin-token');
     localStorage.setItem('user', JSON.stringify(user));
   }, account);
   page.on('dialog', (dialog) => dialog.accept());
 
-  await page.goto('/#/admin');
+  await page.goto('/admin/');
   await expect(page.getByText('2 товаров · 0 клиентов')).toBeVisible();
   await page.getByRole('button', { name: 'Товары', exact: true }).click();
   const createForm = page.locator('.admin-products-layout form.admin-form');
@@ -726,11 +729,11 @@ test('admin order, return, promotion and bonus actions use versioned writes', as
     await route.fulfill({ json: response });
   });
   await page.addInitScript((user) => {
-    localStorage.setItem('authToken', 'admin-token');
+    sessionStorage.setItem('adminAuthToken', 'admin-token');
     localStorage.setItem('user', JSON.stringify(user));
   }, account);
 
-  await page.goto('/#/admin');
+  await page.goto('/admin/');
   await expect(page.getByText('2 товаров · 1 клиентов')).toBeVisible();
   await page.getByRole('button', { name: 'Заказы', exact: true }).click();
   await page.locator('.admin-table select').selectOption('CONFIRMED');
@@ -1331,9 +1334,64 @@ test('adds the selected size to the cart', async ({ page }) => {
 });
 
 test('redirects an unauthenticated visitor away from administration', async ({ page }) => {
-  await page.goto('/#/admin');
-  await expect(page).toHaveURL(/#\/profile$/);
-  await expect(page.getByText('Личный кабинет').first()).toBeVisible();
+  await page.goto('/admin/');
+  await expect(page.getByRole('heading', { name: 'Панель управления' })).toBeVisible();
+  await expect(page.getByLabel('Email')).toBeVisible();
+});
+
+test('staff sees only IAM-authorized administration sections', async ({ page }) => {
+  await page.route('**/api/v1/auth/iam/me', (route) => route.fulfill({ json: { role: 'STAFF', permissions: ['stock:write'] } }));
+  await page.route('**/api/v1/products/admin/variants', (route) => route.fulfill({ json: { colors: [], sizes: [] } }));
+  await page.addInitScript(() => {
+    sessionStorage.setItem('adminAuthToken', 'staff-token');
+    localStorage.setItem('user', JSON.stringify({ role: 'STAFF' }));
+  });
+  await page.goto('/admin/');
+  await expect(page.getByRole('heading', { name: 'Управление магазином' })).toBeVisible();
+  await expect(page.locator('.admin-tabs').getByRole('button', { name: 'Остатки' })).toBeVisible();
+  await expect(page.locator('.admin-tabs').getByRole('button', { name: 'Заказы' })).toHaveCount(0);
+  await expect(page.locator('.admin-tabs').getByRole('button', { name: 'Доступ' })).toHaveCount(0);
+});
+
+test('admin assigns a limited permission to an existing account', async ({ page }) => {
+  const userId = '77777777-7777-7777-7777-777777777777';
+  let saved = null;
+  await page.route('**/api/v1/order/admin/users', (route) => route.fulfill({ json: [{ id: userId, email: 'staff@example.test', firstName: 'Иван', lastName: 'Сотрудник', role: 'CUSTOMER', orderCount: 0, orderTotal: 0, bonusBalance: 0 }] }));
+  await page.route(`**/api/v1/auth/iam/staff/${userId}/permissions`, async (route) => {
+    if (route.request().method() === 'PUT') {
+      saved = route.request().postDataJSON();
+      await route.fulfill({ json: { role: 'STAFF', permissions: saved.permissions } });
+    } else await route.fulfill({ json: { role: 'CUSTOMER', permissions: [] } });
+  });
+  await page.addInitScript(() => sessionStorage.setItem('adminAuthToken', 'admin-token'));
+  await page.goto('/admin/');
+  await page.locator('.admin-tabs').getByRole('button', { name: 'Доступ' }).click();
+  await page.getByLabel('Учётная запись').selectOption(userId);
+  await page.getByLabel('Остатки магазинов и склада').check();
+  await page.getByRole('button', { name: 'Сохранить права' }).click();
+  await expect(page.getByText('Права сотрудника сохранены. Изменения действуют сразу.')).toBeVisible();
+  expect(saved).toEqual({ permissions: ['stock:write'] });
+});
+
+test('admin has a separate session from the storefront account', async ({ page }) => {
+  await page.route('**/api/v1/auth/login', (route) => route.fulfill({ json: {
+    uuid: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN', token: 'admin-token',
+  } }));
+  await page.route('**/api/v1/auth/logout', (route) => {
+    expect(route.request().headers().authorization).toBe('Bearer admin-token');
+    return route.fulfill({ status: 204 });
+  });
+  await page.addInitScript(() => localStorage.setItem('authToken', 'customer-token'));
+  await page.goto('/admin/');
+  await page.getByLabel('Email').fill('admin@example.test');
+  await page.getByLabel('Пароль').fill('correct-password');
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await expect(page.getByRole('heading', { name: 'Управление магазином' })).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem('adminAuthToken'))).toBe('admin-token');
+  expect(await page.evaluate(() => localStorage.getItem('authToken'))).toBe('customer-token');
+  await page.locator('.admin-app__header').getByRole('button', { name: 'Выйти' }).click();
+  await expect(page.getByLabel('Email')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('authToken'))).toBe('customer-token');
 });
 
 async function openCheckout(page, { geocoderAvailable = false } = {}) {

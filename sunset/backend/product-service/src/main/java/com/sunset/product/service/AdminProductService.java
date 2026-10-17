@@ -1,5 +1,7 @@
 package com.sunset.product.service;
 
+import com.sunset.contract.IamAccess;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,11 +13,12 @@ import java.util.*;
 public class AdminProductService {
     private static final UUID WAREHOUSE_ID = UUID.fromString("00000000-0000-4000-8000-000000000001");
     private final JdbcTemplate jdbc;
-    public AdminProductService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final IamAccess access;
+    public AdminProductService(JdbcTemplate jdbc) { this.jdbc = jdbc; this.access = new IamAccess(jdbc); }
 
     @Transactional
     public Map<String,Object> create(UUID userId, Map<String,Object> request) {
-        ensureAdmin(userId);
+        access.require(userId, "catalog:write");
         String name = text(request.get("name"));
         if (name.isBlank()) throw new IllegalArgumentException("Укажите название товара");
         BigDecimal price = new BigDecimal(Objects.toString(request.get("price"), "0"));
@@ -43,11 +46,11 @@ public class AdminProductService {
     }
 
     @Transactional
-    public void delete(UUID userId, UUID productId) { ensureAdmin(userId); if (jdbc.update("DELETE FROM products WHERE id=?", productId)==0) throw new IllegalArgumentException("Товар не найден"); }
+    public void delete(UUID userId, UUID productId) { access.require(userId, "catalog:write"); if (jdbc.update("DELETE FROM products WHERE id=?", productId)==0) throw new IllegalArgumentException("Товар не найден"); }
 
     @Transactional
     public Map<String,Object> update(UUID userId, UUID productId, Map<String,Object> request) {
-        ensureAdmin(userId);
+        access.require(userId, "catalog:write");
         String name = text(request.get("name"));
         BigDecimal price = new BigDecimal(Objects.toString(request.get("price"), "0"));
         if (name.isBlank() || price.signum() <= 0) throw new IllegalArgumentException("Укажите название и корректную цену");
@@ -68,7 +71,7 @@ public class AdminProductService {
 
     @Transactional
     public Map<String,Object> updateStock(UUID userId, UUID productId, Map<String,Object> request) {
-        ensureAdmin(userId);
+        access.require(userId, "stock:write");
         UUID locationId;
         try { locationId = UUID.fromString(Objects.toString(request.get("locationId"), "")); }
         catch (RuntimeException error) { throw new IllegalArgumentException("Выберите магазин или склад"); }
@@ -122,7 +125,7 @@ public class AdminProductService {
     }
 
     public List<Map<String,Object>> stock(UUID userId, UUID productId, UUID locationId) {
-        ensureAdmin(userId);
+        access.require(userId, "stock:write");
         return jdbc.queryForList("""
                 SELECT ls.size_id AS "sizeId", s.label AS "sizeName", s.type AS "sizeType",
                        s.gender AS "sizeGender", s.description AS "sizeDescription",
@@ -136,7 +139,7 @@ public class AdminProductService {
     }
 
     public Map<String,Object> variants(UUID userId) {
-        ensureAdmin(userId);
+        access.require(userId, "stock:write");
         List<Map<String,Object>> colors = jdbc.query("SELECT id,name,hex_code FROM colors ORDER BY name", (rs,n) -> {
             Map<String,Object> item = new LinkedHashMap<>();
             item.put("id", rs.getObject("id", UUID.class));
@@ -156,7 +159,6 @@ public class AdminProductService {
         });
         return Map.of("colors", colors, "sizes", sizes);
     }
-    private void ensureAdmin(UUID userId) { List<String> roles=jdbc.query("SELECT role FROM users WHERE id=?",(rs,n)->rs.getString(1),userId); if(roles.isEmpty()||!"ADMIN".equalsIgnoreCase(roles.get(0))) throw new SecurityException("Требуются права администратора"); }
     private String normalizedGender(Object value) { String raw=text(value).toUpperCase(Locale.ROOT); return Set.of("WOMEN","MEN","UNISEX").contains(raw)?raw:"WOMEN"; }
     private String sizeType(UUID categoryId, String gender) {
         String name=jdbc.queryForObject("SELECT name FROM categories WHERE id=?",String.class,categoryId);

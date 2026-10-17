@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../components/HeaderParts/CartContext";
 import ProductCard from "../components/Main/ProductCard";
 import AddressBook from "./AddressBook";
@@ -10,6 +10,7 @@ import "./ContentPages.css";
 import "./Profile.css";
 
 export default function Profile({ user, setUser, section = "overview" }) {
+  const navigate = useNavigate();
   const { cartItemCount } = useCart();
   const { products } = useStore();
   const { favoriteCount, favoriteIds } = useFavorites();
@@ -127,9 +128,13 @@ export default function Profile({ user, setUser, section = "overview" }) {
     }
     setPasswordState({ loading: true, message: "", error: "" });
     try {
-      const data = await changePasswordRequest(localStorage.getItem("authToken"), { currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword });
+      await changePasswordRequest(localStorage.getItem("authToken"), { currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword });
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setPasswordState({ loading: false, message: data.message || "Пароль успешно изменён", error: "" });
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+      localStorage.removeItem("cartItems");
+      setUser(null);
+      navigate("/login", { replace: true, state: { notice: "Пароль изменён. Войдите снова." } });
     } catch (error) {
       setPasswordState({ loading: false, message: "", error: error.message });
     }
@@ -153,7 +158,7 @@ export default function Profile({ user, setUser, section = "overview" }) {
           <Link className={section === "settings" ? "active" : ""} to="/profile/settings"><span>06</span>Настройки</Link>
           <Link className={section === "notifications" ? "active" : ""} to="/profile/notifications"><span>07</span>Уведомления<em>{unreadNotifications}</em></Link>
           <Link className={section === "addresses" ? "active" : ""} to="/profile/addresses"><span>08</span>Адреса и оплата</Link>
-          {user.role === "ADMIN" && <Link to="/admin"><span>09</span>Управление</Link>}
+          {["ADMIN", "STAFF"].includes(user.role) && <a href="/admin/"><span>09</span>Управление</a>}
         </nav>
 
         <main className="account-content">

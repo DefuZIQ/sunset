@@ -25,8 +25,8 @@ test("renders the main navigation and brand", () => {
   expect(screen.getByText("КОНТАКТЫ")).toBeInTheDocument();
 });
 
-test("redirects a guest away from the admin route", async () => {
+test("points legacy admin route to the separate administration app", async () => {
   window.location.hash = "#/admin";
   render(<App />);
-  expect(await screen.findByText("Личный кабинет")).toBeInTheDocument();
+  expect(await screen.findByRole("link", { name: "Открыть панель" })).toHaveAttribute("href", "/admin/");
 });
