@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { loginCustomer } from "../api/client";
+import { loginCustomer, verifyMfaLogin } from "../api/client";
 import "./Auth.css";
 
 export default function Login({ setUser }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [challengeToken, setChallengeToken] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,6 +19,19 @@ export default function Login({ setUser }) {
     setError(null);
     loginCustomer({ email, password })
       .then((data) => {
+        if (data.mfaRequired && data.challengeToken) {
+          setChallengeToken(data.challengeToken);
+          setPassword("");
+          return;
+        }
+        finishLogin(data);
+      })
+      .catch((err) => {
+        setError(err.message || "Ошибка при входе");
+      });
+  };
+
+  const finishLogin = (data) => {
         const { uuid, email, firstName, lastName, phone, birthday, avatar, role, token } = data;
 
         if (!token || !uuid || !email) {
@@ -38,7 +53,13 @@ export default function Login({ setUser }) {
         localStorage.setItem("user", JSON.stringify(user));
         setUser(user);
         navigate("/");
-      })
+  };
+
+  const handleMfaSubmit = (e) => {
+    e.preventDefault();
+    setError(null);
+    verifyMfaLogin(challengeToken, mfaCode.trim())
+      .then(finishLogin)
       .catch((err) => {
         setError(err.message || "Ошибка при входе");
       });
@@ -51,7 +72,12 @@ export default function Login({ setUser }) {
           <div className="login_form col-5">
             <h1>Вход</h1>
             {location.state?.notice && <p className="auth-notice" role="status">{location.state.notice}</p>}
-            <form onSubmit={handleSubmit}>
+            {challengeToken ? <form onSubmit={handleMfaSubmit}>
+              <p>Введите код из приложения-аутентификатора или резервный код.</p>
+              <input className="login_input" autoComplete="one-time-code" inputMode="numeric" required value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} placeholder="Одноразовый код" />
+              <button type="submit" className="login_btn">Подтвердить вход</button>
+              <button type="button" onClick={() => { setChallengeToken(""); setMfaCode(""); }} className="login_btn">Назад</button>
+            </form> : <form onSubmit={handleSubmit}>
               <input
                 type="email"
                 placeholder="Email"
@@ -71,7 +97,7 @@ export default function Login({ setUser }) {
               <button type="submit" className="login_btn">
                 Войти
               </button>
-            </form>
+            </form>}
             {error && <p style={{ color: "red" }}>{error}</p>}
           </div>
         </div>

@@ -5,9 +5,33 @@ import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotificat
   listAdminReviews, listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
     markNotificationRead, markProductReviewHelpful, moderateAdminReview, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview, voteProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
-  updateCustomerAddress, uploadProductReviewPhoto, validatePromoCode, getProfile, syncCustomerAddresses, revokeSession } from "./client";
+  updateCustomerAddress, uploadProductReviewPhoto, validatePromoCode, getProfile, syncCustomerAddresses, revokeSession,
+  verifyMfaLogin, getMfaStatus, startMfaEnrollment, confirmMfaEnrollment, disableMfa } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("MFA enrollment uses authenticated endpoints and login uses only a short-lived challenge", async () => {
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ enabled: false, recoveryCodesRemaining: 0 }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ secret: "BASE32", otpauthUri: "otpauth://totp/SUNSET" }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ recoveryCodes: ["RECOVERY"] }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ token: "fresh-jwt" }) })
+    .mockResolvedValueOnce({ ok: true, status: 204 });
+  vi.stubGlobal("fetch", fetchMock);
+  await getMfaStatus("old-jwt");
+  await startMfaEnrollment("old-jwt", "password");
+  await confirmMfaEnrollment("old-jwt", "123456");
+  await verifyMfaLogin("challenge", "654321");
+  await disableMfa("fresh-jwt", "password", "RECOVERY");
+  expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/auth/mfa/enroll/start", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer old-jwt" },
+    body: JSON.stringify({ currentPassword: "password" }),
+  });
+  expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/v1/auth/mfa/login", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challengeToken: "challenge", code: "654321" }),
+  });
+});
 
 test("logout revokes the bearer session and accepts 204", async () => {
   const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, status: 204 });

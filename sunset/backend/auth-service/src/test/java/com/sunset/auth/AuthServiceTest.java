@@ -9,6 +9,7 @@ import com.sunset.auth.repository.UserRepository;
 import com.sunset.auth.security.JwtUtil;
 import com.sunset.auth.service.AuthService;
 import com.sunset.auth.service.AuthSessionService;
+import com.sunset.auth.service.MfaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -25,13 +26,15 @@ class AuthServiceTest {
     private UserRepository repository;
     private JwtUtil jwt;
     private AuthSessionService sessions;
+    private MfaService mfa;
     private AuthService service;
 
     @BeforeEach void setUp() {
         repository = Mockito.mock(UserRepository.class);
         jwt = Mockito.mock(JwtUtil.class);
         sessions = Mockito.mock(AuthSessionService.class);
-        service = new AuthService(repository, jwt, sessions);
+        mfa = Mockito.mock(MfaService.class);
+        service = new AuthService(repository, jwt, sessions, mfa);
     }
 
     @Test void registersUserWithHashedPassword() {

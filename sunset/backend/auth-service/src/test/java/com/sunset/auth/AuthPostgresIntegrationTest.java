@@ -7,8 +7,11 @@ import com.sunset.auth.dto.RegisterRequest;
 import com.sunset.auth.dto.UpdateProfileRequest;
 import com.sunset.auth.exceptions.InvalidPasswordException;
 import com.sunset.auth.security.JwtUtil;
+import com.sunset.auth.security.MfaSecretCipher;
+import com.sunset.auth.security.TotpCodes;
 import com.sunset.auth.service.AuthService;
 import com.sunset.auth.service.AuthSessionService;
+import com.sunset.auth.service.MfaService;
 import com.sunset.auth.service.CustomerAddressService;
 import com.sunset.auth.controller.IamController;
 import com.sunset.contract.IamAccess;
@@ -23,6 +26,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.List;
 
@@ -48,11 +52,13 @@ class AuthPostgresIntegrationTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.liquibase.enabled", () -> "true");
         registry.add("spring.security.jwt.secret", () -> "test-secret-that-is-at-least-32-bytes");
+        registry.add("mfa.encryption-key", () -> "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
     }
 
     @Autowired private AuthService service;
     @Autowired private JwtUtil jwt;
     @Autowired private AuthSessionService sessions;
+    @Autowired private MfaService mfa;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private CustomerAddressService addresses;
     @Autowired private IamController iam;
@@ -170,6 +176,48 @@ class AuthPostgresIntegrationTest {
         assertThat(jwt.parse(token).getExpiration().getTime() - jwt.parse(token).getIssuedAt().getTime())
                 .isEqualTo(15 * 60 * 1000L);
         assertThat(sessions.authenticatedUser(token)).isEqualTo(userId);
+    }
+
+    @Test
+    void adminEnrollmentRequiresTotpAndRevokesOldSessions() {
+        UUID adminId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "mfa-admin@sunset.test", "initial-pass-123", "Анна", "Админ")).getUuid());
+        jdbc.update("UPDATE users SET role='ADMIN' WHERE id=?", adminId);
+        String oldToken = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123")).getToken();
+        var enrollment = mfa.startEnrollment(adminId, "initial-pass-123");
+        assertThat(enrollment.otpauthUri()).startsWith("otpauth://totp/SUNSET:");
+        String encrypted = jdbc.queryForObject("SELECT secret_ciphertext FROM mfa_totp WHERE user_id=?", String.class, adminId);
+        byte[] secret = new MfaSecretCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+                .decrypt(encrypted, adminId);
+        assertThat(encrypted).doesNotContain(enrollment.secret());
+        List<String> recovery = mfa.confirmEnrollment(adminId, TotpCodes.at(secret, Instant.now().getEpochSecond()));
+        assertThat(recovery).hasSize(8);
+        assertThat(sessions.authenticatedUser(oldToken)).isNull();
+
+        var challenge = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        assertThat(challenge.isMfaRequired()).isTrue();
+        assertThat(challenge.getToken()).isNull();
+        String nextCode = TotpCodes.at(secret, (Instant.now().getEpochSecond() / 30 + 1) * 30);
+        var verified = mfa.verifyLogin(challenge.getChallengeToken(), nextCode);
+        assertThat(verified).isNotNull();
+        assertThat(sessions.authenticatedUser(verified.getToken())).isEqualTo(adminId);
+        assertThat(mfa.verifyLogin(challenge.getChallengeToken(), nextCode)).isNull();
+
+        var replayChallenge = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        assertThat(mfa.verifyLogin(replayChallenge.getChallengeToken(), nextCode)).isNull();
+        var supersedingChallenge = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        assertThat(mfa.verifyLogin(replayChallenge.getChallengeToken(), recovery.get(0))).isNull();
+        assertThat(mfa.verifyLogin(supersedingChallenge.getChallengeToken(), recovery.get(0))).isNotNull();
+        assertThat(mfa.recoveryCodesRemaining(adminId)).isEqualTo(7);
+
+        var recoveryChallenge = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        var recovered = mfa.verifyLogin(recoveryChallenge.getChallengeToken(), recovery.get(2));
+        assertThat(recovered).isNotNull();
+        assertThat(mfa.recoveryCodesRemaining(adminId)).isEqualTo(6);
+        assertThat(mfa.disable(adminId, "initial-pass-123", recovery.get(1))).isTrue();
+        assertThat(sessions.authenticatedUser(recovered.getToken())).isNull();
+        assertThat(service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123")).getToken())
+                .isNotBlank();
     }
 
     @Test

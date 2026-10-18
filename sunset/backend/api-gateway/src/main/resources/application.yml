@@ -66,6 +66,7 @@ security:
     - /assistant/chat
     - /auth/register
     - /auth/login
+    - /auth/mfa/login
     - /products/all
     - /products/by-uuid
     - /products/reviews

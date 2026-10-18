@@ -26,11 +26,13 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final JwtUtil jwtUtil;
     private final AuthSessionService sessions;
+    private final MfaService mfa;
 
-    public AuthService(UserRepository userRepository, JwtUtil jwtUtil, AuthSessionService sessions) {
+    public AuthService(UserRepository userRepository, JwtUtil jwtUtil, AuthSessionService sessions, MfaService mfa) {
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
         this.sessions = sessions;
+        this.mfa = mfa;
     }
 
     public AuthResponse registerUser(RegisterRequest request) {
@@ -61,6 +63,15 @@ public class AuthService {
         User user = optionalUser.get();
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new InvalidPasswordException("Invalid password for user " + request.getEmail());
+        }
+
+        if (("ADMIN".equalsIgnoreCase(user.getRole()) || "STAFF".equalsIgnoreCase(user.getRole()))
+                && mfa.enabled(user.getId())) {
+            AuthResponse challenge = new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(),
+                    user.getLastName(), user.getPhone(), user.getRole(), null);
+            challenge.setMfaRequired(true);
+            challenge.setChallengeToken(mfa.beginChallenge(user.getId()));
+            return challenge;
         }
 
         // Преобразуем UUID в строку для генерации токена

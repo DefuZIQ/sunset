@@ -37,6 +37,40 @@
         "responses": { "204": { "description": "Сеанс завершён" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
+    "/auth/mfa/login": {
+      "post": {
+        "tags": ["Auth"], "operationId": "verifyMfaLogin", "summary": "Завершить вход сотрудника одноразовым или резервным кодом",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["challengeToken", "code"], "properties": { "challengeToken": { "type": "string" }, "code": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Выдан JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/mfa/status": {
+      "get": {
+        "tags": ["Auth", "Administration"], "operationId": "getMfaStatus", "summary": "Состояние MFA", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Состояние MFA", "content": { "application/json": { "schema": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "recoveryCodesRemaining": { "type": "integer" } } } } } } }
+      }
+    },
+    "/auth/mfa/enroll/start": {
+      "post": {
+        "tags": ["Administration"], "operationId": "startMfaEnrollment", "summary": "Начать привязку TOTP", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["currentPassword"], "properties": { "currentPassword": { "type": "string", "format": "password" } } } } } },
+        "responses": { "200": { "description": "Ключ для приложения-аутентификатора", "content": { "application/json": { "schema": { "type": "object", "properties": { "secret": { "type": "string" }, "otpauthUri": { "type": "string" } } } } } } }
+      }
+    },
+    "/auth/mfa/enroll/confirm": {
+      "post": {
+        "tags": ["Administration"], "operationId": "confirmMfaEnrollment", "summary": "Подтвердить MFA и получить резервные коды", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Одноразовые резервные коды", "content": { "application/json": { "schema": { "type": "object", "properties": { "recoveryCodes": { "type": "array", "items": { "type": "string" } } } } } } } }
+      }
+    },
+    "/auth/mfa/disable": {
+      "post": {
+        "tags": ["Administration"], "operationId": "disableMfa", "summary": "Отключить MFA после повторной проверки", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["currentPassword", "code"], "properties": { "currentPassword": { "type": "string", "format": "password" }, "code": { "type": "string" } } } } } },
+        "responses": { "204": { "description": "MFA отключена, сеансы отозваны" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
     "/auth/iam/me": {
       "get": {
         "tags": ["Auth", "Administration"], "operationId": "getIamIdentity", "summary": "Текущая роль и действующие разрешения", "security": [{ "bearerAuth": [] }],
@@ -498,7 +532,8 @@
         "properties": {
           "uuid": { "type": "string", "format": "uuid" }, "email": { "type": "string", "format": "email" },
           "firstName": { "type": "string" }, "lastName": { "type": "string" }, "phone": { "type": "string", "nullable": true },
-          "role": { "type": "string" }, "token": { "type": "string", "nullable": true, "description": "JWT после входа; null при регистрации" }
+          "role": { "type": "string" }, "token": { "type": "string", "nullable": true, "description": "JWT после входа; null при регистрации или незавершённой MFA" },
+          "mfaRequired": { "type": "boolean" }, "challengeToken": { "type": "string", "nullable": true }
         }
       },
       "UserProfile": {

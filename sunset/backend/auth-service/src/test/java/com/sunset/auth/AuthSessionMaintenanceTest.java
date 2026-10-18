@@ -2,6 +2,7 @@ package com.sunset.auth;
 
 import com.sunset.auth.service.AuthSessionMaintenance;
 import com.sunset.auth.service.AuthSessionService;
+import com.sunset.auth.service.MfaService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -16,13 +17,15 @@ class AuthSessionMaintenanceTest {
     @Test
     void retainsSevenDaysOfExpiredSessionHistory() {
         AuthSessionService sessions = mock(AuthSessionService.class);
+        MfaService mfa = mock(MfaService.class);
         Instant before = Instant.now().minus(7, ChronoUnit.DAYS);
 
-        new AuthSessionMaintenance(sessions).purgeExpiredSessions();
+        new AuthSessionMaintenance(sessions, mfa).purgeExpiredSessions();
 
         Instant after = Instant.now().minus(7, ChronoUnit.DAYS);
         ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
         verify(sessions).purgeExpiredBefore(cutoff.capture());
+        verify(mfa).purgeExpiredChallenges();
         assertThat(cutoff.getValue()).isBetween(before, after);
     }
 }

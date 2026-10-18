@@ -72,6 +72,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/mfa/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Завершить вход сотрудника одноразовым или резервным кодом */
+        post: operations["verifyMfaLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Состояние MFA */
+        get: operations["getMfaStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/enroll/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Начать привязку TOTP */
+        post: operations["startMfaEnrollment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/enroll/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Подтвердить MFA и получить резервные коды */
+        post: operations["confirmMfaEnrollment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Отключить MFA после повторной проверки */
+        post: operations["disableMfa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/iam/me": {
         parameters: {
             query?: never;
@@ -1070,8 +1155,10 @@ export interface components {
             lastName?: string;
             phone?: string | null;
             role: string;
-            /** @description JWT после входа; null при регистрации */
+            /** @description JWT после входа; null при регистрации или незавершённой MFA */
             token: string | null;
+            mfaRequired?: boolean;
+            challengeToken?: string | null;
         };
         UserProfile: {
             /** Format: uuid */
@@ -1712,6 +1799,142 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Сеанс завершён */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    verifyMfaLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    challengeToken: string;
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Выдан JWT */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getMfaStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Состояние MFA */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        enabled?: boolean;
+                        recoveryCodesRemaining?: number;
+                    };
+                };
+            };
+        };
+    };
+    startMfaEnrollment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    currentPassword: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Ключ для приложения-аутентификатора */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        secret?: string;
+                        otpauthUri?: string;
+                    };
+                };
+            };
+        };
+    };
+    confirmMfaEnrollment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Одноразовые резервные коды */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        recoveryCodes?: string[];
+                    };
+                };
+            };
+        };
+    };
+    disableMfa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    currentPassword: string;
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description MFA отключена, сеансы отозваны */
             204: {
                 headers: {
                     [name: string]: unknown;

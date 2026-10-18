@@ -40,6 +40,7 @@ const categoryTree = [
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/auth/iam/me', (route) => route.fulfill({ json: { role: 'ADMIN', permissions: ['catalog:write', 'stock:write', 'orders:read', 'orders:manage', 'reviews:moderate', 'promotions:manage', 'customers:read', 'customers:bonuses:write', 'stores:manage'] } }));
+  await page.route('**/api/v1/auth/mfa/status', (route) => route.fulfill({ json: { enabled: false, recoveryCodesRemaining: 0 } }));
   await page.route('**/products/all', (route) => route.fulfill({ json: products }));
   await page.route('**/products/categories/tree', (route) => route.fulfill({ json: categoryTree }));
   await page.route('**/orders/promotions/public', (route) => route.fulfill({ json: [] }));
@@ -533,6 +534,26 @@ test('expired session is cleared after the versioned profile rejects it', async 
   await expect(page.getByRole('heading', { name: 'Войдите в аккаунт' })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('authToken'))).toBeNull();
   expect(await page.evaluate(() => localStorage.getItem('user'))).toBeNull();
+});
+
+test('admin login requires a second factor before saving a session', async ({ page }) => {
+  await page.route('**/api/v1/auth/login', (route) => route.fulfill({ json: {
+    token: null, mfaRequired: true, challengeToken: 'one-time-challenge', role: 'ADMIN',
+  } }));
+  await page.route('**/api/v1/auth/mfa/login', (route) => {
+    expect(route.request().postDataJSON()).toEqual({ challengeToken: 'one-time-challenge', code: '123456' });
+    expect(route.request().headers().authorization).toBeUndefined();
+    return route.fulfill({ json: { token: 'verified-admin-token', role: 'ADMIN' } });
+  });
+  await page.goto('/admin/');
+  await page.getByLabel('Email').fill('admin@example.test');
+  await page.getByLabel('Пароль').fill('correct-password');
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  await expect(page.getByText('Введите код из приложения-аутентификатора')).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem('adminAuthToken'))).toBeNull();
+  await page.getByLabel('Одноразовый код').fill('123456');
+  await page.getByRole('button', { name: 'Подтвердить вход' }).click();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('adminAuthToken'))).toBe('verified-admin-token');
 });
 
 test('admin dashboard loads protected data from the versioned API', async ({ page }) => {
