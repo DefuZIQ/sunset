@@ -22,7 +22,7 @@
       "post": {
         "tags": ["Auth"], "operationId": "loginCustomer", "summary": "Вход",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
-        "responses": { "200": { "description": "Выдан JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+        "responses": { "200": { "description": "Клиенту выдан JWT; сотруднику возвращён TOTP- или setup-challenge без JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
     "/auth/session/validate": {
@@ -44,31 +44,24 @@
         "responses": { "200": { "description": "Выдан JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
+    "/auth/mfa/setup/start": {
+      "post": {
+        "tags": ["Auth", "Administration"], "operationId": "startMandatoryMfaSetup", "summary": "Начать обязательную настройку TOTP после пароля",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["setupToken"], "properties": { "setupToken": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Секрет для приложения-аутентификатора", "content": { "application/json": { "schema": { "type": "object", "properties": { "secret": { "type": "string" }, "otpauthUri": { "type": "string" } } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/mfa/setup/confirm": {
+      "post": {
+        "tags": ["Auth", "Administration"], "operationId": "confirmMandatoryMfaSetup", "summary": "Включить MFA и выдать резервные коды и проверенный JWT",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["setupToken", "code"], "properties": { "setupToken": { "type": "string" }, "code": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Вход завершён после проверки TOTP", "content": { "application/json": { "schema": { "type": "object", "properties": { "auth": { "$ref": "#/components/schemas/AuthResponse" }, "recoveryCodes": { "type": "array", "items": { "type": "string" } } } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
     "/auth/mfa/status": {
       "get": {
         "tags": ["Auth", "Administration"], "operationId": "getMfaStatus", "summary": "Состояние MFA", "security": [{ "bearerAuth": [] }],
         "responses": { "200": { "description": "Состояние MFA", "content": { "application/json": { "schema": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "recoveryCodesRemaining": { "type": "integer" } } } } } } }
-      }
-    },
-    "/auth/mfa/enroll/start": {
-      "post": {
-        "tags": ["Administration"], "operationId": "startMfaEnrollment", "summary": "Начать привязку TOTP", "security": [{ "bearerAuth": [] }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["currentPassword"], "properties": { "currentPassword": { "type": "string", "format": "password" } } } } } },
-        "responses": { "200": { "description": "Ключ для приложения-аутентификатора", "content": { "application/json": { "schema": { "type": "object", "properties": { "secret": { "type": "string" }, "otpauthUri": { "type": "string" } } } } } } }
-      }
-    },
-    "/auth/mfa/enroll/confirm": {
-      "post": {
-        "tags": ["Administration"], "operationId": "confirmMfaEnrollment", "summary": "Подтвердить MFA и получить резервные коды", "security": [{ "bearerAuth": [] }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" } } } } } },
-        "responses": { "200": { "description": "Одноразовые резервные коды", "content": { "application/json": { "schema": { "type": "object", "properties": { "recoveryCodes": { "type": "array", "items": { "type": "string" } } } } } } } }
-      }
-    },
-    "/auth/mfa/disable": {
-      "post": {
-        "tags": ["Administration"], "operationId": "disableMfa", "summary": "Отключить MFA после повторной проверки", "security": [{ "bearerAuth": [] }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["currentPassword", "code"], "properties": { "currentPassword": { "type": "string", "format": "password" }, "code": { "type": "string" } } } } } },
-        "responses": { "204": { "description": "MFA отключена, сеансы отозваны" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
     "/auth/iam/me": {
@@ -533,7 +526,8 @@
           "uuid": { "type": "string", "format": "uuid" }, "email": { "type": "string", "format": "email" },
           "firstName": { "type": "string" }, "lastName": { "type": "string" }, "phone": { "type": "string", "nullable": true },
           "role": { "type": "string" }, "token": { "type": "string", "nullable": true, "description": "JWT после входа; null при регистрации или незавершённой MFA" },
-          "mfaRequired": { "type": "boolean" }, "challengeToken": { "type": "string", "nullable": true }
+          "mfaRequired": { "type": "boolean" }, "challengeToken": { "type": "string", "nullable": true },
+          "mfaEnrollmentRequired": { "type": "boolean" }, "setupToken": { "type": "string", "nullable": true }
         }
       },
       "UserProfile": {

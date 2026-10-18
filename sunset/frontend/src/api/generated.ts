@@ -89,6 +89,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/mfa/setup/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Начать обязательную настройку TOTP после пароля */
+        post: operations["startMandatoryMfaSetup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/setup/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Включить MFA и выдать резервные коды и проверенный JWT */
+        post: operations["confirmMandatoryMfaSetup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/mfa/status": {
         parameters: {
             query?: never;
@@ -100,57 +134,6 @@ export interface paths {
         get: operations["getMfaStatus"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/mfa/enroll/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Начать привязку TOTP */
-        post: operations["startMfaEnrollment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/mfa/enroll/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Подтвердить MFA и получить резервные коды */
-        post: operations["confirmMfaEnrollment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/mfa/disable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Отключить MFA после повторной проверки */
-        post: operations["disableMfa"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1159,6 +1142,8 @@ export interface components {
             token: string | null;
             mfaRequired?: boolean;
             challengeToken?: string | null;
+            mfaEnrollmentRequired?: boolean;
+            setupToken?: string | null;
         };
         UserProfile: {
             /** Format: uuid */
@@ -1756,7 +1741,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Выдан JWT */
+            /** @description Клиенту выдан JWT; сотруднику возвращён TOTP- или setup-challenge без JWT */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1836,6 +1821,67 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    startMandatoryMfaSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    setupToken: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Секрет для приложения-аутентификатора */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        secret?: string;
+                        otpauthUri?: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    confirmMandatoryMfaSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    setupToken: string;
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Вход завершён после проверки TOTP */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        auth?: components["schemas"]["AuthResponse"];
+                        recoveryCodes?: string[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     getMfaStatus: {
         parameters: {
             query?: never;
@@ -1857,91 +1903,6 @@ export interface operations {
                     };
                 };
             };
-        };
-    };
-    startMfaEnrollment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: password */
-                    currentPassword: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Ключ для приложения-аутентификатора */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        secret?: string;
-                        otpauthUri?: string;
-                    };
-                };
-            };
-        };
-    };
-    confirmMfaEnrollment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    code: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Одноразовые резервные коды */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        recoveryCodes?: string[];
-                    };
-                };
-            };
-        };
-    };
-    disableMfa: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: password */
-                    currentPassword: string;
-                    code: string;
-                };
-            };
-        };
-        responses: {
-            /** @description MFA отключена, сеансы отозваны */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
         };
     };
     getIamIdentity: {

@@ -172,7 +172,15 @@ class AuthPostgresIntegrationTest {
         UUID userId = UUID.fromString(service.registerUser(new RegisterRequest(
                 "staff-session@sunset.test", "initial-pass-123", "Иван", "Сотрудник")).getUuid());
         jdbc.update("UPDATE users SET role='STAFF' WHERE id=?", userId);
-        String token = service.loginUser(new LoginRequest("staff-session@sunset.test", "initial-pass-123")).getToken();
+        var setup = service.loginUser(new LoginRequest("staff-session@sunset.test", "initial-pass-123"));
+        assertThat(setup.getToken()).isNull();
+        assertThat(setup.isMfaEnrollmentRequired()).isTrue();
+        var enrollment = mfa.startSetup(setup.getSetupToken());
+        byte[] secret = new MfaSecretCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+                .decrypt(jdbc.queryForObject("SELECT secret_ciphertext FROM mfa_totp WHERE user_id=?", String.class, userId), userId);
+        assertThat(enrollment.secret()).isNotBlank();
+        String token = mfa.confirmSetup(setup.getSetupToken(), TotpCodes.at(secret, Instant.now().getEpochSecond()))
+                .auth().getToken();
         assertThat(jwt.parse(token).getExpiration().getTime() - jwt.parse(token).getIssuedAt().getTime())
                 .isEqualTo(15 * 60 * 1000L);
         assertThat(sessions.authenticatedUser(token)).isEqualTo(userId);
@@ -183,16 +191,24 @@ class AuthPostgresIntegrationTest {
         UUID adminId = UUID.fromString(service.registerUser(new RegisterRequest(
                 "mfa-admin@sunset.test", "initial-pass-123", "Анна", "Админ")).getUuid());
         jdbc.update("UPDATE users SET role='ADMIN' WHERE id=?", adminId);
-        String oldToken = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123")).getToken();
-        var enrollment = mfa.startEnrollment(adminId, "initial-pass-123");
+        String oldToken = jwt.generateToken(adminId, "ADMIN");
+        sessions.record(oldToken, adminId);
+        assertThat(sessions.authenticatedUser(oldToken)).isNull();
+        var setup = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        assertThat(setup.isMfaEnrollmentRequired()).isTrue();
+        assertThat(setup.getToken()).isNull();
+        var enrollment = mfa.startSetup(setup.getSetupToken());
         assertThat(enrollment.otpauthUri()).startsWith("otpauth://totp/SUNSET:");
         String encrypted = jdbc.queryForObject("SELECT secret_ciphertext FROM mfa_totp WHERE user_id=?", String.class, adminId);
         byte[] secret = new MfaSecretCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
                 .decrypt(encrypted, adminId);
         assertThat(encrypted).doesNotContain(enrollment.secret());
-        List<String> recovery = mfa.confirmEnrollment(adminId, TotpCodes.at(secret, Instant.now().getEpochSecond()));
+        var completed = mfa.confirmSetup(setup.getSetupToken(), TotpCodes.at(secret, Instant.now().getEpochSecond()));
+        List<String> recovery = completed.recoveryCodes();
         assertThat(recovery).hasSize(8);
         assertThat(sessions.authenticatedUser(oldToken)).isNull();
+        assertThat(sessions.authenticatedUser(completed.auth().getToken())).isEqualTo(adminId);
+        assertThat(mfa.confirmSetup(setup.getSetupToken(), TotpCodes.at(secret, Instant.now().getEpochSecond()))).isNull();
 
         var challenge = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
         assertThat(challenge.isMfaRequired()).isTrue();
@@ -214,10 +230,9 @@ class AuthPostgresIntegrationTest {
         var recovered = mfa.verifyLogin(recoveryChallenge.getChallengeToken(), recovery.get(2));
         assertThat(recovered).isNotNull();
         assertThat(mfa.recoveryCodesRemaining(adminId)).isEqualTo(6);
-        assertThat(mfa.disable(adminId, "initial-pass-123", recovery.get(1))).isTrue();
-        assertThat(sessions.authenticatedUser(recovered.getToken())).isNull();
-        assertThat(service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123")).getToken())
-                .isNotBlank();
+        assertThat(sessions.authenticatedUser(recovered.getToken())).isEqualTo(adminId);
+        assertThat(service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"))
+                .isMfaRequired()).isTrue();
     }
 
     @Test

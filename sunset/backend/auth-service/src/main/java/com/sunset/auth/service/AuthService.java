@@ -65,12 +65,16 @@ public class AuthService {
             throw new InvalidPasswordException("Invalid password for user " + request.getEmail());
         }
 
-        if (("ADMIN".equalsIgnoreCase(user.getRole()) || "STAFF".equalsIgnoreCase(user.getRole()))
-                && mfa.enabled(user.getId())) {
+        if ("ADMIN".equalsIgnoreCase(user.getRole()) || "STAFF".equalsIgnoreCase(user.getRole())) {
             AuthResponse challenge = new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(),
                     user.getLastName(), user.getPhone(), user.getRole(), null);
-            challenge.setMfaRequired(true);
-            challenge.setChallengeToken(mfa.beginChallenge(user.getId()));
+            if (mfa.enabled(user.getId())) {
+                challenge.setMfaRequired(true);
+                challenge.setChallengeToken(mfa.beginChallenge(user.getId()));
+            } else {
+                challenge.setMfaEnrollmentRequired(true);
+                challenge.setSetupToken(mfa.beginSetupChallenge(user.getId()));
+            }
             return challenge;
         }
 

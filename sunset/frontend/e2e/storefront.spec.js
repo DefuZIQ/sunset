@@ -556,6 +556,35 @@ test('admin login requires a second factor before saving a session', async ({ pa
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('adminAuthToken'))).toBe('verified-admin-token');
 });
 
+test('admin without MFA must finish setup and save recovery codes before entering', async ({ page }) => {
+  await page.route('**/api/v1/auth/login', (route) => route.fulfill({ json: {
+    token: null, mfaEnrollmentRequired: true, setupToken: 'setup-challenge', role: 'ADMIN',
+  } }));
+  await page.route('**/api/v1/auth/mfa/setup/start', (route) => {
+    expect(route.request().postDataJSON()).toEqual({ setupToken: 'setup-challenge' });
+    expect(route.request().headers().authorization).toBeUndefined();
+    return route.fulfill({ json: { secret: 'BASE32SECRET', otpauthUri: 'otpauth://totp/SUNSET?secret=BASE32SECRET' } });
+  });
+  await page.route('**/api/v1/auth/mfa/setup/confirm', (route) => {
+    expect(route.request().postDataJSON()).toEqual({ setupToken: 'setup-challenge', code: '123456' });
+    return route.fulfill({ json: { auth: { token: 'enrolled-admin-token', role: 'ADMIN' }, recoveryCodes: ['AAAAA-BBBBB-CCCCC-DDDDD-EEEEE'] } });
+  });
+  await page.goto('/admin/');
+  await page.getByLabel('Email').fill('admin@example.test');
+  await page.getByLabel('Пароль').fill('correct-password');
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  await expect(page.getByText('Для доступа к управлению магазином необходима двухфакторная защита.')).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem('adminAuthToken'))).toBeNull();
+  await page.getByRole('button', { name: 'Начать настройку' }).click();
+  await expect(page.getByText('BASE32SECRET')).toBeVisible();
+  await page.getByLabel('Шестизначный код').fill('123456');
+  await page.getByRole('button', { name: 'Подтвердить код' }).click();
+  await expect(page.getByText('AAAAA-BBBBB-CCCCC-DDDDD-EEEEE')).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem('adminAuthToken'))).toBeNull();
+  await page.getByRole('button', { name: 'Я сохранил коды — открыть админку' }).click();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('adminAuthToken'))).toBe('enrolled-admin-token');
+});
+
 test('admin dashboard loads protected data from the versioned API', async ({ page }) => {
   const account = { id: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN' };
   const requested = new Set();

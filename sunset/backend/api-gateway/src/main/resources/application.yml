@@ -67,6 +67,8 @@ security:
     - /auth/register
     - /auth/login
     - /auth/mfa/login
+    - /auth/mfa/setup/start
+    - /auth/mfa/setup/confirm
     - /products/all
     - /products/by-uuid
     - /products/reviews

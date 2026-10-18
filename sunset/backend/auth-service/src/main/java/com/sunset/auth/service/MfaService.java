@@ -8,7 +8,6 @@ import com.sunset.auth.security.MfaSecretCipher;
 import com.sunset.auth.security.TotpCodes;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +34,6 @@ public class MfaService {
     private final AuthSessionService sessions;
     private final JwtUtil jwt;
     private final MfaSecretCipher cipher;
-    private final BCryptPasswordEncoder passwords = new BCryptPasswordEncoder();
 
     public MfaService(JdbcTemplate jdbc, UserRepository users, AuthSessionService sessions, JwtUtil jwt,
                       @Value("${mfa.encryption-key}") String encryptionKey) {
@@ -58,9 +56,7 @@ public class MfaService {
 
     @Transactional
     public String beginChallenge(UUID userId) {
-        byte[] raw = new byte[32];
-        RANDOM.nextBytes(raw);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
+        String token = randomChallenge();
         // Only the latest password-authenticated challenge may be used.
         jdbc.update("DELETE FROM mfa_login_challenges WHERE user_id=?", userId);
         jdbc.update("INSERT INTO mfa_login_challenges(token_hash,user_id,expires_at) VALUES (?,?,?)",
@@ -69,21 +65,49 @@ public class MfaService {
     }
 
     @Transactional
-    public Enrollment startEnrollment(UUID userId, String currentPassword) {
-        User user = users.findById(userId).orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
-        requireElevatedRole(user);
-        if (currentPassword == null || !passwords.matches(currentPassword, user.getPassword()))
-            throw new IllegalArgumentException("Неверный пароль");
-        if (enabled(userId)) throw new IllegalArgumentException("Двухфакторная защита уже включена");
+    public String beginSetupChallenge(UUID userId) {
+        String token = randomChallenge();
+        jdbc.update("DELETE FROM mfa_setup_challenges WHERE user_id=?", userId);
+        jdbc.update("INSERT INTO mfa_setup_challenges(token_hash,user_id,expires_at) VALUES (?,?,?)",
+                hash(token), userId, Timestamp.from(Instant.now().plus(10, ChronoUnit.MINUTES)));
+        return token;
+    }
+
+    @Transactional
+    public Enrollment startSetup(String setupToken) {
+        UUID userId = setupUserIdForUpdate(setupToken);
+        if (userId == null) return null;
+        User user = users.findById(userId).orElse(null);
+        if (user == null || !elevatedRole(user)) return null;
+        Factor current = factorForUpdate(userId);
+        if (current != null && (current.enabled || locked(current))) return null;
         byte[] secret = TotpCodes.newSecret();
-        String encoded = TotpCodes.base32(secret);
         int changed = jdbc.update("""
                 INSERT INTO mfa_totp(user_id,secret_ciphertext) VALUES (?,?)
                 ON CONFLICT (user_id) DO UPDATE SET secret_ciphertext=EXCLUDED.secret_ciphertext,
-                enabled=FALSE,last_used_step=-1,failed_attempts=0,locked_until=NULL
-                WHERE mfa_totp.enabled=FALSE
+                last_used_step=-1 WHERE mfa_totp.enabled=FALSE
                 """, userId, cipher.encrypt(secret, userId));
-        if (changed != 1) throw new IllegalArgumentException("Двухфакторная защита уже включена");
+        if (changed != 1) return null;
+        return enrollment(user, secret);
+    }
+
+    @Transactional
+    public SetupCompletion confirmSetup(String setupToken, String code) {
+        UUID userId = setupUserIdForUpdate(setupToken);
+        if (userId == null) return null;
+        List<String> recoveryCodes = confirmEnrollment(userId, code);
+        if (recoveryCodes.isEmpty()) return null;
+        User user = users.findById(userId).orElseThrow();
+        jdbc.update("DELETE FROM mfa_setup_challenges WHERE user_id=?", userId);
+        String token = jwt.generateToken(userId, user.getRole());
+        sessions.record(token, userId, true);
+        AuthResponse auth = new AuthResponse(userId.toString(), user.getEmail(), user.getFirstName(),
+                user.getLastName(), user.getPhone(), user.getRole(), token);
+        return new SetupCompletion(auth, recoveryCodes);
+    }
+
+    private static Enrollment enrollment(User user, byte[] secret) {
+        String encoded = TotpCodes.base32(secret);
         String account = URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8);
         String uri = "otpauth://totp/SUNSET:" + account + "?secret=" + encoded
                 + "&issuer=SUNSET&algorithm=SHA1&digits=6&period=30";
@@ -146,33 +170,23 @@ public class MfaService {
                 user.getLastName(), user.getPhone(), user.getRole(), token);
     }
 
-    @Transactional
-    public boolean disable(UUID userId, String currentPassword, String code) {
-        User user = users.findById(userId).orElse(null);
-        Factor factor = factorForUpdate(userId);
-        if (user == null || factor == null || !factor.enabled || locked(factor)) return false;
-        if (currentPassword == null || !passwords.matches(currentPassword, user.getPassword())) {
-            registerFailure(userId, factor.failedAttempts);
-            return false;
-        }
-        long step = TotpCodes.matchingStep(cipher.decrypt(factor.ciphertext, userId), code,
-                Instant.now(), factor.lastStep);
-        boolean recovery = step < 0 && isRecoveryCode(code)
-                && jdbc.update("DELETE FROM mfa_recovery_codes WHERE user_id=? AND code_hash=?",
-                        userId, hash(normalizeCode(code))) == 1;
-        if (step < 0 && !recovery) {
-            registerFailure(userId, factor.failedAttempts);
-            return false;
-        }
-        jdbc.update("DELETE FROM mfa_login_challenges WHERE user_id=?", userId);
-        jdbc.update("DELETE FROM mfa_recovery_codes WHERE user_id=?", userId);
-        jdbc.update("DELETE FROM mfa_totp WHERE user_id=?", userId);
-        sessions.revokeAll(userId);
-        return true;
+    public int purgeExpiredChallenges() {
+        return jdbc.update("DELETE FROM mfa_login_challenges WHERE expires_at<NOW()")
+                + jdbc.update("DELETE FROM mfa_setup_challenges WHERE expires_at<NOW()");
     }
 
-    public int purgeExpiredChallenges() {
-        return jdbc.update("DELETE FROM mfa_login_challenges WHERE expires_at<NOW()");
+    private UUID setupUserIdForUpdate(String setupToken) {
+        if (setupToken == null || setupToken.length() != 43) return null;
+        List<UUID> ids = jdbc.query("""
+                SELECT user_id FROM mfa_setup_challenges WHERE token_hash=? AND expires_at>NOW() FOR UPDATE
+                """, (rs, row) -> rs.getObject(1, UUID.class), hash(setupToken));
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    private static String randomChallenge() {
+        byte[] raw = new byte[32];
+        RANDOM.nextBytes(raw);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
     }
 
     private Factor factorForUpdate(UUID userId) {
@@ -230,5 +244,6 @@ public class MfaService {
     }
 
     public record Enrollment(String secret, String otpauthUri) {}
+    public record SetupCompletion(AuthResponse auth, List<String> recoveryCodes) {}
     private record Factor(String ciphertext, boolean enabled, long lastStep, int failedAttempts, Instant lockedUntil) {}
 }

@@ -11,6 +11,8 @@ public class AuthResponse {
     private String token;  // Токен в DTO
     private boolean mfaRequired;
     private String challengeToken;
+    private boolean mfaEnrollmentRequired;
+    private String setupToken;
 
     public AuthResponse() {}
 
@@ -81,4 +83,8 @@ public class AuthResponse {
     public void setMfaRequired(boolean mfaRequired) { this.mfaRequired = mfaRequired; }
     public String getChallengeToken() { return challengeToken; }
     public void setChallengeToken(String challengeToken) { this.challengeToken = challengeToken; }
+    public boolean isMfaEnrollmentRequired() { return mfaEnrollmentRequired; }
+    public void setMfaEnrollmentRequired(boolean mfaEnrollmentRequired) { this.mfaEnrollmentRequired = mfaEnrollmentRequired; }
+    public String getSetupToken() { return setupToken; }
+    public void setSetupToken(String setupToken) { this.setupToken = setupToken; }
 }

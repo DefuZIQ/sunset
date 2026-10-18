@@ -16,8 +16,9 @@ export type Order = components["schemas"]["Order"];
 export type OrderDetail = components["schemas"]["OrderDetail"];
 export type OrderReturn = components["schemas"]["OrderReturn"];
 export type AuthResponse = components["schemas"]["AuthResponse"];
-export type MfaLoginResponse = AuthResponse & { mfaRequired?: boolean; challengeToken?: string };
+export type MfaLoginResponse = AuthResponse & { mfaRequired?: boolean; challengeToken?: string; mfaEnrollmentRequired?: boolean; setupToken?: string };
 export type MfaEnrollment = { secret: string; otpauthUri: string };
+export type MfaSetupCompletion = { auth: AuthResponse; recoveryCodes: string[] };
 export type MfaStatus = { enabled: boolean; recoveryCodesRemaining: number };
 export type UserProfile = components["schemas"]["UserProfile"];
 export type Notification = components["schemas"]["Notification"];
@@ -163,30 +164,20 @@ export async function verifyMfaLogin(challengeToken: string, code: string): Prom
   }));
 }
 
+export async function startMandatoryMfaSetup(setupToken: string): Promise<MfaEnrollment> {
+  return readJson<MfaEnrollment>(await fetch("/api/v1/auth/mfa/setup/start", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ setupToken }),
+  }));
+}
+
+export async function confirmMandatoryMfaSetup(setupToken: string, code: string): Promise<MfaSetupCompletion> {
+  return readJson<MfaSetupCompletion>(await fetch("/api/v1/auth/mfa/setup/confirm", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ setupToken, code }),
+  }));
+}
+
 export async function getMfaStatus(token: string): Promise<MfaStatus> {
   return readJson<MfaStatus>(await fetch("/api/v1/auth/mfa/status", { headers: bearer(token) }));
-}
-
-export async function startMfaEnrollment(token: string, currentPassword: string): Promise<MfaEnrollment> {
-  return readJson<MfaEnrollment>(await fetch("/api/v1/auth/mfa/enroll/start", {
-    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) },
-    body: JSON.stringify({ currentPassword }),
-  }));
-}
-
-export async function confirmMfaEnrollment(token: string, code: string): Promise<{ recoveryCodes: string[] }> {
-  return readJson<{ recoveryCodes: string[] }>(await fetch("/api/v1/auth/mfa/enroll/confirm", {
-    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) },
-    body: JSON.stringify({ code }),
-  }));
-}
-
-export async function disableMfa(token: string, currentPassword: string, code: string): Promise<void> {
-  const response = await fetch("/api/v1/auth/mfa/disable", {
-    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) },
-    body: JSON.stringify({ currentPassword, code }),
-  });
-  if (!response.ok) throw new ApiHttpError(response.status, "Не удалось отключить двухфакторную защиту");
 }
 
 export async function getProfile(token: string): Promise<UserProfile> {

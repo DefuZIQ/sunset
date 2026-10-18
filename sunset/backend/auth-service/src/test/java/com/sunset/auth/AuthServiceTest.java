@@ -67,6 +67,22 @@ class AuthServiceTest {
         verify(sessions).record("jwt-token", id);
     }
 
+    @Test void elevatedAccountWithoutMfaGetsSetupChallengeInsteadOfToken() {
+        UUID id = UUID.randomUUID();
+        User user = user(id, "secret123");
+        user.setRole("ADMIN");
+        when(repository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(mfa.beginSetupChallenge(id)).thenReturn("setup-challenge");
+
+        var response = service.loginUser(new LoginRequest(user.getEmail(), "secret123"));
+
+        assertTrue(response.isMfaEnrollmentRequired());
+        assertEquals("setup-challenge", response.getSetupToken());
+        assertNull(response.getToken());
+        verify(jwt, never()).generateToken(any(), any());
+        verifyNoInteractions(sessions);
+    }
+
     @Test void rejectsWrongPassword() {
         User user = user(UUID.randomUUID(), "secret123");
         when(repository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));

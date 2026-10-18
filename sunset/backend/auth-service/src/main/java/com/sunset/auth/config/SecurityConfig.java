@@ -36,7 +36,9 @@ public class SecurityConfig {
                         // Разрешаем OPTIONS запросы для всех путей (preflight)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Разрешаем доступ без авторизации к регистрационным и логин эндпоинтам
-                        .requestMatchers("/auth/register", "/auth/login", "/auth/mfa/login", "/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
+                        .requestMatchers("/auth/register", "/auth/login", "/auth/mfa/login",
+                                "/auth/mfa/setup/start", "/auth/mfa/setup/confirm",
+                                "/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
                         // Все остальные запросы требуют аутентификации
                         .anyRequest().authenticated()
                 )

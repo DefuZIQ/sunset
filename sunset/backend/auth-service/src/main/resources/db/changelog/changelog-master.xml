@@ -39,4 +39,8 @@
         <sqlFile path="classpath:/db/migrations/V8__admin_mfa.sql"/>
     </changeSet>
 
+    <changeSet id="15" author="codex">
+        <sqlFile path="classpath:/db/migrations/V9__mandatory_staff_mfa.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

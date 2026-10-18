@@ -9,6 +9,7 @@ export default function Login({ setUser }) {
   const [error, setError] = useState(null);
   const [challengeToken, setChallengeToken] = useState("");
   const [mfaCode, setMfaCode] = useState("");
+  const [setupRequired, setSetupRequired] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,8 +18,14 @@ export default function Login({ setUser }) {
     e.preventDefault();
 
     setError(null);
+    setSetupRequired(false);
     loginCustomer({ email, password })
       .then((data) => {
+        if (data.mfaEnrollmentRequired) {
+          setPassword("");
+          setSetupRequired(true);
+          return;
+        }
         if (data.mfaRequired && data.challengeToken) {
           setChallengeToken(data.challengeToken);
           setPassword("");
@@ -99,6 +106,7 @@ export default function Login({ setUser }) {
               </button>
             </form>}
             {error && <p style={{ color: "red" }}>{error}</p>}
+            {setupRequired && <p role="status">Для сотрудника обязательна настройка двухфакторной защиты. <a href="/admin/">Продолжить в админке</a></p>}
           </div>
         </div>
       </div>

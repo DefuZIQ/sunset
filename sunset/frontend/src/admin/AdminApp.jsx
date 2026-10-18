@@ -4,6 +4,7 @@ import Admin from "../pages/Admin";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { ApiHttpError, getIamIdentity, loginCustomer, revokeSession, verifyMfaLogin } from "../api/client";
 import AdminMfaPanel from "./AdminMfaPanel";
+import AdminMfaSetup from "./AdminMfaSetup";
 import "./AdminApp.css";
 
 export default function AdminApp() {
@@ -15,6 +16,7 @@ export default function AdminApp() {
   const [identity, setIdentity] = useState(null);
   const [challengeToken, setChallengeToken] = useState("");
   const [mfaCode, setMfaCode] = useState("");
+  const [setupToken, setSetupToken] = useState("");
 
   useEffect(() => {
     const token = sessionStorage.getItem("adminAuthToken");
@@ -44,6 +46,12 @@ export default function AdminApp() {
         setStatus("challenge");
         return;
       }
+      if (result.mfaEnrollmentRequired && result.setupToken) {
+        setSetupToken(result.setupToken);
+        setPassword("");
+        setStatus("setup");
+        return;
+      }
       if (!result.token) throw new Error("Сервер не выдал токен доступа");
       await completeSignIn(result.token);
     } catch (error) {
@@ -63,6 +71,7 @@ export default function AdminApp() {
       setIdentity(access);
       setPassword("");
       setChallengeToken("");
+      setSetupToken("");
       setMfaCode("");
       setStatus("admin");
   }
@@ -76,6 +85,12 @@ export default function AdminApp() {
       await completeSignIn(result.token);
     } catch (error) { setMessage(error.message || "Неверный код"); }
     finally { setBusy(false); }
+  }
+
+  async function finishMandatorySetup(auth) {
+    if (!auth?.token) { setMessage("Сервер не выдал токен доступа"); return; }
+    try { await completeSignIn(auth.token); }
+    catch (error) { setMessage(error.message || "Не удалось открыть админку"); }
   }
 
   async function signOut() {
@@ -94,17 +109,7 @@ export default function AdminApp() {
     setStatus("guest");
     setIdentity(null);
     setChallengeToken("");
-    setMessage("");
-  }
-
-  function clearRevokedSession() {
-    // Enrollment and MFA disable revoke the token on the server already.
-    // Calling /logout with that token would return 403 and strand the UI.
-    sessionStorage.removeItem("adminAuthToken");
-    setStatus("guest");
-    setIdentity(null);
-    setChallengeToken("");
-    setMfaCode("");
+    setSetupToken("");
     setMessage("");
   }
 
@@ -114,7 +119,7 @@ export default function AdminApp() {
         <a className="admin-app__brand" href="/">SUNSET <span>CONTROL</span></a>
         <nav aria-label="Навигация администрации"><a href="/">Перейти в магазин</a>{status === "admin" && <button type="button" onClick={signOut} disabled={busy}>{busy ? "Выходим…" : "Выйти"}</button>}</nav>
       </header>
-      {status === "admin" ? <main>{message && <p role="alert">{message}</p>}<AdminMfaPanel token={sessionStorage.getItem("adminAuthToken")} onSessionRevoked={clearRevokedSession} /><ErrorBoundary variant="app"><Admin identity={identity} /></ErrorBoundary></main> :
+      {status === "admin" ? <main>{message && <p role="alert">{message}</p>}<AdminMfaPanel token={sessionStorage.getItem("adminAuthToken")} /><ErrorBoundary variant="app"><Admin identity={identity} /></ErrorBoundary></main> :
         <main className="admin-app__access">
           <div className="admin-app__access-card">
             <p className="page-kicker">SUNSET CONTROL</p>
@@ -133,6 +138,8 @@ export default function AdminApp() {
               <button type="submit" disabled={busy}>{busy ? "Проверяем…" : "Подтвердить вход"}</button>
               <button type="button" className="admin-app__secondary" onClick={() => { setStatus("guest"); setChallengeToken(""); setMfaCode(""); }}>Назад к паролю</button>
             </form>}
+            {status === "setup" && <AdminMfaSetup setupToken={setupToken} onFinish={finishMandatorySetup}
+              onBack={() => { setStatus("guest"); setSetupToken(""); setMessage(""); }} />}
             {message && <p role="alert">{message}</p>}
           </div>
         </main>}

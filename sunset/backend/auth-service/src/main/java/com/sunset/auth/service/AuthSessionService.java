@@ -51,9 +51,10 @@ public class AuthSessionService {
             Boolean active = jdbc.queryForObject("""
                     SELECT EXISTS(SELECT 1 FROM auth_sessions s
                     JOIN users u ON u.id=s.user_id
-                    LEFT JOIN mfa_totp f ON f.user_id=u.id
                     WHERE s.id=? AND s.user_id=? AND s.revoked_at IS NULL AND s.expires_at > NOW()
-                    AND (u.role NOT IN ('ADMIN','STAFF') OR f.enabled IS NOT TRUE OR s.mfa_verified))
+                    AND (u.role NOT IN ('ADMIN','STAFF') OR
+                         (s.mfa_verified AND EXISTS
+                          (SELECT 1 FROM mfa_totp f WHERE f.user_id=u.id AND f.enabled))))
                     """, Boolean.class, sessionId, userId);
             return Boolean.TRUE.equals(active) ? userId : null;
         } catch (IllegalArgumentException exception) {
