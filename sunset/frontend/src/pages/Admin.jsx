@@ -5,9 +5,10 @@ import AdminStockPanel from "./admin/AdminStockPanel";
 import AdminReviewsPanel from "./admin/AdminReviewsPanel";
 import AdminAccessPanel from "./admin/AdminAccessPanel";
 import { adjustAdminBonuses, createAdminProduct, createAdminPromotion, deleteAdminProduct, getAdminAnalytics, getAdminLocationStock, getCategoryTree, listAdminLocations, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock } from "../api/client";
+import { ADMIN_COOKIE_SESSION } from "../api/client";
 import "./Admin.css";
 
-const adminToken = () => sessionStorage.getItem("adminAuthToken") || "";
+const adminToken = () => ADMIN_COOKIE_SESSION;
 const blankProduct = { name:"",description:"",price:"",quantity:10,category:"Женские боди",gender:"WOMEN",imageUrl:"/images/products/1.png" };
 const leafCategory = (item) => item?.categories?.[item.categories.length-1] || "";
 const orderStatusLabels={PENDING:"Новый",CONFIRMED:"Подтверждён",ASSEMBLING:"Собирается",SHIPPED:"Доставка",DELIVERED:"Доставлен",CANCELLED:"Отменён"};

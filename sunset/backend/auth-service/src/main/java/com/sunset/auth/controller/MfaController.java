@@ -2,6 +2,9 @@ package com.sunset.auth.controller;
 
 import com.sunset.auth.dto.AuthResponse;
 import com.sunset.auth.service.MfaService;
+import com.sunset.auth.security.AdminCookieSession;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,9 +21,11 @@ import java.util.UUID;
 @RequestMapping("/auth/mfa")
 public class MfaController {
     private final MfaService mfa;
+    private final AdminCookieSession cookieSession;
 
-    public MfaController(MfaService mfa) {
+    public MfaController(MfaService mfa, AdminCookieSession cookieSession) {
         this.mfa = mfa;
+        this.cookieSession = cookieSession;
     }
 
     @GetMapping("/status")
@@ -30,9 +35,10 @@ public class MfaController {
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@RequestBody ChallengeInput input) {
+    public AuthResponse login(@RequestBody ChallengeInput input, HttpServletRequest request, HttpServletResponse response) {
         AuthResponse result = mfa.verifyLogin(input.challengeToken(), input.code());
         if (result == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Неверный код или временная блокировка");
+        cookieSession.issue(result, request, response);
         return result;
     }
 
@@ -44,9 +50,11 @@ public class MfaController {
     }
 
     @PostMapping("/setup/confirm")
-    public MfaService.SetupCompletion setupConfirm(@RequestBody SetupConfirmInput input) {
+    public MfaService.SetupCompletion setupConfirm(@RequestBody SetupConfirmInput input,
+                                                   HttpServletRequest request, HttpServletResponse response) {
         MfaService.SetupCompletion result = mfa.confirmSetup(input.setupToken(), input.code());
         if (result == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Неверный код или время настройки истекло");
+        cookieSession.issue(result.auth(), request, response);
         return result;
     }
 

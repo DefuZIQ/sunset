@@ -29,10 +29,13 @@ public class JwtFilter implements GlobalFilter, Ordered {
 
     private final WhitelistConfig whitelistConfig;
     private final AuthSessionVerifier sessionVerifier;
+    private final AdminCookieCsrf adminCookieCsrf;
 
-    public JwtFilter(WhitelistConfig whitelistConfig, AuthSessionVerifier sessionVerifier) {
+    public JwtFilter(WhitelistConfig whitelistConfig, AuthSessionVerifier sessionVerifier,
+                     AdminCookieCsrf adminCookieCsrf) {
         this.whitelistConfig = whitelistConfig;
         this.sessionVerifier = sessionVerifier;
+        this.adminCookieCsrf = adminCookieCsrf;
     }
 
     @Override
@@ -42,19 +45,26 @@ public class JwtFilter implements GlobalFilter, Ordered {
 
         boolean publicRequest = isPublicRequest(request);
         String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        boolean bearerAuth = authHeader != null && authHeader.startsWith("Bearer ");
+        String cookieToken = adminCookieCsrf.sessionToken(request);
 
-        if (publicRequest && (authHeader == null || !authHeader.startsWith("Bearer "))) {
+        if (publicRequest && !bearerAuth) {
             log.debug("Путь {} разрешён без авторизации", path);
             return chain.filter(withTrustedUserId(exchange, null));
         }
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (!bearerAuth && (cookieToken == null || cookieToken.isBlank())) {
             log.warn("Отсутствует или некорректный Authorization заголовок");
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
-        String token = authHeader.substring(7);
+        boolean cookieAuth = !bearerAuth;
+        String token = cookieAuth ? cookieToken : authHeader.substring(7);
+        if (cookieAuth && !safeMethod(request) && !adminCookieCsrf.valid(request, token)) {
+            exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+            return exchange.getResponse().setComplete();
+        }
         try {
             Claims claims = Jwts.parser()
                     .setSigningKey(Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8)))
@@ -64,7 +74,7 @@ public class JwtFilter implements GlobalFilter, Ordered {
             String userId = claims.getSubject();
             log.debug("JWT валиден. user-id: {}", userId);
 
-            return sessionVerifier.isActive(token)
+            return (cookieAuth ? sessionVerifier.isAdminActive(token) : sessionVerifier.isActive(token))
                     .onErrorResume(error -> {
                         log.error("Проверка сеанса в Auth Service недоступна: {}", error.toString());
                         exchange.getResponse().setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
@@ -75,7 +85,7 @@ public class JwtFilter implements GlobalFilter, Ordered {
                             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                             return exchange.getResponse().setComplete();
                         }
-                        return chain.filter(withTrustedUserId(exchange, userId));
+                        return chain.filter(withTrustedUserId(exchange, userId, cookieAuth ? token : null));
                     });
 
         } catch (ExpiredJwtException e) {
@@ -94,10 +104,26 @@ public class JwtFilter implements GlobalFilter, Ordered {
         return exchange.getResponse().setComplete();
     }
 
+    private static boolean safeMethod(ServerHttpRequest request) {
+        HttpMethod method = request.getMethod();
+        return HttpMethod.GET.equals(method) || HttpMethod.HEAD.equals(method) || HttpMethod.OPTIONS.equals(method);
+    }
+
     private ServerWebExchange withTrustedUserId(ServerWebExchange exchange, String userId) {
+        return withTrustedUserId(exchange, userId, null);
+    }
+
+    private ServerWebExchange withTrustedUserId(ServerWebExchange exchange, String userId, String cookieToken) {
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                 .headers(headers -> {
                     headers.remove("user-id");
+                    headers.remove("X-Sunset-Request-Host");
+                    if (exchange.getRequest().getHeaders().getHost() != null) {
+                        headers.set("X-Sunset-Request-Host", exchange.getRequest().getHeaders().getHost().getHostString());
+                    }
+                    headers.remove(AdminCookieCsrf.HEADER);
+                    headers.remove(HttpHeaders.COOKIE);
+                    if (cookieToken != null) headers.setBearerAuth(cookieToken);
                     if (userId != null && !userId.isBlank()) {
                         headers.set("user-id", userId);
                     }

@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/admin/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Восстановить CSRF-токен активной cookie-сессии администратора */
+        get: operations["getAdminSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -115,7 +132,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Включить MFA и выдать резервные коды и проверенный JWT */
+        /** Включить MFA, выдать резервные коды и cookie-сеанс */
         post: operations["confirmMandatoryMfaSetup"];
         delete?: never;
         options?: never;
@@ -1138,8 +1155,10 @@ export interface components {
             lastName?: string;
             phone?: string | null;
             role: string;
-            /** @description JWT после входа; null при регистрации или незавершённой MFA */
+            /** @description JWT только для клиента; у администратора всегда null */
             token: string | null;
+            /** @description CSRF-токен админского cookie-сеанса; не является учётными данными для входа */
+            csrfToken?: string | null;
             mfaRequired?: boolean;
             challengeToken?: string | null;
             mfaEnrollmentRequired?: boolean;
@@ -1774,6 +1793,29 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getAdminSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSRF-токен (не JWT) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        csrfToken: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     revokeSession: {
         parameters: {
             query?: never;
@@ -1809,7 +1851,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Выдан JWT */
+            /** @description Выдан HttpOnly cookie-сеанс и CSRF-токен; JWT в JSON не возвращается */
             200: {
                 headers: {
                     [name: string]: unknown;

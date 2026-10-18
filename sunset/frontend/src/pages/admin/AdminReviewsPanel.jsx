@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { listAdminReviews, moderateAdminReview, saveAdminReviewReply } from "../../api/client";
+import { ADMIN_COOKIE_SESSION, listAdminReviews, moderateAdminReview, saveAdminReviewReply } from "../../api/client";
 
 export default function AdminReviewsPanel() {
   const [reviews, setReviews] = useState([]);
@@ -13,7 +13,7 @@ export default function AdminReviewsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listAdminReviews(sessionStorage.getItem("adminAuthToken"));
+      const data = await listAdminReviews(ADMIN_COOKIE_SESSION);
       setReviews(data);
       setDrafts(Object.fromEntries(data.map((item) => [item.id, item.storeReply || ""])));
       setMessage("");
@@ -29,7 +29,7 @@ export default function AdminReviewsPanel() {
   const save = async (item, reply) => {
     setSaving(item.id);
     try {
-      const updated = await saveAdminReviewReply(sessionStorage.getItem("adminAuthToken"), item.id, { reply });
+      const updated = await saveAdminReviewReply(ADMIN_COOKIE_SESSION, item.id, { reply });
       setReviews((current) => current.map((review) => review.id === item.id ? updated : review));
       setDrafts((current) => ({ ...current, [item.id]: updated.storeReply || "" }));
       setMessage(reply ? "Ответ магазина сохранён" : "Ответ магазина удалён");
@@ -42,7 +42,7 @@ export default function AdminReviewsPanel() {
   const moderate = async (item) => {
     setModerating(item.id);
     try {
-      const updated = await moderateAdminReview(sessionStorage.getItem("adminAuthToken"), item.id, { isHidden: !item.isHidden });
+      const updated = await moderateAdminReview(ADMIN_COOKIE_SESSION, item.id, { isHidden: !item.isHidden });
       setReviews((current) => current.map((review) => review.id === item.id ? updated : review));
       setMessage(updated.isHidden ? "Отзыв скрыт из магазина и рейтинга" : "Отзыв снова опубликован");
     } catch (error) {

@@ -9,6 +9,7 @@ public class AuthResponse {
     private String phone;
     private String role;
     private String token;  // Токен в DTO
+    private String csrfToken;
     private boolean mfaRequired;
     private String challengeToken;
     private boolean mfaEnrollmentRequired;
@@ -78,6 +79,9 @@ public class AuthResponse {
     public void setToken(String token) {
         this.token = token;
     }
+
+    public String getCsrfToken() { return csrfToken; }
+    public void setCsrfToken(String csrfToken) { this.csrfToken = csrfToken; }
 
     public boolean isMfaRequired() { return mfaRequired; }
     public void setMfaRequired(boolean mfaRequired) { this.mfaRequired = mfaRequired; }

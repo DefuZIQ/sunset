@@ -153,6 +153,7 @@ class AuthPostgresIntegrationTest {
         String second = service.loginUser(new LoginRequest("sessions@sunset.test", "initial-pass-123")).getToken();
         assertThat(sessions.authenticatedUser(first)).isEqualTo(userId);
         assertThat(sessions.authenticatedUser(second)).isEqualTo(userId);
+        assertThat(sessions.isElevatedSession(first, userId)).isFalse();
 
         sessions.revoke(first, userId);
         assertThat(sessions.authenticatedUser(first)).isNull();
@@ -184,6 +185,7 @@ class AuthPostgresIntegrationTest {
         assertThat(jwt.parse(token).getExpiration().getTime() - jwt.parse(token).getIssuedAt().getTime())
                 .isEqualTo(15 * 60 * 1000L);
         assertThat(sessions.authenticatedUser(token)).isEqualTo(userId);
+        assertThat(sessions.isElevatedSession(token, userId)).isTrue();
     }
 
     @Test

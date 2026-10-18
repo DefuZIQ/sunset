@@ -31,6 +31,12 @@
         "responses": { "204": { "description": "Сеанс активен" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
+    "/auth/admin/session": {
+      "get": {
+        "tags": ["Auth", "Administration"], "operationId": "getAdminSession", "summary": "Восстановить CSRF-токен активной cookie-сессии администратора", "security": [{ "adminCookie": [] }],
+        "responses": { "200": { "description": "CSRF-токен (не JWT)", "content": { "application/json": { "schema": { "type": "object", "required": ["csrfToken"], "properties": { "csrfToken": { "type": "string" } } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
     "/auth/logout": {
       "post": {
         "tags": ["Auth"], "operationId": "revokeSession", "summary": "Отозвать текущий сеанс", "security": [{ "bearerAuth": [] }],
@@ -41,7 +47,7 @@
       "post": {
         "tags": ["Auth"], "operationId": "verifyMfaLogin", "summary": "Завершить вход сотрудника одноразовым или резервным кодом",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["challengeToken", "code"], "properties": { "challengeToken": { "type": "string" }, "code": { "type": "string" } } } } } },
-        "responses": { "200": { "description": "Выдан JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+        "responses": { "200": { "description": "Выдан HttpOnly cookie-сеанс и CSRF-токен; JWT в JSON не возвращается", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
     "/auth/mfa/setup/start": {
@@ -53,7 +59,7 @@
     },
     "/auth/mfa/setup/confirm": {
       "post": {
-        "tags": ["Auth", "Administration"], "operationId": "confirmMandatoryMfaSetup", "summary": "Включить MFA и выдать резервные коды и проверенный JWT",
+        "tags": ["Auth", "Administration"], "operationId": "confirmMandatoryMfaSetup", "summary": "Включить MFA, выдать резервные коды и cookie-сеанс",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["setupToken", "code"], "properties": { "setupToken": { "type": "string" }, "code": { "type": "string" } } } } } },
         "responses": { "200": { "description": "Вход завершён после проверки TOTP", "content": { "application/json": { "schema": { "type": "object", "properties": { "auth": { "$ref": "#/components/schemas/AuthResponse" }, "recoveryCodes": { "type": "array", "items": { "type": "string" } } } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
@@ -474,7 +480,7 @@
     }
   },
   "components": {
-    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" } },
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }, "adminCookie": { "type": "apiKey", "in": "cookie", "name": "SUNSET_ADMIN_SESSION", "description": "HttpOnly cookie после MFA; для POST/PUT/PATCH/DELETE нужен X-SUNSET-CSRF" } },
     "parameters": {
       "OrderId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
       "ResourceId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
@@ -525,7 +531,8 @@
         "properties": {
           "uuid": { "type": "string", "format": "uuid" }, "email": { "type": "string", "format": "email" },
           "firstName": { "type": "string" }, "lastName": { "type": "string" }, "phone": { "type": "string", "nullable": true },
-          "role": { "type": "string" }, "token": { "type": "string", "nullable": true, "description": "JWT после входа; null при регистрации или незавершённой MFA" },
+          "role": { "type": "string" }, "token": { "type": "string", "nullable": true, "description": "JWT только для клиента; у администратора всегда null" },
+          "csrfToken": { "type": "string", "nullable": true, "description": "CSRF-токен админского cookie-сеанса; не является учётными данными для входа" },
           "mfaRequired": { "type": "boolean" }, "challengeToken": { "type": "string", "nullable": true },
           "mfaEnrollmentRequired": { "type": "boolean" }, "setupToken": { "type": "string", "nullable": true }
         }

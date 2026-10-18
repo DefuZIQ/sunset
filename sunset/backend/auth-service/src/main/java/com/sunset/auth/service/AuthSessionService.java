@@ -69,6 +69,22 @@ public class AuthSessionService {
                 UUID.fromString(claims.getId()), userId);
     }
 
+    public boolean isElevatedSession(String token, UUID userId) {
+        Claims claims = jwt.parse(token);
+        if (claims == null || claims.getId() == null || !userId.toString().equals(claims.getSubject())) return false;
+        try {
+            Boolean active = jdbc.queryForObject("""
+                    SELECT EXISTS(SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.user_id
+                    JOIN mfa_totp f ON f.user_id=u.id AND f.enabled
+                    WHERE s.id=? AND s.user_id=? AND s.revoked_at IS NULL AND s.expires_at>NOW()
+                    AND s.mfa_verified AND u.role IN ('ADMIN','STAFF'))
+                    """, Boolean.class, UUID.fromString(claims.getId()), userId);
+            return Boolean.TRUE.equals(active);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     public void revokeAll(UUID userId) {
         jdbc.update("UPDATE auth_sessions SET revoked_at=NOW() WHERE user_id=? AND revoked_at IS NULL", userId);
     }

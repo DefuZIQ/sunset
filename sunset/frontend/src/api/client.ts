@@ -16,9 +16,9 @@ export type Order = components["schemas"]["Order"];
 export type OrderDetail = components["schemas"]["OrderDetail"];
 export type OrderReturn = components["schemas"]["OrderReturn"];
 export type AuthResponse = components["schemas"]["AuthResponse"];
-export type MfaLoginResponse = AuthResponse & { mfaRequired?: boolean; challengeToken?: string; mfaEnrollmentRequired?: boolean; setupToken?: string };
+export type MfaLoginResponse = AuthResponse & { mfaRequired?: boolean; challengeToken?: string; mfaEnrollmentRequired?: boolean; setupToken?: string; csrfToken?: string };
 export type MfaEnrollment = { secret: string; otpauthUri: string };
-export type MfaSetupCompletion = { auth: AuthResponse; recoveryCodes: string[] };
+export type MfaSetupCompletion = { auth: MfaLoginResponse; recoveryCodes: string[] };
 export type MfaStatus = { enabled: boolean; recoveryCodesRemaining: number };
 export type UserProfile = components["schemas"]["UserProfile"];
 export type Notification = components["schemas"]["Notification"];
@@ -79,7 +79,13 @@ async function readJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export const ADMIN_COOKIE_SESSION = "ADMIN_COOKIE_SESSION";
+let adminCsrfToken = "";
+
+export function setAdminCsrfToken(token: string) { adminCsrfToken = token; }
+
 function bearer(token: string): Record<string, string> {
+  if (token === ADMIN_COOKIE_SESSION) return adminCsrfToken ? { "X-SUNSET-CSRF": adminCsrfToken } : {};
   return { Authorization: `Bearer ${token}` };
 }
 
@@ -178,6 +184,10 @@ export async function confirmMandatoryMfaSetup(setupToken: string, code: string)
 
 export async function getMfaStatus(token: string): Promise<MfaStatus> {
   return readJson<MfaStatus>(await fetch("/api/v1/auth/mfa/status", { headers: bearer(token) }));
+}
+
+export async function getAdminSession(): Promise<{ csrfToken: string }> {
+  return readJson(await fetch("/api/v1/auth/admin/session"));
 }
 
 export async function getProfile(token: string): Promise<UserProfile> {

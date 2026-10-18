@@ -1,14 +1,29 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createCustomerAddress, createOrder, createOrderReturn, deleteAdminProduct, deleteCustomerAddress, deleteOwnProductReview, getCategoryTree,
+import { ADMIN_COOKIE_SESSION, adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createCustomerAddress, createOrder, createOrderReturn, deleteAdminProduct, deleteCustomerAddress, deleteOwnProductReview, getAdminSession, getCategoryTree,
   getAddressGeocoderStatus, getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
   listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
   listAdminReviews, listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
     markNotificationRead, markProductReviewHelpful, moderateAdminReview, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview, voteProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
   updateCustomerAddress, uploadProductReviewPhoto, validatePromoCode, getProfile, syncCustomerAddresses, revokeSession,
-  verifyMfaLogin, getMfaStatus, startMandatoryMfaSetup, confirmMandatoryMfaSetup } from "./client";
+  verifyMfaLogin, getMfaStatus, startMandatoryMfaSetup, confirmMandatoryMfaSetup, setAdminCsrfToken } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("admin cookie requests use CSRF but never expose a bearer token", async () => {
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: "csrf" }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ status: "CONFIRMED" }) });
+  vi.stubGlobal("fetch", fetchMock);
+  const session = await getAdminSession();
+  setAdminCsrfToken(session.csrfToken);
+  await updateAdminOrderStatus(ADMIN_COOKIE_SESSION, "order-1", { status: "CONFIRMED" });
+  expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/auth/admin/session");
+  const options = fetchMock.mock.calls[1][1];
+  expect(options.headers["X-SUNSET-CSRF"]).toBe("csrf");
+  expect(options.headers.Authorization).toBeUndefined();
+  setAdminCsrfToken("");
+});
 
 test("mandatory MFA setup uses a password-issued challenge without an admin bearer token", async () => {
   const fetchMock = vi.fn()

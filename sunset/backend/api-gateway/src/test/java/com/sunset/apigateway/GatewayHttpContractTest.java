@@ -19,6 +19,9 @@ import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
 import java.nio.charset.StandardCharsets;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -32,6 +35,8 @@ class GatewayHttpContractTest {
     private static final String CUSTOMER_ID = "10000000-0000-0000-0000-000000000001";
     private static final AtomicReference<ForwardedRequest> FORWARDED = new AtomicReference<>();
     private static final AtomicInteger REQUEST_COUNT = new AtomicInteger();
+    private static final DisposableServer AUTH_VALIDATOR = HttpServer.create().port(0)
+            .handle((request, response) -> response.status(204).send()).bindNow();
     private static final DisposableServer DOWNSTREAM = HttpServer.create().port(0)
             .handle((request, response) -> request.receive().aggregate().asString()
                     .defaultIfEmpty("")
@@ -57,6 +62,8 @@ class GatewayHttpContractTest {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("jwt.secret", () -> SECRET);
+        registry.add("auth.session-validation-url", () -> "http://localhost:" + AUTH_VALIDATOR.port() + "/auth/session/validate");
+        registry.add("auth.admin-session-validation-url", () -> "http://localhost:" + AUTH_VALIDATOR.port() + "/auth/session/admin/validate");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].id", () -> "auth-test");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].uri", () -> "http://localhost:" + DOWNSTREAM.port());
         registry.add("spring.cloud.gateway.server.webflux.routes[0].predicates[0]", () -> "Path=/auth/**");
@@ -77,6 +84,7 @@ class GatewayHttpContractTest {
     @AfterAll
     static void stopDownstream() {
         DOWNSTREAM.disposeNow();
+        AUTH_VALIDATOR.disposeNow();
     }
 
     @Autowired
@@ -435,6 +443,33 @@ class GatewayHttpContractTest {
                 .jsonPath("$.requestId").exists();
 
         assertThat(REQUEST_COUNT.get()).isZero();
+    }
+
+    @Test
+    void adminCookieAuthenticatesReadsButRequiresCsrfForWrites() throws Exception {
+        String session = token(CUSTOMER_ID);
+        client.get().uri("/api/v1/order/admin/orders")
+                .cookie("SUNSET_ADMIN_SESSION", session)
+                .exchange().expectStatus().isOk();
+        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+
+        client.post().uri("/api/v1/order/admin/promotions")
+                .cookie("SUNSET_ADMIN_SESSION", session)
+                .bodyValue("{}")
+                .exchange().expectStatus().isForbidden();
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        String csrf = Base64.getUrlEncoder().withoutPadding().encodeToString(
+                mac.doFinal(("sunset-admin-csrf-v1:" + session).getBytes(StandardCharsets.UTF_8)));
+        client.post().uri("/api/v1/order/admin/promotions")
+                .cookie("SUNSET_ADMIN_SESSION", session)
+                .header("X-SUNSET-CSRF", csrf)
+                .bodyValue("{}")
+                .exchange().expectStatus().isOk();
+        assertThat(REQUEST_COUNT.get()).isEqualTo(2);
     }
 
     private String token(String subject) {

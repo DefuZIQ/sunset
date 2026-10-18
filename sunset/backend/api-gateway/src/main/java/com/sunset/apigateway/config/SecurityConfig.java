@@ -22,6 +22,7 @@ import org.springframework.security.web.server.context.NoOpServerSecurityContext
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import com.sunset.apigateway.security.AdminCookieCsrf;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
@@ -35,13 +36,16 @@ public class SecurityConfig {
 
     private final WhitelistConfig whitelistConfig;
     private final ApiErrorWriter apiErrorWriter;
+    private final AdminCookieCsrf adminCookieCsrf;
 
     @Value("${jwt.secret}")
     private String secretKey;
 
-    public SecurityConfig(WhitelistConfig whitelistConfig, ApiErrorWriter apiErrorWriter) {
+    public SecurityConfig(WhitelistConfig whitelistConfig, ApiErrorWriter apiErrorWriter,
+                          AdminCookieCsrf adminCookieCsrf) {
         this.whitelistConfig = whitelistConfig;
         this.apiErrorWriter = apiErrorWriter;
+        this.adminCookieCsrf = adminCookieCsrf;
         log.info(">>> SecurityConfig инициализирован");
     }
 
@@ -66,10 +70,14 @@ public class SecurityConfig {
                 new AuthenticationWebFilter(jwtAuthenticationManager);
         jwtAuthenticationFilter.setServerAuthenticationConverter(exchange -> {
             String authorization = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-            if (authorization == null || !authorization.startsWith("Bearer ")) {
-                return Mono.empty();
-            }
-            String token = authorization.substring(7);
+            String path = exchange.getRequest().getURI().getPath();
+            boolean publicPath = whitelistConfig.getWhitelistPaths().stream()
+                    .anyMatch(value -> path.equals(value) || path.startsWith(value + "/"));
+            if ((publicPath || "/order/stores".equals(path))
+                    && (authorization == null || !authorization.startsWith("Bearer "))) return Mono.empty();
+            String token = authorization != null && authorization.startsWith("Bearer ")
+                    ? authorization.substring(7) : adminCookieCsrf.sessionToken(exchange.getRequest());
+            if (token == null || token.isBlank()) return Mono.empty();
             return Mono.just(new UsernamePasswordAuthenticationToken(token, token));
         });
         jwtAuthenticationFilter.setSecurityContextRepository(NoOpServerSecurityContextRepository.getInstance());

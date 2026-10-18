@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getIamUserPermissions, updateIamUserPermissions } from "../../api/client";
+import { ADMIN_COOKIE_SESSION, getIamUserPermissions, updateIamUserPermissions } from "../../api/client";
 
 const permissionLabels = [
   ["catalog:write", "Управление товарами"],
@@ -24,7 +24,7 @@ export default function AdminAccessPanel({ users }) {
     if (!userId) { setSelected([]); setCurrentRole(""); return; }
     let active = true;
     setLoading(true);
-    getIamUserPermissions(sessionStorage.getItem("adminAuthToken"), userId)
+    getIamUserPermissions(ADMIN_COOKIE_SESSION, userId)
       .then((result) => { if (active) { setSelected(result.permissions || []); setCurrentRole(result.role); } })
       .catch((error) => { if (active) setMessage(error.message || "Не удалось загрузить права"); })
       .finally(() => { if (active) setLoading(false); });
@@ -41,7 +41,7 @@ export default function AdminAccessPanel({ users }) {
     setLoading(true);
     setMessage("");
     try {
-      const result = await updateIamUserPermissions(sessionStorage.getItem("adminAuthToken"), userId, selected);
+      const result = await updateIamUserPermissions(ADMIN_COOKIE_SESSION, userId, selected);
       setCurrentRole(result.role);
       setSelected(result.permissions || []);
       setMessage("Права сотрудника сохранены. Изменения действуют сразу.");

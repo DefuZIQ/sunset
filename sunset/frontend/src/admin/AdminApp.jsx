@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { HashRouter } from "react-router-dom";
 import Admin from "../pages/Admin";
 import ErrorBoundary from "../components/ErrorBoundary";
-import { ApiHttpError, getIamIdentity, loginCustomer, revokeSession, verifyMfaLogin } from "../api/client";
+import { ADMIN_COOKIE_SESSION, ApiHttpError, getAdminSession, getIamIdentity, loginCustomer, revokeSession, setAdminCsrfToken, verifyMfaLogin } from "../api/client";
 import AdminMfaPanel from "./AdminMfaPanel";
 import AdminMfaSetup from "./AdminMfaSetup";
 import "./AdminApp.css";
@@ -19,13 +19,13 @@ export default function AdminApp() {
   const [setupToken, setSetupToken] = useState("");
 
   useEffect(() => {
-    const token = sessionStorage.getItem("adminAuthToken");
-    if (!token) { setStatus("guest"); return; }
-    getIamIdentity(token)
+    sessionStorage.removeItem("adminAuthToken");
+    getAdminSession()
+      .then(({ csrfToken }) => { setAdminCsrfToken(csrfToken); return getIamIdentity(ADMIN_COOKIE_SESSION); })
       .then((access) => { setIdentity(access); setStatus(access.permissions?.length ? "admin" : "denied"); })
       .catch((error) => {
         if (error instanceof ApiHttpError && [401, 403].includes(error.status)) {
-          sessionStorage.removeItem("adminAuthToken");
+          setAdminCsrfToken("");
           setStatus("guest");
         } else {
           setMessage("Не удалось проверить доступ. Попробуйте обновить страницу.");
@@ -52,8 +52,7 @@ export default function AdminApp() {
         setStatus("setup");
         return;
       }
-      if (!result.token) throw new Error("Сервер не выдал токен доступа");
-      await completeSignIn(result.token);
+      throw new Error("Для входа в панель требуется двухфакторная защита");
     } catch (error) {
       setMessage(error.message || "Не удалось войти");
     } finally {
@@ -61,13 +60,14 @@ export default function AdminApp() {
     }
   }
 
-  async function completeSignIn(token) {
-      const access = await getIamIdentity(token);
+  async function completeSignIn(csrfToken) {
+      if (!csrfToken) throw new Error("Сервер не создал защищённый сеанс");
+      setAdminCsrfToken(csrfToken);
+      const access = await getIamIdentity(ADMIN_COOKIE_SESSION);
       if (!access.permissions?.length) {
         setStatus("denied");
         return;
       }
-      sessionStorage.setItem("adminAuthToken", token);
       setIdentity(access);
       setPassword("");
       setChallengeToken("");
@@ -81,23 +81,21 @@ export default function AdminApp() {
     setBusy(true); setMessage("");
     try {
       const result = await verifyMfaLogin(challengeToken, mfaCode.trim());
-      if (!result.token) throw new Error("Сервер не выдал токен доступа");
-      await completeSignIn(result.token);
+      await completeSignIn(result.csrfToken);
     } catch (error) { setMessage(error.message || "Неверный код"); }
     finally { setBusy(false); }
   }
 
   async function finishMandatorySetup(auth) {
-    if (!auth?.token) { setMessage("Сервер не выдал токен доступа"); return; }
-    try { await completeSignIn(auth.token); }
+    if (!auth?.csrfToken) { setMessage("Сервер не создал защищённый сеанс"); return; }
+    try { await completeSignIn(auth.csrfToken); }
     catch (error) { setMessage(error.message || "Не удалось открыть админку"); }
   }
 
   async function signOut() {
-    const token = sessionStorage.getItem("adminAuthToken");
-    if (token) {
+    if (status === "admin" || status === "denied") {
       setBusy(true);
-      try { await revokeSession(token); }
+      try { await revokeSession(ADMIN_COOKIE_SESSION); }
       catch (error) {
         setMessage(error.message || "Не удалось завершить сеанс на сервере");
         setBusy(false);
@@ -105,7 +103,7 @@ export default function AdminApp() {
       }
       setBusy(false);
     }
-    sessionStorage.removeItem("adminAuthToken");
+    setAdminCsrfToken("");
     setStatus("guest");
     setIdentity(null);
     setChallengeToken("");
@@ -119,7 +117,7 @@ export default function AdminApp() {
         <a className="admin-app__brand" href="/">SUNSET <span>CONTROL</span></a>
         <nav aria-label="Навигация администрации"><a href="/">Перейти в магазин</a>{status === "admin" && <button type="button" onClick={signOut} disabled={busy}>{busy ? "Выходим…" : "Выйти"}</button>}</nav>
       </header>
-      {status === "admin" ? <main>{message && <p role="alert">{message}</p>}<AdminMfaPanel token={sessionStorage.getItem("adminAuthToken")} /><ErrorBoundary variant="app"><Admin identity={identity} /></ErrorBoundary></main> :
+      {status === "admin" ? <main>{message && <p role="alert">{message}</p>}<AdminMfaPanel token={ADMIN_COOKIE_SESSION} /><ErrorBoundary variant="app"><Admin identity={identity} /></ErrorBoundary></main> :
         <main className="admin-app__access">
           <div className="admin-app__access-card">
             <p className="page-kicker">SUNSET CONTROL</p>

@@ -8,10 +8,14 @@ import com.sunset.auth.dto.UpdateProfileRequest;
 import com.sunset.auth.dto.UserDTO;
 import com.sunset.auth.service.AuthService;
 import com.sunset.auth.service.AuthSessionService;
+import com.sunset.auth.security.AdminCookieSession;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.UUID;
 import java.util.Map;
 
@@ -22,10 +26,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthSessionService sessions;
+    private final AdminCookieSession cookieSession;
 
-    public AuthController(AuthService authService, AuthSessionService sessions) {
+    public AuthController(AuthService authService, AuthSessionService sessions, AdminCookieSession cookieSession) {
         this.authService = authService;
         this.sessions = sessions;
+        this.cookieSession = cookieSession;
     }
 
     @PostMapping("/register")
@@ -60,9 +66,29 @@ public class AuthController {
         // JwtFilter has already checked both the JWT and the server-side session.
     }
 
+    @GetMapping("/session/admin/validate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void validateAdminSession(Authentication authentication, @RequestHeader("Authorization") String authorization) {
+        if (!sessions.isElevatedSession(authorization.substring(7), (UUID) authentication.getPrincipal())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Недействительный сеанс администратора");
+        }
+    }
+
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logout(Authentication authentication, @RequestHeader("Authorization") String authorization) {
+    public void logout(Authentication authentication, @RequestHeader("Authorization") String authorization,
+                       HttpServletRequest request, HttpServletResponse response) {
         sessions.revoke(authorization.substring(7), (UUID) authentication.getPrincipal());
+        cookieSession.clear(request, response);
+    }
+
+    @GetMapping("/admin/session")
+    public Map<String, String> adminSession(Authentication authentication,
+                                            @RequestHeader("Authorization") String authorization) {
+        String token = authorization.substring(7);
+        if (!sessions.isElevatedSession(token, (UUID) authentication.getPrincipal())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Недействительный сеанс администратора");
+        }
+        return Map.of("csrfToken", cookieSession.csrf(token));
     }
 }
