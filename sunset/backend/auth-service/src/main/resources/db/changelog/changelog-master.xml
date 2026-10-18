@@ -31,4 +31,8 @@
         <sqlFile path="classpath:/db/migrations/V6__auth_sessions.sql"/>
     </changeSet>
 
+    <changeSet id="13" author="codex">
+        <sqlFile path="classpath:/db/migrations/V7__auth_session_expiry_index.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

@@ -173,6 +173,23 @@ class AuthPostgresIntegrationTest {
     }
 
     @Test
+    void oldExpiredSessionsArePurgedWithoutTouchingActiveSessions() {
+        UUID userId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "cleanup@sunset.test", "initial-pass-123", "Анна", "Очистка")).getUuid());
+        String oldToken = service.loginUser(new LoginRequest("cleanup@sunset.test", "initial-pass-123")).getToken();
+        String activeToken = service.loginUser(new LoginRequest("cleanup@sunset.test", "initial-pass-123")).getToken();
+        UUID oldSession = UUID.fromString(jwt.parse(oldToken).getId());
+        jdbc.update("UPDATE auth_sessions SET issued_at=NOW()-INTERVAL '10 days', "
+                + "expires_at=NOW()-INTERVAL '8 days' WHERE id=?", oldSession);
+
+        assertThat(sessions.purgeExpiredBefore(java.time.Instant.now().minus(7, java.time.temporal.ChronoUnit.DAYS)))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_sessions WHERE id=?", Integer.class, oldSession))
+                .isZero();
+        assertThat(sessions.authenticatedUser(activeToken)).isEqualTo(userId);
+    }
+
+    @Test
     void addressesPersistAndStayPrivateToTheirOwner() {
         UUID owner = UUID.fromString(service.registerUser(new RegisterRequest("owner@sunset.test", "initial-pass-123", "Анна", "Иванова")).getUuid());
         UUID stranger = UUID.fromString(service.registerUser(new RegisterRequest("stranger@sunset.test", "initial-pass-123", "Иван", "Соколов")).getUuid());

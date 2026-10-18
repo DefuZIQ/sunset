@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -62,5 +63,9 @@ public class AuthSessionService {
 
     public void revokeAll(UUID userId) {
         jdbc.update("UPDATE auth_sessions SET revoked_at=NOW() WHERE user_id=? AND revoked_at IS NULL", userId);
+    }
+
+    public int purgeExpiredBefore(Instant cutoff) {
+        return jdbc.update("DELETE FROM auth_sessions WHERE expires_at < ?", Timestamp.from(cutoff));
     }
 }
