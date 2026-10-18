@@ -20,4 +20,12 @@ CSRF-токен не следует трактовать как замену з�
 
 Перед установкой сохранить предыдущие Docker-образы Auth/Gateway/web и статический релиз на VDS. Откатывать эти три компонента согласованно: старая админка ожидает JWT в `sessionStorage`, новый Auth его не возвращает. База не меняется, миграции и отката схемы нет. Существующие cookie-сеансы после отката не используются старой админкой; пользователям потребуется войти повторно.
 
+## Фактический выпуск
+
+Auth, Gateway и локальный web развёрнуты на VM из `4dea579`; прежние образы сохранены с тегом `rollback-admin-cookie-20261018`. На VDS статический релиз переключён с `/srv/sunset/releases/mfa-required-20261018` на `/srv/sunset/releases/admin-cookie-20261018`; предыдущая папка сохранена. Тест с отдельным PostgreSQL 16 прошёл, включая HTTP-ответ настройки MFA: `HttpOnly`, `Secure` на публичном host, JWT в JSON равен `null`, восемь резервных кодов. Gateway unit/HTTP-контракт, 68 frontend unit, typecheck/build и Playwright: 119 passed, 11 skipped. Живые smoke-тесты публичного и локального сайта прошли на desktop/mobile; `/`, `/admin/`, дерево категорий — `200`, `/auth/admin/session` без cookie — `401`.
+
+Во время выпуска VM оказалась выключена; остаточный lock VMware перемещён в `F:\Virtual Machine\Ubuntu 64-bit.vmx.lck.stale-20261018-1413` и VM запущена. После перезапуска был краткий `502` публичного API до восстановления обратного SSH-туннеля; повторная проверка дала `200`, а прямой запрос через туннель на VDS также дал `200`. Файл lock сохранён для диагностики.
+
+Реальный вход действующего администратора и операции записи без передачи его TOTP/резервных кодов не выполнялись; владелец должен проверить первый вход на своём устройстве. Секреты, ранее отправленные в чат, остаются задачей ротации после отделения админского origin.
+
 Ориентиры: [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), [OWASP CSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).

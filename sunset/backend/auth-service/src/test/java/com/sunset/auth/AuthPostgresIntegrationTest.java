@@ -14,6 +14,8 @@ import com.sunset.auth.service.AuthSessionService;
 import com.sunset.auth.service.MfaService;
 import com.sunset.auth.service.CustomerAddressService;
 import com.sunset.auth.controller.IamController;
+import com.sunset.auth.controller.MfaController;
+import com.sunset.auth.security.AdminCookieSession;
 import com.sunset.contract.IamAccess;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,15 @@ import java.time.LocalDate;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.List;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -186,6 +197,31 @@ class AuthPostgresIntegrationTest {
                 .isEqualTo(15 * 60 * 1000L);
         assertThat(sessions.authenticatedUser(token)).isEqualTo(userId);
         assertThat(sessions.isElevatedSession(token, userId)).isTrue();
+    }
+
+    @Test
+    void mfaSetupHttpResponseSetsCookieWithoutLeakingAdminJwt() throws Exception {
+        UUID userId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "cookie-admin@sunset.test", "initial-pass-123", "Иван", "Админ")).getUuid());
+        jdbc.update("UPDATE users SET role='ADMIN' WHERE id=?", userId);
+        var setup = service.loginUser(new LoginRequest("cookie-admin@sunset.test", "initial-pass-123"));
+        mfa.startSetup(setup.getSetupToken());
+        byte[] secret = new MfaSecretCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+                .decrypt(jdbc.queryForObject("SELECT secret_ciphertext FROM mfa_totp WHERE user_id=?", String.class, userId), userId);
+        String code = TotpCodes.at(secret, Instant.now().getEpochSecond());
+        var mvc = MockMvcBuilders.standaloneSetup(new MfaController(mfa,
+                new AdminCookieSession("test-secret-that-is-at-least-32-bytes"))).build();
+
+        mvc.perform(post("/auth/mfa/setup/confirm")
+                        .header("X-Sunset-Request-Host", "t3ch.pro")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"setupToken\":\"" + setup.getSetupToken() + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Set-Cookie", containsString("HttpOnly")))
+                .andExpect(header().string("Set-Cookie", containsString("Secure")))
+                .andExpect(jsonPath("$.auth.token").value(nullValue()))
+                .andExpect(jsonPath("$.auth.csrfToken").isString())
+                .andExpect(jsonPath("$.recoveryCodes.length()").value(8));
     }
 
     @Test
