@@ -123,7 +123,8 @@ public class SecurityConfig {
                 "http://localhost:5173",
                 "http://192.168.1.186",
                 "https://t3ch.pro",
-                "https://www.t3ch.pro"));
+                "https://www.t3ch.pro",
+                "https://admin.t3ch.pro"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowCredentials(true);

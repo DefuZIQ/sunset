@@ -152,6 +152,20 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void administrationOriginCanSubmitLogin() {
+        client.mutate().baseUrl("http://localhost").build().post().uri("/api/v1/auth/login")
+                .header(HttpHeaders.ORIGIN, "https://admin.t3ch.pro")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"email\":\"staff@sunset.test\",\"password\":\"invalid\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://admin.t3ch.pro");
+
+        assertThat(REQUEST_COUNT.get()).isEqualTo(1);
+        assertThat(FORWARDED.get().path()).isEqualTo("/auth/login");
+    }
+
+    @Test
     void untrustedOriginCannotSubmitLogin() {
         client.mutate().baseUrl("http://localhost").build().post().uri("/api/v1/auth/login")
                 .header(HttpHeaders.ORIGIN, "https://untrusted.example.invalid")

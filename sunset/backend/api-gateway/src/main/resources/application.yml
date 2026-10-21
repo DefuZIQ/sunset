@@ -38,6 +38,7 @@ spring:
                   - http://192.168.1.186
                   - https://t3ch.pro
                   - https://www.t3ch.pro
+                  - https://admin.t3ch.pro
                 allowed-methods:
                   - GET
                   - POST

@@ -10,7 +10,7 @@ backup=${4:-}
 project_dir=${5:-/home/defuziq/sunset}
 
 case "$mode" in --check|--apply) ;; *) echo 'Usage: deploy-backend-candidate.sh --check|--apply SERVICE RELEASE BACKUP [PROJECT_DIR]' >&2; exit 2 ;; esac
-case "$service" in auth-service|product-service|order-service|notification-service|api-gateway) ;; *) echo 'Unknown service' >&2; exit 2 ;; esac
+case "$service" in auth-service|product-service|order-service|notification-service|api-gateway|web) ;; *) echo 'Unknown service' >&2; exit 2 ;; esac
 case "$release" in ''|*[!a-zA-Z0-9._-]*) echo 'Invalid release tag' >&2; exit 2 ;; esac
 test -f "$project_dir/docker-compose.prod.yml"
 test -f "$backup"
@@ -33,7 +33,11 @@ container=$(docker compose -f docker-compose.prod.yml ps -q "$service")
 test -n "$container"
 current_image=$(docker inspect --format '{{.Image}}' "$container")
 current_health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container")
-test "$current_health" = healthy
+if [ "$service" = web ]; then
+  test "$current_health" = running
+else
+  test "$current_health" = healthy
+fi
 curl -fsS --max-time 15 -o /dev/null http://127.0.0.1/
 
 printf 'Service: %s\nCurrent image: %s\nCandidate: %s\nRollback tag: %s\n' \

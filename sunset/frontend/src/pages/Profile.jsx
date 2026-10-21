@@ -5,6 +5,7 @@ import ProductCard from "../components/Main/ProductCard";
 import AddressBook from "./AddressBook";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStore } from "../contexts/StoreContext";
+import { adminUrl } from "../admin/adminUrls";
 import { changePassword as changePasswordRequest, getLoyaltyAccount, getSubscriptionStatus, listMyOrders, listNotifications, markNotificationRead as markNotificationReadRequest, unsubscribeNewsletter, updateProfile } from "../api/client";
 import "./ContentPages.css";
 import "./Profile.css";
@@ -158,7 +159,7 @@ export default function Profile({ user, setUser, section = "overview" }) {
           <Link className={section === "settings" ? "active" : ""} to="/profile/settings"><span>06</span>Настройки</Link>
           <Link className={section === "notifications" ? "active" : ""} to="/profile/notifications"><span>07</span>Уведомления<em>{unreadNotifications}</em></Link>
           <Link className={section === "addresses" ? "active" : ""} to="/profile/addresses"><span>08</span>Адреса и оплата</Link>
-          {["ADMIN", "STAFF"].includes(user.role) && <a href="/admin/"><span>09</span>Управление</a>}
+          {["ADMIN", "STAFF"].includes(user.role) && <a href={adminUrl()}><span>09</span>Управление</a>}
         </nav>
 
         <main className="account-content">

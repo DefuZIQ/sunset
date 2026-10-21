@@ -21,6 +21,7 @@ import BackToTop from "./components/BackToTop";
 import OrderDetail from "./pages/OrderDetail";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ApiHttpError, getProfile, revokeSession } from "./api/client";
+import { adminUrl } from "./admin/adminUrls";
 
 import { CartProvider } from "./components/HeaderParts/CartContext";
 import { StoreProvider } from "./contexts/StoreContext";
@@ -32,8 +33,8 @@ function PageBoundary({ children }) {
 }
 
 function LegacyAdminRedirect() {
-  useEffect(() => { window.location.replace("/admin/"); }, []);
-  return <p className="container">Панель управления переехала. <a href="/admin/">Открыть панель</a></p>;
+  useEffect(() => { window.location.replace(adminUrl()); }, []);
+  return <p className="container">Панель управления переехала. <a href={adminUrl()}>Открыть панель</a></p>;
 }
 
 function App() {

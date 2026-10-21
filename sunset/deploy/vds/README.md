@@ -8,20 +8,22 @@ remain on the private VM at `192.168.1.186`.
 `/api/` (plus the legacy assistant route) to `127.0.0.1:18080`. That loopback
 port is supplied by a reverse SSH tunnel initiated by the private VM. The VDS
 must never expose port `18080` publicly.
-The admin frontend is a separate entry at `https://t3ch.pro/admin/`, deployed
-on 2026-10-16 with the updated `nginx-sunset.conf`, `admin/index.html`, and Auth
-Service IAM migration/API. The admin frontend shares the origin with the
-storefront; API authorization is enforced by backend permissions, not the URL.
-The admin UI uses a separate tab-scoped token; signing out of it does not sign
-out of the customer storefront.
+The administration frontend is published at `https://admin.t3ch.pro/` with its
+own host-only HttpOnly MFA session cookie. The storefront redirects `/admin/`
+there. The local VM still serves `/admin/` for development and diagnostics.
+The admin vhost rejects foreign `Origin` headers before proxying `/api/`, and
+the storefront/API vhosts do not proxy administration API paths. Backend IAM
+permissions and CSRF protection remain mandatory; the hostname alone is not
+an authorization boundary. See `../../docs/improvements/ADMIN_ORIGIN_20261021.md`.
 Both public `/api/` locations allow a 6 MiB request body so a review photo of
 up to 5 MiB plus multipart framing reaches the product service. The service
 still validates the file type and 5 MiB file limit.
 
-TLS is provided by the Certbot certificate named `sunset-t3ch-pro`; `certbot.timer`
-renews it and `nginx-reload-after-renewal.sh` reloads nginx after renewal. The deployed static release is
-`/srv/sunset/releases/sessions-20261017`, with `current` as a symlink. The
-previous releases remain under `/srv/sunset/releases/`. Test any
+TLS uses Certbot certificates `sunset-t3ch-pro` and `sunset-admin-t3ch-pro`.
+`certbot.timer` renews them and `nginx-reload-after-renewal.sh` reloads nginx.
+The admin certificate uses webroot `/var/www/letsencrypt`; keep the HTTP ACME
+challenge location in `nginx-sunset.conf`. Static releases are selected by
+`/srv/sunset/current`, with prior releases retained for rollback. Test any
 replacement nginx configuration with `nginx -t` before reloading.
 
 The VM-side systemd unit is `sunset-api-tunnel.service`, installed and enabled

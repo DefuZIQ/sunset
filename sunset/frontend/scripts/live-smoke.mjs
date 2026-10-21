@@ -1,6 +1,7 @@
 import { chromium } from '@playwright/test';
 
 const base = (process.env.SUNSET_LIVE_URL || 'https://t3ch.pro').replace(/\/$/, '');
+const adminBase = (process.env.SUNSET_ADMIN_LIVE_URL || (base === 'https://t3ch.pro' ? 'https://admin.t3ch.pro' : `${base}/admin`)).replace(/\/$/, '');
 const browser = await chromium.launch();
 
 try {
@@ -27,8 +28,12 @@ try {
     await page.locator('.product-detail-wrapper').waitFor({ timeout: 20000 });
     await page.goto(`${base}/#/contacts`, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.locator('.contacts-page').waitFor({ timeout: 20000 });
+    const adminPage = await page.goto(`${adminBase}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    if (adminPage?.status() !== 200) throw new Error(`${profile.name}: admin returned ${adminPage?.status()}`);
+    await page.getByRole('heading', { name: 'Панель управления' }).waitFor({ timeout: 20000 });
+    await page.getByRole('link', { name: 'Перейти в магазин' }).waitFor({ timeout: 10000 });
     if (pageErrors.length) throw new Error(`${profile.name}: ${pageErrors.join('; ')}`);
-    console.log(`${profile.name}: homepage, catalog (${cards} cards), product and contacts passed`);
+    console.log(`${profile.name}: homepage, catalog (${cards} cards), product, contacts and admin login passed`);
     await context.close();
   }
 } finally {

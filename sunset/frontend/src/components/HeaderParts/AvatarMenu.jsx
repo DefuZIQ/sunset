@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PopupActionIcon from "./PopupActionIcon";
 import usePopupDismissal from "./usePopupDismissal";
+import { adminUrl } from "../../admin/adminUrls";
 import "./AvatarMenu.css";
 
 export default function AvatarMenu({ isAuthenticated, user, onLogout, isPopupOpen }) {
@@ -57,7 +58,7 @@ export default function AvatarMenu({ isAuthenticated, user, onLogout, isPopupOpe
               <Link to="/profile/orders" role="menuitem">Мои заказы <PopupActionIcon name="orders" /></Link>
               <Link to="/profile/notifications" role="menuitem">Уведомления <PopupActionIcon name="notifications" /></Link>
               <Link to="/profile/settings#password" role="menuitem">Изменить пароль <PopupActionIcon name="password" /></Link>
-              {["ADMIN", "STAFF"].includes(user?.role) && <a href="/admin/" role="menuitem">Управление магазином <PopupActionIcon name="admin" /></a>}
+              {["ADMIN", "STAFF"].includes(user?.role) && <a href={adminUrl()} role="menuitem">Управление магазином <PopupActionIcon name="admin" /></a>}
             </div>
           </div>
           <div className="profile-popup__signed-foot">

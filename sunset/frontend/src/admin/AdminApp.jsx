@@ -5,6 +5,7 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import { ADMIN_COOKIE_SESSION, ApiHttpError, getAdminSession, getIamIdentity, loginCustomer, revokeSession, setAdminCsrfToken, verifyMfaLogin } from "../api/client";
 import AdminMfaPanel from "./AdminMfaPanel";
 import AdminMfaSetup from "./AdminMfaSetup";
+import { storefrontUrl } from "./adminUrls";
 import "./AdminApp.css";
 
 export default function AdminApp() {
@@ -114,8 +115,8 @@ export default function AdminApp() {
   return <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
     <div className="admin-app">
       <header className="admin-app__header">
-        <a className="admin-app__brand" href="/">SUNSET <span>CONTROL</span></a>
-        <nav aria-label="Навигация администрации"><a href="/">Перейти в магазин</a>{status === "admin" && <button type="button" onClick={signOut} disabled={busy}>{busy ? "Выходим…" : "Выйти"}</button>}</nav>
+        <a className="admin-app__brand" href={storefrontUrl()}>SUNSET <span>CONTROL</span></a>
+        <nav aria-label="Навигация администрации"><a href={storefrontUrl()}>Перейти в магазин</a>{status === "admin" && <button type="button" onClick={signOut} disabled={busy}>{busy ? "Выходим…" : "Выйти"}</button>}</nav>
       </header>
       {status === "admin" ? <main>{message && <p role="alert">{message}</p>}<AdminMfaPanel token={ADMIN_COOKIE_SESSION} /><ErrorBoundary variant="app"><Admin identity={identity} /></ErrorBoundary></main> :
         <main className="admin-app__access">
