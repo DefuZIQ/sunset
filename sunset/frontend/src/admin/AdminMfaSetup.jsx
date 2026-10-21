@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { confirmMandatoryMfaSetup, startMandatoryMfaSetup } from "../api/client";
 
 export default function AdminMfaSetup({ setupToken, onFinish, onBack }) {
@@ -29,8 +30,19 @@ export default function AdminMfaSetup({ setupToken, onFinish, onBack }) {
     <p>Для доступа к управлению магазином необходима двухфакторная защита. Пароль подтверждён; теперь привяжите приложение-аутентификатор. Настройку нужно завершить в течение 10 минут.</p>
     {!enrollment && !completion && <button type="button" disabled={busy} onClick={start}>{busy ? "Подготавливаем…" : "Начать настройку"}</button>}
     {enrollment && <>
-      <p>Добавьте SUNSET в приложение-аутентификатор. Откройте ссылку на телефоне или введите ключ вручную:</p>
+      <p>Отсканируйте QR-код в приложении-аутентификаторе. Если приложение установлено на этом устройстве, откройте ссылку или введите ключ вручную.</p>
+      <div className="admin-mfa__qr" aria-label="QR-код для подключения двухфакторной защиты">
+        <QRCodeSVG
+          value={enrollment.otpauthUri}
+          size={192}
+          marginSize={4}
+          bgColor="#fffdfb"
+          fgColor="#211a17"
+          title="QR-код SUNSET для приложения-аутентификатора"
+        />
+      </div>
       <a className="admin-mfa__link" href={enrollment.otpauthUri}>Открыть в приложении</a>
+      <span className="admin-mfa__hint">Ключ для ручного ввода — не сообщайте его никому:</span>
       <code className="admin-mfa__secret">{enrollment.secret}</code>
       <form onSubmit={confirm}>
         <label>Шестизначный код<input autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={(event) => setCode(event.target.value)} /></label>
