@@ -6,6 +6,7 @@ import com.sunset.auth.exceptions.UserNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -13,6 +14,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AuthApiExceptionHandlerTest {
@@ -24,6 +26,10 @@ class AuthApiExceptionHandlerTest {
 
         @GetMapping("/unknown-user") String unknownUser() {
             throw new UserNotFoundException("Sensitive account detail");
+        }
+
+        @PostMapping("/post-only") String postOnly() {
+            return "ok";
         }
     }
 
@@ -54,5 +60,15 @@ class AuthApiExceptionHandlerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Пользователь не найден"));
+    }
+
+    @Test
+    void unsupportedMethodReturns405AndAllowHeader() throws Exception {
+        var mvc = MockMvcBuilders.standaloneSetup(new FailingController())
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+        mvc.perform(get("/post-only"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Allow", "POST"))
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
     }
 }

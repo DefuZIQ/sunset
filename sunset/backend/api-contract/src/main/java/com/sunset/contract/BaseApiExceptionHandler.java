@@ -4,8 +4,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.server.ResponseStatusException;
@@ -52,6 +54,16 @@ public abstract class BaseApiExceptionHandler {
         exception.getBindingResult().getFieldErrors().forEach(field ->
                 fields.putIfAbsent(field.getField(), field.getDefaultMessage() == null ? "Некорректное значение" : field.getDefaultMessage()));
         return error(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Проверьте поля запроса", fields, response);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> methodNotAllowed(HttpRequestMethodNotSupportedException exception,
+                                                      HttpServletResponse response) {
+        String[] supported = exception.getSupportedMethods();
+        if (supported != null && supported.length > 0) {
+            response.setHeader(HttpHeaders.ALLOW, String.join(", ", supported));
+        }
+        return error(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "Метод не поддерживается", Map.of(), response);
     }
 
     @ExceptionHandler(Exception.class)

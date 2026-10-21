@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
@@ -13,6 +14,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ApiErrorContractTest {
@@ -21,6 +23,7 @@ class ApiErrorContractTest {
         @GetMapping("/bad") String bad() { throw new IllegalArgumentException("Проверьте значение"); }
         @GetMapping("/missing") String missing() { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Нет товара"); }
         @GetMapping("/broken") String broken() { throw new IllegalStateException("private database detail"); }
+        @PostMapping("/post-only") String postOnly() { return "ok"; }
     }
 
     @RestControllerAdvice
@@ -52,5 +55,14 @@ class ApiErrorContractTest {
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
                 .andExpect(jsonPath("$.message").value("Внутренняя ошибка сервера"));
+    }
+
+    @Test
+    void wrongHttpMethodKeepsTheSharedErrorContract() throws Exception {
+        var mvc = MockMvcBuilders.standaloneSetup(new FailingController()).setControllerAdvice(new Advice()).build();
+        mvc.perform(get("/post-only"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Allow", "POST"))
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
     }
 }
