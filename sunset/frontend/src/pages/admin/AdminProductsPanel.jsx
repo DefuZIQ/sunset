@@ -1,3 +1,4 @@
+import { useState } from "react";
 import AdminCategoryTree, { categoryMatches, firstLeafCategory } from "../../components/AdminCategoryTree";
 import { categoryPath } from "../../data/categoryLabels";
 
@@ -7,9 +8,11 @@ export default function AdminProductsPanel({
   products, categoryTree, product, setProduct, productGender, setProductGender,
   productCategoryFilter, setProductCategoryFilter, onCreate, onEdit, onDelete,
 }) {
+  const [productQuery, setProductQuery] = useState("");
   const visibleProducts = products.filter((item) =>
     (productGender === "ALL" || (item.gender || "WOMEN") === productGender)
-    && categoryMatches(categoryTree, productCategoryFilter, item.categories || []));
+    && categoryMatches(categoryTree, productCategoryFilter, item.categories || [])
+    && [item.name, item.description, item.id].some((value) => String(value || "").toLocaleLowerCase("ru-RU").includes(productQuery.trim().toLocaleLowerCase("ru-RU"))));
   const genderCount = (gender) => products.filter((item) => (item.gender || "WOMEN") === gender).length;
 
   return <div className="admin-products-layout">
@@ -25,6 +28,7 @@ export default function AdminProductsPanel({
     </form>
     <div className="admin-product-list">
       <div className="admin-list-head"><div><h2>Карточки товаров</h2><span className="admin-list-subtitle">{visibleProducts.length} из {products.length}</span></div></div>
+      <label className="admin-product-search">Поиск в каталоге<input type="search" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="Название или артикул" /></label>
       <div className="admin-gender-tabs" aria-label="Раздел товаров">{[["ALL", "Все", products.length], ["WOMEN", "Для женщин", genderCount("WOMEN")], ["MEN", "Для мужчин", genderCount("MEN")], ["UNISEX", "Унисекс", genderCount("UNISEX")]].map(([key, label, count]) => <button type="button" className={productGender === key ? "active" : ""} onClick={() => { setProductGender(key); setProductCategoryFilter(""); }} key={key}><span>{label}</span><small>{count}</small></button>)}</div>
       <AdminCategoryTree tree={categoryTree} selected={productCategoryFilter} gender={productGender} onSelect={setProductCategoryFilter} selectBranches allowAll title="Фильтр по категориям" />
       {visibleProducts.length === 0 && <p className="admin-empty-list">В выбранной категории товаров нет.</p>}

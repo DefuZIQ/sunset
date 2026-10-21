@@ -118,7 +118,7 @@ export default function AdminApp() {
         <a className="admin-app__brand" href={storefrontUrl()}>SUNSET <span>CONTROL</span></a>
         <nav aria-label="Навигация администрации"><a href={storefrontUrl()}>Перейти в магазин</a>{status === "admin" && <button type="button" onClick={signOut} disabled={busy}>{busy ? "Выходим…" : "Выйти"}</button>}</nav>
       </header>
-      {status === "admin" ? <main>{message && <p role="alert">{message}</p>}<AdminMfaPanel token={ADMIN_COOKIE_SESSION} /><ErrorBoundary variant="app"><Admin identity={identity} /></ErrorBoundary></main> :
+      {status === "admin" ? <main className="admin-app__main">{message && <p role="alert">{message}</p>}<ErrorBoundary variant="app"><Admin identity={identity} securityPanel={<AdminMfaPanel token={ADMIN_COOKIE_SESSION} />} /></ErrorBoundary></main> :
         <main className="admin-app__access">
           <div className="admin-app__access-card">
             <p className="page-kicker">SUNSET CONTROL</p>

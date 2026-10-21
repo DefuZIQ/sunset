@@ -42,6 +42,13 @@ async function setAdminCookie(page) {
   await page.context().addCookies([{ name: 'SUNSET_ADMIN_SESSION', value: 'test-admin-session', url: 'http://127.0.0.1:4173' }]);
 }
 
+async function openAdminSection(page, name) {
+  await page.locator('.admin-page').waitFor();
+  const menuButton = page.getByRole('button', { name: 'Открыть меню' });
+  if (await menuButton.isVisible()) await menuButton.click();
+  await page.locator('.admin-tabs').getByRole('button', { name, exact: true }).click();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/auth/admin/session', (route) => route.fulfill(
     route.request().headers().cookie?.includes('SUNSET_ADMIN_SESSION=test-admin-session')
@@ -638,9 +645,58 @@ test('admin dashboard loads protected data from the versioned API', async ({ pag
   await page.goto('/admin/');
   await expect(page.getByRole('heading', { name: 'Управление магазином' })).toBeVisible();
   await expect(page.getByText('2 товаров · 1 клиентов')).toBeVisible();
-  await page.getByRole('button', { name: 'Заказы', exact: true }).click();
+  await openAdminSection(page, 'Заказы');
   await expect(page.getByText('SUN-1')).toBeVisible();
   expect(requested.size).toBe(Object.keys(adminResponses).length);
+});
+
+test('admin workspace filters operational lists and keeps mobile navigation usable', async ({ page }, testInfo) => {
+  await page.route('**/api/v1/order/admin/orders', (route) => route.fulfill({ json: [
+    { id: 'order-1', orderNumber: 'SUN-101', status: 'PENDING', totalAmount: 3900, customerName: 'Анна', customerPhone: '+79990001122', createdAt: '2026-10-06T00:00:00Z' },
+    { id: 'order-2', orderNumber: 'SUN-202', status: 'DELIVERED', totalAmount: 6200, customerName: 'Иван', customerPhone: '+79990003344', createdAt: '2026-10-07T00:00:00Z' },
+  ] }));
+  await page.route('**/api/v1/order/admin/users', (route) => route.fulfill({ json: [
+    { id: 'user-1', firstName: 'Анна', lastName: 'Тестовая', email: 'anna@example.test', role: 'USER', bonusBalance: 100, orderCount: 1, orderTotal: 3900 },
+    { id: 'user-2', firstName: 'Иван', lastName: 'Проверочный', email: 'ivan@example.test', role: 'USER', bonusBalance: 0, orderCount: 1, orderTotal: 6200 },
+  ] }));
+  await page.route('**/api/v1/order/admin/analytics', (route) => route.fulfill({ json: { orders: { total: 2, last30Days: 2, revenue: 10100 }, returns: { requested: 1 }, lowStock: 3, topProducts: [] } }));
+  await page.route('**/api/v1/order/admin/returns', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/order/admin/promotions', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/products/admin/variants', (route) => route.fulfill({ json: { colors: [], sizes: [] } }));
+  await setAdminCookie(page);
+  await page.goto('/admin/');
+  await expect(page.getByRole('heading', { name: 'Управление магазином' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('admin-workspace.png'), fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+  if (await page.getByRole('button', { name: 'Открыть меню' }).isVisible()) {
+    await page.getByRole('button', { name: 'Открыть меню' }).click();
+    await expect(page.locator('.admin-sidebar')).toHaveClass(/is-open/);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.admin-sidebar')).not.toHaveClass(/is-open/);
+    await expect(page.getByRole('button', { name: 'Открыть меню' })).toBeFocused();
+  }
+  await openAdminSection(page, 'Заказы');
+  await expect(page.getByRole('button', { name: 'Закрыть меню' })).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Поиск заказа' }).fill('SUN-202');
+  await expect(page.getByText('SUN-202')).toBeVisible();
+  await expect(page.getByText('SUN-101')).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Поиск заказа' }).fill('');
+  await page.locator('.admin-filterbar select').selectOption('PENDING');
+  await expect(page.getByText('SUN-101')).toBeVisible();
+  await expect(page.getByText('SUN-202')).toHaveCount(0);
+  await openAdminSection(page, 'Клиенты');
+  await page.getByRole('searchbox', { name: 'Поиск клиента' }).fill('ivan@');
+  await expect(page.getByText('ivan@example.test')).toBeVisible();
+  await expect(page.getByText('anna@example.test')).toHaveCount(0);
+  await openAdminSection(page, 'Безопасность');
+  await expect(page.getByRole('heading', { name: 'Двухфакторная защита' })).toBeVisible();
+  await openAdminSection(page, 'Товары');
+  await page.getByRole('searchbox', { name: 'Поиск в каталоге' }).fill('пальто');
+  await expect(page.locator('.admin-product-list article')).toHaveCount(1);
+  await expect(page.locator('.admin-product-list article')).toContainText('Мужское пальто');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+  await page.setViewportSize({ width: 320, height: 720 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
 });
 
 test('admin replies to a review and the reply appears on the product page', async ({ page }) => {
@@ -669,7 +725,7 @@ test('admin replies to a review and the reply appears on the product page', asyn
     return route.fulfill({ json: review });
   });
   await page.goto('/admin/');
-  await page.getByRole('button', { name: 'Отзывы', exact: true }).click();
+  await openAdminSection(page, 'Отзывы');
   await expect(page.getByText('Удобная рубашка')).toBeVisible();
   await page.getByRole('textbox', { name: 'Ответ магазина' }).fill('Спасибо за отзыв!');
   await page.getByRole('button', { name: 'Сохранить ответ' }).click();
@@ -742,7 +798,7 @@ test('admin product forms use versioned writes including empty-body deletion', a
 
   await page.goto('/admin/');
   await expect(page.getByText('2 товаров · 0 клиентов')).toBeVisible();
-  await page.getByRole('button', { name: 'Товары', exact: true }).click();
+  await openAdminSection(page, 'Товары');
   const createForm = page.locator('.admin-products-layout form.admin-form');
   await createForm.getByLabel('Название').fill('Новое пальто');
   await createForm.getByLabel('Цена').fill('9000');
@@ -756,7 +812,7 @@ test('admin product forms use versioned writes including empty-body deletion', a
   await page.locator('.admin-product-list article').first().getByRole('button', { name: 'Удалить' }).click();
   await expect.poll(() => writes.length).toBe(3);
 
-  await page.getByRole('button', { name: 'Остатки', exact: true }).click();
+  await openAdminSection(page, 'Остатки');
   await page.getByRole('tree', { name: 'Сначала выберите категорию' }).getByRole('button', { name: /Рубашки/ }).click();
   await page.locator('.stock-row input[type="number"]').first().fill('6');
   await page.getByRole('button', { name: 'Сохранить остатки' }).click();
@@ -804,18 +860,18 @@ test('admin order, return, promotion and bonus actions use versioned writes', as
 
   await page.goto('/admin/');
   await expect(page.getByText('2 товаров · 1 клиентов')).toBeVisible();
-  await page.getByRole('button', { name: 'Заказы', exact: true }).click();
+  await openAdminSection(page, 'Заказы');
   await page.locator('.admin-table select').selectOption('CONFIRMED');
   await expect.poll(() => writes.length).toBe(1);
-  await page.getByRole('button', { name: 'Возвраты', exact: true }).click();
+  await openAdminSection(page, 'Возвраты');
   await page.locator('.admin-table select').selectOption('APPROVED');
   await expect.poll(() => writes.length).toBe(2);
-  await page.getByRole('button', { name: 'Акции', exact: true }).click();
+  await openAdminSection(page, 'Акции');
   await page.locator('form.admin-form').getByLabel('Код').fill('NEW10');
   await page.locator('form.admin-form').getByLabel('Название').fill('Новинка');
   await page.getByRole('button', { name: 'Запустить акцию' }).click();
   await expect.poll(() => writes.length).toBe(3);
-  await page.getByRole('button', { name: 'Клиенты', exact: true }).click();
+  await openAdminSection(page, 'Клиенты');
   await page.locator('.bonus-control input').fill('100');
   await page.getByRole('button', { name: 'Применить' }).click();
   await expect.poll(() => writes.length).toBe(4);
@@ -1417,6 +1473,7 @@ test('staff sees only IAM-authorized administration sections', async ({ page }) 
   await page.addInitScript(() => localStorage.setItem('user', JSON.stringify({ role: 'STAFF' })));
   await page.goto('/admin/');
   await expect(page.getByRole('heading', { name: 'Управление магазином' })).toBeVisible();
+  if (await page.getByRole('button', { name: 'Открыть меню' }).isVisible()) await page.getByRole('button', { name: 'Открыть меню' }).click();
   await expect(page.locator('.admin-tabs').getByRole('button', { name: 'Остатки' })).toBeVisible();
   await expect(page.locator('.admin-tabs').getByRole('button', { name: 'Заказы' })).toHaveCount(0);
   await expect(page.locator('.admin-tabs').getByRole('button', { name: 'Доступ' })).toHaveCount(0);
@@ -1434,7 +1491,7 @@ test('admin assigns a limited permission to an existing account', async ({ page 
   });
   await setAdminCookie(page);
   await page.goto('/admin/');
-  await page.locator('.admin-tabs').getByRole('button', { name: 'Доступ' }).click();
+  await openAdminSection(page, 'Доступ');
   await page.getByLabel('Учётная запись').selectOption(userId);
   await page.getByLabel('Остатки магазинов и склада').check();
   await page.getByRole('button', { name: 'Сохранить права' }).click();
