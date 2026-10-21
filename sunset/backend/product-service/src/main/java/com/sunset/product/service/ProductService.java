@@ -57,6 +57,10 @@ public class ProductService {
                 .map(this::mapToDTO);
     }
 
+    public ProductDTO toDTO(Product product) {
+        return mapToDTO(product);
+    }
+
     public List<Map<String, Object>> getStoreAvailability(UUID storeId) {
         Integer activeStore = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM stores WHERE id=? AND kind='STORE' AND active=TRUE", Integer.class, storeId);

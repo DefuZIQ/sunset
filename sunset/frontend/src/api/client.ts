@@ -1,6 +1,7 @@
 import type { components, paths } from "./generated";
 
 export type Product = components["schemas"]["Product"];
+export type CatalogPage = components["schemas"]["CatalogPage"];
 export type CategoryNode = components["schemas"]["CategoryNode"];
 export type Promotion = components["schemas"]["Promotion"];
 export type ProductReview = components["schemas"]["ProductReview"];
@@ -311,6 +312,14 @@ export async function updateAdminReturnStatus(token: string, id: string, request
 export async function listProducts(signal?: AbortSignal): Promise<Product[]> {
   const response = await fetch("/api/v1/products/all", { signal });
   return readJson<Product[]>(response);
+}
+
+export async function searchProducts(params: URLSearchParams, signal?: AbortSignal): Promise<CatalogPage> {
+  const result = await readJson<CatalogPage>(await fetch(`/api/v1/products/search?${params.toString()}`, { signal }));
+  if (!result || !Array.isArray(result.items) || !Number.isFinite(result.total) || !Number.isFinite(result.pageSize)) {
+    throw new Error("Invalid catalog search response");
+  }
+  return result;
 }
 
 export async function getProductById(id: string): Promise<Product> {

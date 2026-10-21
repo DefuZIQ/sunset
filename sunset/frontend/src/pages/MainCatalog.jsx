@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/Main/ProductCard";
 import ProductCardSkeleton from "../components/Main/ProductCardSkeleton";
 import { useStore } from "../contexts/StoreContext";
-import { getStoreAvailability, listPickupStores } from "../api/client";
+import { getStoreAvailability, listPickupStores, searchProducts } from "../api/client";
 import { readCatalogFilters, readCatalogPage, writeCatalogFilters, writeCatalogPage } from "./catalogFilters";
 import { productSearchScore } from "./productSearch";
 import { categoryLabel, categoryRoots } from "../data/categoryLabels";
@@ -41,7 +41,35 @@ export default function MainCatalog() {
   const [storeStock, setStoreStock] = useState(null);
   const [storeStockError, setStoreStockError] = useState("");
   const [storeStockReloadKey, setStoreStockReloadKey] = useState(0);
+  const [serverPage, setServerPage] = useState(null);
+  const [serverError, setServerError] = useState(false);
+  const [serverReloadKey, setServerReloadKey] = useState(0);
   const filter = readCatalogFilters(params);
+  const pageSize = isMobile ? 20 : 48;
+  const requestedPage = readCatalogPage(params);
+  const requestKey = `${params.toString()}|${isMobile ? "mobile" : "desktop"}|${serverReloadKey}`;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const pages = isMobile ? Array.from({ length: requestedPage }, (_, index) => index + 1) : [requestedPage];
+      Promise.all(pages.map((page) => {
+        const query = new URLSearchParams(params);
+        query.set("page", String(page));
+        query.set("pageSize", String(pageSize));
+        return searchProducts(query, controller.signal);
+      }))
+        .then((results) => {
+          if (!controller.signal.aborted) {
+            const result = isMobile ? { ...results[0], items: results.flatMap((part) => part.items) } : results[0];
+            setServerPage({ key: requestKey, result });
+            setServerError(false);
+          }
+        })
+        .catch((error) => { if (!controller.signal.aborted) { console.warn(error.message); setServerError(true); } });
+    }, filter.search ? 220 : 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [requestKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -162,19 +190,19 @@ export default function MainCatalog() {
     return result;
   }, [products, filter, treeCategories, stockByProduct]);
 
-  const pageSize = isMobile ? 20 : 48;
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const requestedPage = readCatalogPage(params);
+  const livePage = serverPage?.key === requestKey && !serverError ? serverPage.result : null;
+  const resultCount = livePage ? livePage.total : filtered.length;
+  const pageCount = Math.max(1, Math.ceil(resultCount / pageSize));
   const currentPage = Math.min(requestedPage, pageCount);
-  const visibleProducts = isMobile
+  const visibleProducts = livePage ? livePage.items : isMobile
     ? filtered.slice(0, currentPage * pageSize)
     : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   useEffect(() => {
-    if (!loading && !storeStockLoading && !storeStockError && requestedPage > pageCount) {
+    if (!loading && (livePage || serverError) && !storeStockLoading && !storeStockError && requestedPage > pageCount) {
       setParams((current) => writeCatalogPage(current, pageCount), { replace: true });
     }
-  }, [loading, storeStockLoading, storeStockError, requestedPage, pageCount, setParams]);
+  }, [loading, livePage, serverError, storeStockLoading, storeStockError, requestedPage, pageCount, setParams]);
 
   const goToPage = (page, scrollToResults = false) => {
     if (page < 1 || page > pageCount || page === currentPage) return;
@@ -240,7 +268,7 @@ export default function MainCatalog() {
       <header className="catalog-head">
         <div><p className="page-kicker">Коллекция SUNSET</p><h1>Каталог</h1></div>
         <div className="catalog-head__controls">
-          <span>{storeStockLoading ? "Уточняем наличие…" : `${filtered.length} товаров`}</span>
+          <span>{storeStockLoading ? "Уточняем наличие…" : `${resultCount} товаров`}</span>
           <select value={filter.sort} onChange={(event) => update("sort", event.target.value)} aria-label="Сортировка">
             <option value="new">Сначала новинки</option><option value="price-asc">Сначала дешевле</option>
             <option value="price-desc">Сначала дороже</option><option value="rating-desc">По рейтингу</option><option value="name">По названию</option>
@@ -307,18 +335,19 @@ export default function MainCatalog() {
             <div className="size-groups">{sizeGroupOrder.map((group)=><div className="size-group" key={group}>{options.sizes.some((size)=>size.group===group)&&<><span className="size-group__label">{sizeGroupLabels[group]}</span><div className="size-filter">{options.sizes.filter((size)=>size.group===group).map((size) => <button key={size.key} className={filter.sizes.includes(size.key) ? "selected" : ""} onClick={() => toggle("sizes", size.key)} title={size.description||sizeGroupLabels[group]}>{size.name}</button>)}</div></>}</div>)}</div>
           </div>
 
-          <div className="filter-actions"><button className="filter-apply" onClick={() => setFiltersOpen(false)} disabled={storeStockLoading}>Показать {storeStockLoading ? "…" : filtered.length}</button><button onClick={reset}>Сбросить</button></div>
+          <div className="filter-actions"><button className="filter-apply" onClick={() => setFiltersOpen(false)} disabled={storeStockLoading}>Показать {storeStockLoading ? "…" : resultCount}</button><button onClick={reset}>Сбросить</button></div>
         </aside>
 
         <main className="catalog-results">
           {catalogError && products.length > 0 && <p className="catalog-warning" role="status">Не удалось обновить каталог. Показаны ранее загруженные товары; наличие и цены уточняются при оформлении.</p>}
+          {serverError && <div className="catalog-warning" role="alert">Поиск на сервере временно недоступен. Показаны товары из каталога браузера. <button type="button" className="text-link" onClick={() => { setServerError(false); setServerReloadKey((value) => value + 1); }}>Повторить</button></div>}
           {storeStockError && <div className="catalog-warning" role="alert">Не удалось проверить наличие в выбранном магазине. <button type="button" className="text-link" onClick={() => setStoreStockReloadKey((value) => value + 1)}>Повторить</button></div>}
-          {loading || storeStockLoading ? <div className="catalog-grid" role="status" aria-label="Загружаем товары"><ProductCardSkeleton count={isMobile ? 4 : 6} /></div> : storeStockError ? null : filtered.length ? <>
+          {loading || storeStockLoading ? <div className="catalog-grid" role="status" aria-label="Загружаем товары"><ProductCardSkeleton count={isMobile ? 4 : 6} /></div> : storeStockError ? null : resultCount ? <>
             <div className="catalog-grid">{visibleProducts.map((product) => <ProductCard key={product.id} product={product} />)}</div>
             {pageCount > 1 && <>
               <div className="catalog-load-more">
-                <p>Показано {visibleProducts.length} из {filtered.length}</p>
-                <div className="catalog-load-more__progress" role="progressbar" aria-label="Просмотренные товары" aria-valuenow={visibleProducts.length} aria-valuemin={0} aria-valuemax={filtered.length}><span style={{ width: `${visibleProducts.length / filtered.length * 100}%` }} /></div>
+                <p>Показано {visibleProducts.length} из {resultCount}</p>
+                <div className="catalog-load-more__progress" role="progressbar" aria-label="Просмотренные товары" aria-valuenow={visibleProducts.length} aria-valuemin={0} aria-valuemax={resultCount}><span style={{ width: `${visibleProducts.length / resultCount * 100}%` }} /></div>
                 {currentPage < pageCount && <button onClick={() => goToPage(currentPage + 1)}>Показать ещё</button>}
               </div>
               <nav className="catalog-pagination" aria-label="Страницы каталога">

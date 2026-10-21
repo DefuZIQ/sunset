@@ -302,6 +302,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Фильтрованный каталог с серверной пагинацией */
+        get: operations["searchProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/all/availability": {
         parameters: {
             query?: never;
@@ -1210,6 +1227,12 @@ export interface components {
             categories?: string[];
             colors?: components["schemas"]["ProductColor"][];
             stock?: components["schemas"]["ProductStock"][];
+        };
+        CatalogPage: {
+            items: components["schemas"]["Product"][];
+            total: number;
+            page: number;
+            pageSize: number;
         };
         ProductColor: {
             /** Format: uuid */
@@ -2253,6 +2276,43 @@ export interface operations {
                     "application/json": components["schemas"]["Product"][];
                 };
             };
+        };
+    };
+    searchProducts: {
+        parameters: {
+            query?: {
+                q?: string;
+                min?: number;
+                max?: number;
+                "category[]"?: string[];
+                gender?: "all" | "WOMEN" | "MEN";
+                "color[]"?: string[];
+                "size[]"?: string[];
+                availability?: "all" | "in-stock" | "low-stock";
+                store?: string;
+                ratingMin?: number;
+                ratingMax?: number;
+                reviewed?: "1";
+                sort?: "new" | "price-asc" | "price-desc" | "rating-desc" | "name";
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Страница каталога */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
         };
     };
     getStoreAvailability: {

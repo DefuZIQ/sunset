@@ -215,6 +215,17 @@ test("catalog uses the versioned path and forwards the abort signal", async () =
   expect(fetchMock).toHaveBeenCalledWith("/api/v1/products/all", { signal: controller.signal });
 });
 
+test("server catalog search forwards URL filters and abort signal", async () => {
+  const { searchProducts } = await import("./client");
+  const response = { items: [], total: 0, page: 1, pageSize: 20 };
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => response });
+  vi.stubGlobal("fetch", fetchMock);
+  const controller = new AbortController();
+  const params = new URLSearchParams({ gender: "WOMEN", page: "1", pageSize: "20" });
+  expect(await searchProducts(params, controller.signal)).toEqual(response);
+  expect(fetchMock).toHaveBeenCalledWith(`/api/v1/products/search?${params.toString()}`, { signal: controller.signal });
+});
+
 test("product details send the typed UUID body to the versioned path", async () => {
   const product = { id: "11111111-1111-1111-1111-111111111111", name: "Пальто", price: 8900 };
   const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => product });

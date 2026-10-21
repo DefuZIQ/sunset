@@ -2,6 +2,8 @@ package com.sunset.product.controller;
 
 import com.sunset.product.dto.ProductDTO;
 import com.sunset.product.service.ProductService;
+import com.sunset.product.service.CatalogSearchService;
+import com.sunset.product.dto.CatalogPage;
 import com.sunset.product.service.AdminProductService;
 import com.sunset.product.service.ReviewService;
 import com.sunset.product.service.ReviewPhotoService;
@@ -21,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -35,13 +38,15 @@ import java.io.IOException;
 public class ProductController {
 
     private final ProductService productService;
+    private final CatalogSearchService catalogSearchService;
     private final AdminProductService adminProductService;
     private final ReviewService reviewService;
     private final ReviewPhotoService reviewPhotoService;
     private final ReviewCommentService reviewCommentService;
 
-    public ProductController(ProductService productService, AdminProductService adminProductService, ReviewService reviewService, ReviewPhotoService reviewPhotoService, ReviewCommentService reviewCommentService) {
+    public ProductController(ProductService productService, CatalogSearchService catalogSearchService, AdminProductService adminProductService, ReviewService reviewService, ReviewPhotoService reviewPhotoService, ReviewCommentService reviewCommentService) {
         this.productService = productService;
+        this.catalogSearchService = catalogSearchService;
         this.adminProductService = adminProductService;
         this.reviewService = reviewService;
         this.reviewPhotoService = reviewPhotoService;
@@ -51,6 +56,11 @@ public class ProductController {
     @GetMapping("/all")
     public List<ProductDTO> getAllProducts() {
         return productService.getProducts();
+    }
+
+    @GetMapping("/search")
+    public CatalogPage search(@RequestParam MultiValueMap<String, String> query) {
+        return catalogSearchService.search(query);
     }
 
     @GetMapping("/all/availability")

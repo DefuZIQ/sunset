@@ -146,6 +146,29 @@
         "responses": { "200": { "description": "Список товаров", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } } } } } }
       }
     },
+    "/products/search": {
+      "get": {
+        "tags": ["Products"], "operationId": "searchProducts", "summary": "Фильтрованный каталог с серверной пагинацией",
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string", "maxLength": 100 } },
+          { "name": "min", "in": "query", "schema": { "type": "number" } },
+          { "name": "max", "in": "query", "schema": { "type": "number" } },
+          { "name": "category[]", "in": "query", "schema": { "type": "array", "items": { "type": "string" } }, "style": "form", "explode": true },
+          { "name": "gender", "in": "query", "schema": { "type": "string", "enum": ["all", "WOMEN", "MEN"] } },
+          { "name": "color[]", "in": "query", "schema": { "type": "array", "items": { "type": "string" } }, "style": "form", "explode": true },
+          { "name": "size[]", "in": "query", "schema": { "type": "array", "items": { "type": "string" } }, "style": "form", "explode": true },
+          { "name": "availability", "in": "query", "schema": { "type": "string", "enum": ["all", "in-stock", "low-stock"] } },
+          { "name": "store", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "ratingMin", "in": "query", "schema": { "type": "number" } },
+          { "name": "ratingMax", "in": "query", "schema": { "type": "number" } },
+          { "name": "reviewed", "in": "query", "schema": { "type": "string", "enum": ["1"] } },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["new", "price-asc", "price-desc", "rating-desc", "name"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 10000 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } }
+        ],
+        "responses": { "200": { "description": "Страница каталога", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogPage" } } } }, "400": { "$ref": "#/components/responses/BadRequest" } }
+      }
+    },
     "/products/all/availability": {
       "get": {
         "tags": ["Products"], "operationId": "getStoreAvailability", "summary": "Доступные варианты в выбранном магазине",
@@ -567,6 +590,7 @@
           "stock": { "type": "array", "items": { "$ref": "#/components/schemas/ProductStock" } }
         }
       },
+      "CatalogPage": { "type": "object", "required": ["items", "total", "page", "pageSize"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } }, "total": { "type": "integer", "minimum": 0 }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1 } } },
       "ProductColor": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "hexCode": { "type": "string" } } },
       "ProductStock": {
         "type": "object", "properties": {

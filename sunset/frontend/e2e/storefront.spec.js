@@ -102,6 +102,19 @@ test('availability and review rating are the first catalog filter sections', asy
   await expect(page.locator('.filter-sidebar .filter-section h3').nth(1)).toHaveText('Рейтинг по отзывам');
 });
 
+test('catalog renders the server-filtered page instead of the full browser cache', async ({ page }) => {
+  const queries = [];
+  await page.route('**/api/v1/products/search?*', (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    queries.push(query.toString());
+    return route.fulfill({ json: { items: [products[1]], total: 1, page: 1, pageSize: Number(query.get('pageSize')) } });
+  });
+  await page.goto('/#/catalog?min=1000');
+  await expect(page.locator('.catalog-grid .product-card')).toHaveCount(1);
+  await expect(page.locator('.catalog-grid')).toContainText('Мужское пальто');
+  expect(queries.some((query) => new URLSearchParams(query).get('min') === '1000')).toBe(true);
+});
+
 test('filter drawer keeps keyboard focus inside and restores it when closed', async ({ page }) => {
   if (page.viewportSize()?.width > 900) await page.setViewportSize({ width: 800, height: 900 });
   await page.goto('/#/catalog');

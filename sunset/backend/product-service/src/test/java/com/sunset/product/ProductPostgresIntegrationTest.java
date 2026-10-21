@@ -1,6 +1,7 @@
 package com.sunset.product;
 
 import com.sunset.product.service.ProductService;
+import com.sunset.product.service.CatalogSearchService;
 import com.sunset.product.service.AdminProductService;
 import com.sunset.product.service.ReviewService;
 import com.sunset.product.service.ReviewPhotoService;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,11 +53,51 @@ class ProductPostgresIntegrationTest {
     }
 
     @Autowired private ProductService products;
+    @Autowired private CatalogSearchService catalogSearch;
     @Autowired private AdminProductService adminProducts;
     @Autowired private ReviewService reviews;
     @Autowired private ReviewPhotoService photos;
     @Autowired private ReviewCommentService comments;
     @Autowired private JdbcTemplate jdbc;
+
+    @Test
+    void catalogSearchPaginatesAndFiltersOnServer() {
+        var first = new LinkedMultiValueMap<String, String>();
+        first.add("pageSize", "5");
+        var page = catalogSearch.search(first);
+        assertThat(page.items()).hasSize(5);
+        assertThat(page.total()).isGreaterThanOrEqualTo(100);
+        assertThat(page.items()).extracting("id").doesNotHaveDuplicates();
+
+        var second = new LinkedMultiValueMap<String, String>();
+        second.add("pageSize", "5");
+        second.add("page", "2");
+        assertThat(catalogSearch.search(second).items()).extracting("id")
+                .doesNotContainAnyElementsOf(page.items().stream().map(item -> item.getId()).toList());
+
+        var filtered = new LinkedMultiValueMap<String, String>();
+        filtered.add("gender", "MEN");
+        filtered.add("min", "1000");
+        filtered.add("sort", "price-asc");
+        var result = catalogSearch.search(filtered);
+        assertThat(result.items()).allSatisfy(item -> {
+            assertThat(item.getGender()).isIn("MEN", "UNISEX");
+            assertThat(item.getPrice()).isGreaterThanOrEqualTo(new java.math.BigDecimal("1000"));
+        });
+        assertThat(result.items()).extracting("price").isSorted();
+
+        var typo = new LinkedMultiValueMap<String, String>();
+        typo.add("q", "джинсыы");
+        assertThat(catalogSearch.search(typo).items()).anySatisfy(item ->
+                assertThat(item.getName().toLowerCase()).contains("джинсы"));
+    }
+
+    @Test
+    void catalogSearchRejectsInvalidLimits() {
+        var query = new LinkedMultiValueMap<String, String>();
+        query.add("pageSize", "1000");
+        assertThatThrownBy(() -> catalogSearch.search(query)).isInstanceOf(ResponseStatusException.class);
+    }
 
     @Test
     void migrationsSeedUsableCatalogAndCategoryTree() {

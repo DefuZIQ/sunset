@@ -117,5 +117,8 @@
     <changeSet id="126" author="codex-reviews">
         <sqlFile path="classpath:/db/migrations/V22__review_comments.sql"/>
     </changeSet>
+    <changeSet id="127" author="codex-catalog">
+        <sqlFile path="classpath:/db/migrations/V23__catalog_search.sql"/>
+    </changeSet>
 
 </databaseChangeLog>

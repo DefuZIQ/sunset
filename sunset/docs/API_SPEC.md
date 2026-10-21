@@ -26,6 +26,7 @@
 | `POST /auth/register` | Регистрация |
 | `POST /auth/login` | Вход |
 | `GET /products/all` | Каталог |
+| `GET /products/search` | Фильтрованный каталог с `items`, `total`, `page`, `pageSize`; параметры и пределы в OpenAPI |
 | `POST /products/by-uuid` | Карточка товара |
 | `GET /products/reviews/{id}` | Отзывы |
 | `GET /products/categories/tree` | Категории |
