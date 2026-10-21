@@ -71,6 +71,7 @@ security:
     - /auth/mfa/setup/start
     - /auth/mfa/setup/confirm
     - /products/all
+    - /products/search
     - /products/by-uuid
     - /products/reviews
     - /products/review-photos

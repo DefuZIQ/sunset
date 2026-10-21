@@ -123,6 +123,17 @@ class GatewayHttpContractTest {
     }
 
     @Test
+    void catalogSearchIsPublicAndKeepsQueryFiltersWithoutForgedIdentity() {
+        client.get().uri("/api/v1/products/search?gender=WOMEN&pageSize=20")
+                .header("user-id", "forged-admin")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(FORWARDED.get().path()).isEqualTo("/products/search?gender=WOMEN&pageSize=20");
+        assertThat(FORWARDED.get().userId()).isNull();
+    }
+
+    @Test
     void versionedRegistrationUsesTheSamePublicRoute() {
         client.post().uri("/api/v1/auth/register")
                 .header("user-id", "forged-admin")

@@ -19,6 +19,15 @@ try {
     await page.goto(`${base}/#/catalog`, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.locator('.product-card').first().waitFor({ timeout: 20000 });
     const cards = await page.locator('.product-card').count();
+    const filteredResponse = page.waitForResponse((response) =>
+      response.url().includes('/api/v1/products/search?') && new URL(response.url()).searchParams.get('gender') === 'WOMEN',
+    { timeout: 20000 });
+    await page.locator('.catalog-gender').getByRole('button', { name: 'Для женщин' }).click();
+    const filtered = await filteredResponse;
+    if (filtered.status() !== 200 || !(await filtered.json()).items?.length) {
+      throw new Error(`${profile.name}: server catalog filter failed`);
+    }
+    await page.locator('.catalog-grid .product-card').first().waitFor({ timeout: 20000 });
     if (profile.isMobile && !(await page.locator('.mobile-tabs').isVisible())) {
       throw new Error('Mobile navigation is not visible');
     }
