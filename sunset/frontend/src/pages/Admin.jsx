@@ -10,7 +10,7 @@ import { ADMIN_COOKIE_SESSION } from "../api/client";
 import "./Admin.css";
 
 const adminToken = () => ADMIN_COOKIE_SESSION;
-const blankProduct = { name:"",description:"",price:"",quantity:10,category:"Женские боди",gender:"WOMEN",imageUrl:"/images/products/1.png" };
+const blankProduct = { name:"",description:"",price:"",quantity:0,category:"",gender:"WOMEN",imageUrl:"" };
 const leafCategory = (item) => item?.categories?.[item.categories.length-1] || "";
 const orderStatusLabels={PENDING:"Новый",CONFIRMED:"Подтверждён",ASSEMBLING:"Собирается",SHIPPED:"Доставка",DELIVERED:"Доставлен",CANCELLED:"Отменён"};
 const nextOrderStatuses={PENDING:["CONFIRMED","CANCELLED"],CONFIRMED:["ASSEMBLING","CANCELLED"],ASSEMBLING:["SHIPPED","CANCELLED"],SHIPPED:["DELIVERED"],DELIVERED:[],CANCELLED:[]};
@@ -83,9 +83,11 @@ export default function Admin({ identity = { role: "ADMIN", permissions: [] }, s
   const notify=(value)=>{setMessage(value);window.setTimeout(()=>setMessage(""),3500);};
   const changeStatus=async(id,status)=>{try{await updateAdminOrderStatus(adminToken(),id,{status});notify("Статус заказа обновлён");load();}catch(error){notify(error.message);}};
   const createProduct=async(event)=>{event.preventDefault();try{
+    if(!product.category)throw new Error("Выберите конечную категорию товара");
+    if(!product.imageUrl.trim())throw new Error("Добавьте ссылку на фотографию товара");
     const data=await createAdminProduct(adminToken(),{...product,price:Number(product.price),quantity:Number(product.quantity)});
-    notify(`Товар «${data.name}» добавлен`);setProduct(blankProduct);load();
-  }catch(error){notify(error.message);}};
+    notify(`Товар «${data.name}» добавлен`);setProduct(blankProduct);load();return true;
+  }catch(error){notify(error.message);return false;}};
   const saveProduct=async(event)=>{event.preventDefault();try{
     await updateAdminProduct(adminToken(),editing.id,{
       name:editing.name,description:editing.description||"",price:Number(editing.price),

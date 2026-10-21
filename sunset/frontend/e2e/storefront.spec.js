@@ -691,6 +691,10 @@ test('admin workspace filters operational lists and keeps mobile navigation usab
   await openAdminSection(page, 'Безопасность');
   await expect(page.getByRole('heading', { name: 'Двухфакторная защита' })).toBeVisible();
   await openAdminSection(page, 'Товары');
+  await page.getByRole('button', { name: '+ Добавить товар' }).click();
+  await expect(page.getByRole('heading', { name: 'Добавление товара' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('admin-products.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Закрыть форму добавления товара' }).click();
   await page.getByRole('searchbox', { name: 'Поиск в каталоге' }).fill('пальто');
   await expect(page.locator('.admin-product-list article')).toHaveCount(1);
   await expect(page.locator('.admin-product-list article')).toContainText('Мужское пальто');
@@ -799,11 +803,19 @@ test('admin product forms use versioned writes including empty-body deletion', a
   await page.goto('/admin/');
   await expect(page.getByText('2 товаров · 0 клиентов')).toBeVisible();
   await openAdminSection(page, 'Товары');
-  const createForm = page.locator('.admin-products-layout form.admin-form');
-  await createForm.getByLabel('Название').fill('Новое пальто');
+  await page.getByRole('button', { name: '+ Добавить товар' }).click();
+  const createForm = page.locator('#admin-create-product');
+  await createForm.getByLabel('Название товара').fill('Новое пальто');
+  await createForm.getByLabel('Для кого').selectOption('MEN');
+  await createForm.getByLabel('Ссылка на фотографию').fill('/logo512.png');
   await createForm.getByLabel('Цена').fill('9000');
   await createForm.getByRole('button', { name: 'Добавить в каталог' }).click();
+  await expect(createForm.getByRole('alert')).toHaveText('Выберите конечную категорию товара');
+  expect(writes).toHaveLength(0);
+  await createForm.getByRole('tree', { name: 'Конечная категория товара' }).getByRole('button', { name: /Пальто/ }).click();
+  await createForm.getByRole('button', { name: 'Добавить в каталог' }).click();
   await expect.poll(() => writes.length).toBe(1);
+  await expect(createForm).toHaveCount(0);
 
   await page.locator('.admin-product-list article').first().getByRole('button', { name: 'Изменить' }).click();
   await page.locator('.admin-modal__body').getByLabel('Цена').fill('4500');
@@ -820,7 +832,7 @@ test('admin product forms use versioned writes including empty-body deletion', a
 
   expect(writes.map((item) => item.method)).toEqual(['POST', 'PUT', 'DELETE', 'PUT']);
   expect(writes[0].path).toBe('/api/v1/products/admin');
-  expect(writes[0].body).toMatchObject({ name: 'Новое пальто', price: 9000 });
+  expect(writes[0].body).toMatchObject({ name: 'Новое пальто', price: 9000, gender: 'MEN', category: 'Пальто', imageUrl: '/logo512.png', quantity: 0 });
   expect(writes[1].path).toBe(`/api/v1/products/admin/${products[0].id}`);
   expect(writes[2].path).toBe(`/api/v1/products/admin/${products[0].id}`);
   expect(writes[3].path).toBe(`/api/v1/products/admin/${products[0].id}/stock`);
