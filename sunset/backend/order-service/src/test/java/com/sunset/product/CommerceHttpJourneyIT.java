@@ -97,6 +97,9 @@ class CommerceHttpJourneyIT {
             orderBody.put("customerPhone", "+79990000001");
             orderBody.put("address", "SUNSET Нижний Новгород, Большая Покровская, 34");
             orderBody.put("deliveryMethod", "pickup");
+            JsonNode pickupStores = request(base, "GET", "/order/stores", null, null, 200);
+            assertThat(pickupStores.size()).isGreaterThan(0);
+            orderBody.put("storeId", pickupStores.get(0).path("id").asText());
             orderBody.put("paymentMethod", "CARD");
             orderBody.put("idempotencyKey", "e2e-" + suffix);
             orderBody.put("bonusesToUse", 0);
@@ -114,12 +117,12 @@ class CommerceHttpJourneyIT {
             assertThat(request(base, "GET", "/order/my/" + orderId, customerToken, null, 200)
                     .path("items").size()).isEqualTo(1);
 
-            JsonNode confirmed = request(base, "PATCH", "/order/admin/orders/" + orderId + "/status",
-                    adminToken, json.createObjectNode().put("status", "CONFIRMED"), 200);
-            assertThat(confirmed.path("status").asText()).isEqualTo("CONFIRMED");
-            int earnedBalance = request(base, "GET", "/order/loyalty", customerToken, null, 200)
+            JsonNode assembling = request(base, "PATCH", "/order/admin/orders/" + orderId + "/status",
+                    adminToken, json.createObjectNode().put("status", "ASSEMBLING"), 200);
+            assertThat(assembling.path("status").asText()).isEqualTo("ASSEMBLING");
+            int balanceBeforeDelivery = request(base, "GET", "/order/loyalty", customerToken, null, 200)
                     .path("balance").asInt();
-            assertThat(earnedBalance).isGreaterThan(originalBalance);
+            assertThat(balanceBeforeDelivery).isEqualTo(originalBalance);
 
             JsonNode cancelled = request(base, "POST", "/order/my/" + orderId + "/cancel",
                     customerToken, null, 200);
@@ -143,7 +146,7 @@ class CommerceHttpJourneyIT {
             assertThat(request(base, "GET", "/order/my", null, null, 401)
                     .path("code").asText()).isEqualTo("UNAUTHORIZED");
             System.out.println("Commerce HTTP E2E passed: registration, catalog, checkout, idempotency, "
-                    + "admin confirmation, loyalty compensation, stock restoration and access control");
+                    + "assembly without confirmation, loyalty compensation, stock restoration and access control");
         }
     }
 

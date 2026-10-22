@@ -24,5 +24,8 @@
     <changeSet id="203" author="codex-inventory">
         <sqlFile path="classpath:/db/migrations/V5__location_inventory.sql"/>
     </changeSet>
+    <changeSet id="204" author="codex-iam">
+        <sqlFile path="classpath:/db/migrations/V6__pickup_store_reference.sql"/>
+    </changeSet>
 
 </databaseChangeLog>

@@ -23,7 +23,8 @@ public class AdminProductService {
         if (name.isBlank()) throw new IllegalArgumentException("Укажите название товара");
         BigDecimal price = new BigDecimal(Objects.toString(request.get("price"), "0"));
         if (price.signum() <= 0) throw new IllegalArgumentException("Цена должна быть больше нуля");
-        int quantity = Math.max(0, Integer.parseInt(Objects.toString(request.get("quantity"), "10")));
+        int quantity = Math.max(0, Integer.parseInt(Objects.toString(request.get("quantity"), "0")));
+        if (quantity > 0) access.require(userId, "stock:write");
         UUID productId = UUID.randomUUID();
         String gender = normalizedGender(request.get("gender"));
         jdbc.update("INSERT INTO products(id,name,description,price,gender) VALUES (?,?,?,?,?)", productId, name, text(request.get("description")), price, gender);
@@ -46,7 +47,11 @@ public class AdminProductService {
     }
 
     @Transactional
-    public void delete(UUID userId, UUID productId) { access.require(userId, "catalog:write"); if (jdbc.update("DELETE FROM products WHERE id=?", productId)==0) throw new IllegalArgumentException("Товар не найден"); }
+    public void delete(UUID userId, UUID productId) {
+        access.require(userId, "catalog:write");
+        access.require(userId, "stock:write");
+        if (jdbc.update("DELETE FROM products WHERE id=?", productId)==0) throw new IllegalArgumentException("Товар не найден");
+    }
 
     @Transactional
     public Map<String,Object> update(UUID userId, UUID productId, Map<String,Object> request) {
@@ -75,6 +80,7 @@ public class AdminProductService {
         UUID locationId;
         try { locationId = UUID.fromString(Objects.toString(request.get("locationId"), "")); }
         catch (RuntimeException error) { throw new IllegalArgumentException("Выберите магазин или склад"); }
+        access.requireLocation(userId, "stock:write", locationId);
         Integer locationExists = jdbc.queryForObject("SELECT COUNT(*) FROM stores WHERE id=?", Integer.class, locationId);
         if (locationExists == null || locationExists == 0) throw new IllegalArgumentException("Магазин или склад не найден");
         Integer exists = jdbc.queryForObject("SELECT COUNT(*) FROM products WHERE id=?", Integer.class, productId);
@@ -125,7 +131,7 @@ public class AdminProductService {
     }
 
     public List<Map<String,Object>> stock(UUID userId, UUID productId, UUID locationId) {
-        access.require(userId, "stock:write");
+        access.requireLocation(userId, "stock:write", locationId);
         return jdbc.queryForList("""
                 SELECT ls.size_id AS "sizeId", s.label AS "sizeName", s.type AS "sizeType",
                        s.gender AS "sizeGender", s.description AS "sizeDescription",

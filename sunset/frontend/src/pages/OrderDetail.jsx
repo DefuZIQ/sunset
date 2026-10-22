@@ -3,8 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiHttpError, cancelMyOrder, createOrderReturn, getMyOrder, listPickupStores, updatePendingOrder } from "../api/client";
 import "./ContentPages.css";
 
-const statusLabels = { PENDING:"Ожидает подтверждения", CONFIRMED:"Подтверждён", ASSEMBLING:"Собирается", SHIPPED:"Передан в доставку", DELIVERED:"Доставлен", CANCELLED:"Отменён" };
-const statusSteps = ["PENDING", "CONFIRMED", "ASSEMBLING", "SHIPPED", "DELIVERED"];
+const statusLabels = { PENDING:"Заказ оформлен", CONFIRMED:"Подтверждён", ASSEMBLING:"Собирается", SHIPPED:"Передан в доставку", DELIVERED:"Доставлен", CANCELLED:"Отменён" };
+const statusSteps = ["PENDING", "ASSEMBLING", "SHIPPED", "DELIVERED"];
 const storeAddress = (store) => `${store.name}, ${store.city}, ${store.address}`;
 
 export default function OrderDetail({ user }) {
@@ -38,7 +38,7 @@ export default function OrderDetail({ user }) {
   }, []);
   useEffect(() => { if (order) setEditForm({ customerName:order.customerName || "", customerEmail:order.customerEmail || "", customerPhone:order.customerPhone || "", deliveryMethod:order.delivery?.deliveryMethod || "courier", address:order.delivery?.address || "" }); }, [order]);
   const cancel = async () => {
-    if (!window.confirm("Отменить заказ? Начисленные бонусы будут компенсированы.")) return;
+    if (!window.confirm("Отменить заказ? Резерв товара и оплата будут отменены, использованные бонусы вернутся.")) return;
     setActionError("");
     try { await cancelMyOrder(localStorage.getItem("authToken"), id); await load(); }
     catch (e) { setActionError(e.message || "Не удалось отменить заказ"); }
@@ -62,15 +62,18 @@ export default function OrderDetail({ user }) {
   };
   if (loading) return <div className="page-shell container"><div className="order-loading">Загружаем детали заказа…</div></div>;
   if (error || !order) return <div className="page-shell container"><div className="empty-state"><h2>{error || "Заказ не найден"}</h2><Link className="text-link" to="/profile/orders">Вернуться к заказам</Link></div></div>;
-  const currentStep = statusSteps.indexOf(order.status);
+  const currentStep = order.status === "CONFIRMED" ? 0 : statusSteps.indexOf(order.status);
+  const visibleStatusLabels = order.delivery?.deliveryMethod === "pickup"
+    ? { ...statusLabels, SHIPPED: "Готов к выдаче", DELIVERED: "Получен" }
+    : statusLabels;
   return <div className="page-shell container order-detail">
     <Link className="text-link order-detail__back" to="/profile/orders">← Все заказы</Link>
     {actionError && <p className="checkout-error" role="alert">{actionError}</p>}
-    <header className="order-detail__hero"><div><p className="page-kicker">Заказ от {new Date(order.createdAt).toLocaleDateString("ru-RU")}</p><h1>{order.orderNumber}</h1><span className={`order-detail__status order-detail__status--${order.status.toLowerCase()}`}>{statusLabels[order.status] || order.status}</span></div><div className="order-detail__hero-total"><span>Сумма заказа</span><strong>{Number(order.totalAmount).toLocaleString("ru-RU")} ₽</strong></div></header>
-    {order.status !== "CANCELLED" && <div className="order-timeline">{statusSteps.map((step, index) => <div className={index <= currentStep ? "active" : ""} key={step}><i>{index < currentStep ? "✓" : index + 1}</i><span>{statusLabels[step]}</span></div>)}</div>}
-    {order.status === "CANCELLED" && <div className="order-cancelled-note"><strong>Заказ отменён</strong><span>Начисленные бонусы списаны компенсационной операцией, использованные — возвращены.</span></div>}
+    <header className="order-detail__hero"><div><p className="page-kicker">Заказ от {new Date(order.createdAt).toLocaleDateString("ru-RU")}</p><h1>{order.orderNumber}</h1><span className={`order-detail__status order-detail__status--${order.status.toLowerCase()}`}>{visibleStatusLabels[order.status] || order.status}</span></div><div className="order-detail__hero-total"><span>Сумма заказа</span><strong>{Number(order.totalAmount).toLocaleString("ru-RU")} ₽</strong></div></header>
+    {order.status !== "CANCELLED" && <div className="order-timeline">{statusSteps.map((step, index) => <div className={index <= currentStep ? "active" : ""} key={step}><i>{index < currentStep ? "✓" : index + 1}</i><span>{visibleStatusLabels[step]}</span></div>)}</div>}
+    {order.status === "CANCELLED" && <div className="order-cancelled-note"><strong>Заказ отменён</strong><span>Резерв товара снят, использованные бонусы возвращены. Если бонусы за покупку уже начислялись, они списаны компенсационной операцией.</span></div>}
     <div className="order-detail__grid"><section className="order-detail__card order-detail__products"><div className="order-detail__section-head"><span>01</span><h2>Состав заказа</h2></div>{order.items?.length ? order.items.map((item) => <article className="order-detail__item" key={`${item.productId}-${item.sizeId}-${item.colorId}`}><div className="order-detail__image">{item.imageUrl ? <img src={item.imageUrl} alt="" /> : <span>S</span>}</div><div className="order-detail__item-copy"><strong>{item.name}</strong><span>{[item.sizeName && `Размер ${item.sizeName}`, item.colorName].filter(Boolean).join(" · ") || "Стандартная комплектация"}</span><small>Количество: {item.quantity}</small></div><div className="order-detail__item-price"><span>{Number(item.price).toLocaleString("ru-RU")} ₽</span><strong>{(Number(item.price) * item.quantity).toLocaleString("ru-RU")} ₽</strong></div></article>) : <p className="muted">Состав заказа не найден.</p>}</section>
-      <aside className="order-detail__card order-detail__summary"><div className="order-detail__section-head"><span>02</span><h2>Оплата</h2></div><div><span>Товары</span><strong>{Number(order.subtotal).toLocaleString("ru-RU")} ₽</strong></div><div><span>Скидка</span><strong>−{Number(order.discountAmount || 0).toLocaleString("ru-RU")} ₽</strong></div><div><span>Списано бонусов</span><strong>−{order.bonusesUsed || 0} ₽</strong></div>{Number(order.delivery?.cost)>0&&<div><span>Доставка</span><strong>{Number(order.delivery.cost).toLocaleString("ru-RU")} ₽</strong></div>}{order.promoCode && <div><span>Промокод</span><strong>{order.promoCode}</strong></div>}<hr /><div className="order-detail__grand-total"><strong>Итого</strong><strong>{Number(order.totalAmount).toLocaleString("ru-RU")} ₽</strong></div><div className={`payment-state payment-state--${String(order.payment?.status||"pending").toLowerCase()}`}><span>{order.payment?.method === "SBP" ? "СБП" : order.payment?.method === "ON_RECEIPT" ? "При получении" : "Банковская карта"}</span><strong>{({PAID:"Оплачено",PENDING:"Ожидает оплаты",REFUNDED:"Возвращено"})[order.payment?.status]||order.payment?.status||"Уточняется"}</strong><small>{order.payment?.provider === "STUB" ? "Тестовый платёж" : order.payment?.provider}</small></div><p className="order-detail__bonus">+{order.bonusesEarned || 0} бонусов за заказ</p></aside>
+      <aside className="order-detail__card order-detail__summary"><div className="order-detail__section-head"><span>02</span><h2>Оплата</h2></div><div><span>Товары</span><strong>{Number(order.subtotal).toLocaleString("ru-RU")} ₽</strong></div><div><span>Скидка</span><strong>−{Number(order.discountAmount || 0).toLocaleString("ru-RU")} ₽</strong></div><div><span>Списано бонусов</span><strong>−{order.bonusesUsed || 0} ₽</strong></div>{Number(order.delivery?.cost)>0&&<div><span>Доставка</span><strong>{Number(order.delivery.cost).toLocaleString("ru-RU")} ₽</strong></div>}{order.promoCode && <div><span>Промокод</span><strong>{order.promoCode}</strong></div>}<hr /><div className="order-detail__grand-total"><strong>Итого</strong><strong>{Number(order.totalAmount).toLocaleString("ru-RU")} ₽</strong></div><div className={`payment-state payment-state--${String(order.payment?.status||"pending").toLowerCase()}`}><span>{order.payment?.method === "SBP" ? "СБП" : order.payment?.method === "ON_RECEIPT" ? "При получении" : "Банковская карта"}</span><strong>{({PAID:"Оплачено",PENDING:"Ожидает оплаты",REFUNDED:"Возвращено"})[order.payment?.status]||order.payment?.status||"Уточняется"}</strong><small>{order.payment?.provider === "STUB" ? "Тестовый платёж" : order.payment?.provider}</small></div><p className="order-detail__bonus">{order.status === "DELIVERED" ? "Начислено" : order.status === "CANCELLED" ? "Не начислено" : "Начислим после получения"}: {order.status === "CANCELLED" ? 0 : order.bonusesEarned || 0} бонусов</p></aside>
     </div>
     {editMode ? <div className="order-edit-panel">
       <div className="order-detail__section-head"><span>{editMode === "delivery" ? "03" : "04"}</span><h2>{editMode === "delivery" ? "Изменение получения" : "Изменение получателя"}</h2></div>

@@ -86,11 +86,15 @@ public class OrderService {
         int bonusCap = afterDiscount.multiply(new BigDecimal("0.30")).setScale(0, RoundingMode.DOWN).intValue();
         int used = Math.min(Math.min(requestedBonuses, balance == null ? 0 : balance), bonusCap);
         String deliveryMethod = normalizeDeliveryMethod(request.deliveryMethod(), request.address());
+        String deliveryAddress = request.address();
         UUID pickupStoreId = null;
-        if ("pickup".equals(deliveryMethod) && request.storeId() != null) {
-            Integer storeExists = jdbc.queryForObject("SELECT COUNT(*) FROM stores WHERE id=? AND kind='STORE' AND active=TRUE", Integer.class, request.storeId());
-            if (storeExists == null || storeExists == 0) throw new IllegalArgumentException("Выберите действующий магазин самовывоза");
+        if ("pickup".equals(deliveryMethod)) {
+            if (request.storeId() == null) throw new IllegalArgumentException("Выберите магазин самовывоза");
+            List<Map<String, Object>> stores = jdbc.queryForList("SELECT name,city,address FROM stores WHERE id=? AND kind='STORE' AND active=TRUE", request.storeId());
+            if (stores.isEmpty()) throw new IllegalArgumentException("Выберите действующий магазин самовывоза");
             pickupStoreId = request.storeId();
+            Map<String, Object> store = stores.get(0);
+            deliveryAddress = store.get("name") + ", " + store.get("city") + ", " + store.get("address");
         }
         BigDecimal deliveryCost = "pickup".equals(deliveryMethod) || afterDiscount.compareTo(BigDecimal.valueOf(7000)) >= 0
                 ? BigDecimal.ZERO : BigDecimal.valueOf(390);
@@ -119,15 +123,15 @@ public class OrderService {
             jdbc.update("INSERT INTO order_items(id,order_id,product_id,color_id,size_id,quantity,price) VALUES (gen_random_uuid(),?,?,?,?,?,?)",
                     orderId, productId, colorId, sizeId, quantity, line.get("price"));
         }
-        if (request.address() == null || request.address().isBlank()) throw new IllegalArgumentException("Укажите способ получения");
-        jdbc.update("INSERT INTO deliveries(id,order_id,address,delivery_method,delivery_status,cost,estimated_at) VALUES (gen_random_uuid(),?,?,?,'preparing',?,NOW()+INTERVAL '3 days')",
-                orderId, request.address().trim(), deliveryMethod, deliveryCost);
+        if (deliveryAddress == null || deliveryAddress.isBlank()) throw new IllegalArgumentException("Укажите способ получения");
+        jdbc.update("INSERT INTO deliveries(id,order_id,address,delivery_method,pickup_store_id,delivery_status,cost,estimated_at) VALUES (gen_random_uuid(),?,?,?,?, 'preparing',?,NOW()+INTERVAL '3 days')",
+                orderId, deliveryAddress.trim(), deliveryMethod, pickupStoreId, deliveryCost);
         PaymentProvider.PaymentResult payment = paymentProvider.authorize(orderId, total, request.paymentMethod());
         jdbc.update("INSERT INTO payments(id,order_id,method,amount,status,provider,provider_payment_id,paid_at) VALUES (gen_random_uuid(),?,?,?,?,?,?,CASE WHEN ?='PAID' THEN NOW() ELSE NULL END)",
                 orderId, normalizePaymentMethod(request.paymentMethod()), total, payment.status(), payment.provider(), payment.providerPaymentId(), payment.status());
         addEvent(orderId, "ORDER_CREATED", "Заказ оформлен", "Товары зарезервированы, платёж: " + payment.status());
-        // Бонусы за заказ резервируются в orders.bonuses_earned, но становятся
-        // доступными только после подтверждения заказа администратором.
+        // Бонусы за заказ рассчитаны, но становятся доступными только после получения.
+        // Оформление заказа не требует ручного подтверждения сотрудником.
         jdbc.update("UPDATE loyalty_accounts SET balance=GREATEST(0,balance-?),updated_at=NOW() WHERE user_id=?",
                 used, userId);
         if (used > 0) jdbc.update("INSERT INTO loyalty_transactions(user_id,order_id,amount,type,description) VALUES (?,?,?,'SPEND','Оплата заказа бонусами')", userId, orderId, -used);
@@ -136,7 +140,7 @@ public class OrderService {
     }
 
     public List<Map<String, Object>> myOrders(UUID userId) {
-        return jdbc.query("SELECT * FROM orders WHERE user_id=? ORDER BY created_at DESC", (rs, n) -> orderMap(rs), userId);
+        return jdbc.query("SELECT o.*, (SELECT delivery_method FROM deliveries WHERE order_id=o.id LIMIT 1) AS delivery_method FROM orders o WHERE o.user_id=? ORDER BY o.created_at DESC", (rs, n) -> orderMap(rs), userId);
     }
     public Map<String, Object> myOrder(UUID userId, UUID orderId) {
         Map<String, Object> order = getOrder(orderId);
@@ -147,15 +151,27 @@ public class OrderService {
     @Transactional
     public Map<String, Object> updatePending(UUID userId, UUID orderId, Map<String, Object> request) {
         Map<String, Object> order = myOrder(userId, orderId);
-        if (!"PENDING".equals(order.get("status"))) throw new IllegalArgumentException("Редактировать можно только заказ до подтверждения");
+        if (!"PENDING".equals(order.get("status"))) throw new IllegalArgumentException("Редактировать можно только заказ до начала сборки");
         String name = valueOr((String) request.get("customerName"), (String) order.get("customerName"));
         String email = valueOr((String) request.get("customerEmail"), (String) order.get("customerEmail"));
         String phone = valueOr((String) request.get("customerPhone"), (String) order.get("customerPhone"));
         String address = valueOr((String) request.get("address"), "");
         String method = "pickup".equalsIgnoreCase(String.valueOf(request.get("deliveryMethod"))) ? "pickup" : "courier";
         if (address.isBlank()) throw new IllegalArgumentException("Укажите адрес доставки или магазин самовывоза");
+        Map<String, Object> previousDelivery = jdbc.queryForMap("SELECT address,delivery_method,pickup_store_id FROM deliveries WHERE order_id=?", orderId);
+        UUID storeId = null;
+        if ("pickup".equals(method)) {
+            if ("pickup".equals(previousDelivery.get("delivery_method")) && address.equals(previousDelivery.get("address"))) {
+                storeId = (UUID) previousDelivery.get("pickup_store_id");
+            } else {
+                List<UUID> stores = jdbc.query("SELECT id FROM stores WHERE kind='STORE' AND active=TRUE AND name || ', ' || city || ', ' || address=?",
+                        (rs, row) -> rs.getObject(1, UUID.class), address);
+                if (stores.isEmpty()) throw new IllegalArgumentException("Выберите действующий магазин самовывоза");
+                storeId = stores.get(0);
+            }
+        }
         jdbc.update("UPDATE orders SET customer_name=?,customer_email=?,customer_phone=?,updated_at=NOW() WHERE id=? AND user_id=?", name, email, phone, orderId, userId);
-        jdbc.update("UPDATE deliveries SET address=?,delivery_method=?,updated_at=NOW() WHERE order_id=?", address, method, orderId);
+        jdbc.update("UPDATE deliveries SET address=?,delivery_method=?,pickup_store_id=?,updated_at=NOW() WHERE order_id=?", address, method, storeId, orderId);
         addEvent(orderId, "ORDER_UPDATED", "Данные заказа изменены", "Получение или получатель обновлены клиентом");
         return myOrder(userId, orderId);
     }
@@ -201,7 +217,15 @@ public class OrderService {
         return promo;
     }
 
-    public List<Map<String, Object>> adminOrders(UUID userId) { access.require(userId, "orders:read"); return jdbc.query("SELECT * FROM orders ORDER BY created_at DESC", (rs,n) -> orderMap(rs)); }
+    public List<Map<String, Object>> adminOrders(UUID userId) {
+        access.require(userId, "orders:read");
+        if ("STORE_MANAGER".equals(access.staffRole(userId))) {
+            access.requireLocation(userId, "stock:write", access.scopedLocation(userId));
+            return jdbc.query("SELECT o.*,d.delivery_method FROM orders o JOIN deliveries d ON d.order_id=o.id WHERE d.pickup_store_id=? ORDER BY o.created_at DESC",
+                    (rs,n) -> orderMap(rs), access.scopedLocation(userId));
+        }
+        return jdbc.query("SELECT o.*, (SELECT delivery_method FROM deliveries WHERE order_id=o.id LIMIT 1) AS delivery_method FROM orders o ORDER BY o.created_at DESC", (rs,n) -> orderMap(rs));
+    }
     public List<Map<String, Object>> adminUsers(UUID userId) {
         access.require(userId, "customers:read");
         return jdbc.queryForList("SELECT u.id,u.email,u.first_name AS \"firstName\",u.last_name AS \"lastName\",u.phone,u.birthday,u.role,u.created_at AS \"createdAt\",COALESCE(l.balance,0) AS \"bonusBalance\",COUNT(o.id) AS \"orderCount\",COALESCE(SUM(o.total_amount),0) AS \"orderTotal\" FROM users u LEFT JOIN loyalty_accounts l ON l.user_id=u.id LEFT JOIN orders o ON o.user_id=u.id GROUP BY u.id,l.balance ORDER BY u.created_at DESC");
@@ -227,16 +251,19 @@ public class OrderService {
     @Transactional
     public Map<String, Object> updateStatus(UUID userId, UUID orderId, String status) {
         access.require(userId, "orders:manage");
+        requireOrderScope(userId, orderId);
         String normalized = status == null ? "" : status.toUpperCase(Locale.ROOT);
         if (!STATUSES.contains(normalized)) throw new IllegalArgumentException("Недопустимый статус");
+        if ("STORE_MANAGER".equals(access.staffRole(userId)) && "CANCELLED".equals(normalized))
+            throw new SecurityException("Отмену с возвратом денег подтверждает администратор");
         String previous = jdbc.queryForObject("SELECT status FROM orders WHERE id=? FOR UPDATE", String.class, orderId);
         if (previous == null) throw new IllegalArgumentException("Заказ не найден");
         if (normalized.equals(previous)) return getOrder(orderId);
         if (!isAllowedTransition(previous, normalized)) throw new IllegalArgumentException("Недопустимый переход статуса: " + previous + " → " + normalized);
         if (jdbc.update("UPDATE orders SET status=?,updated_at=NOW() WHERE id=?", normalized, orderId) == 0) throw new IllegalArgumentException("Заказ не найден");
-        if (Set.of("CONFIRMED", "ASSEMBLING", "SHIPPED", "DELIVERED").contains(normalized)) creditEarnedOnce(orderId);
+        if ("DELIVERED".equals(normalized)) creditEarnedOnce(orderId);
         if ("SHIPPED".equals(normalized)) {
-            jdbc.update("UPDATE deliveries SET delivery_status='in_transit',tracking_number=COALESCE(tracking_number,'SUN-' || UPPER(SUBSTRING(REPLACE(?::text,'-',''),1,10))),shipped_at=NOW(),updated_at=NOW() WHERE order_id=?", orderId, orderId);
+            jdbc.update("UPDATE deliveries SET delivery_status=CASE WHEN delivery_method='pickup' THEN 'ready_for_pickup' ELSE 'in_transit' END,tracking_number=CASE WHEN delivery_method='pickup' THEN NULL ELSE COALESCE(tracking_number,'SUN-' || UPPER(SUBSTRING(REPLACE(?::text,'-',''),1,10))) END,shipped_at=NOW(),updated_at=NOW() WHERE order_id=?", orderId, orderId);
         }
         if ("DELIVERED".equals(normalized)) {
             jdbc.update("UPDATE deliveries SET delivery_status='delivered',delivered_at=NOW(),updated_at=NOW() WHERE order_id=?", orderId);
@@ -281,6 +308,11 @@ public class OrderService {
 
     public List<Map<String, Object>> adminReturns(UUID adminId) {
         access.require(adminId, "orders:read");
+        if ("STORE_MANAGER".equals(access.staffRole(adminId))) {
+            access.requireLocation(adminId, "stock:write", access.scopedLocation(adminId));
+            return jdbc.queryForList("SELECT r.*,o.order_number AS \"orderNumber\",u.email FROM return_requests r JOIN orders o ON o.id=r.order_id JOIN users u ON u.id=r.user_id JOIN deliveries d ON d.order_id=o.id WHERE d.pickup_store_id=? ORDER BY r.created_at DESC",
+                    access.scopedLocation(adminId));
+        }
         return jdbc.queryForList("SELECT r.*,o.order_number AS \"orderNumber\",u.email FROM return_requests r JOIN orders o ON o.id=r.order_id JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC");
     }
 
@@ -291,6 +323,9 @@ public class OrderService {
         if (!RETURN_STATUSES.contains(status)) throw new IllegalArgumentException("Недопустимый статус возврата");
         Map<String, Object> current = jdbc.queryForMap("SELECT order_id,refund_amount,status FROM return_requests WHERE id=? FOR UPDATE", returnId);
         UUID orderId = (UUID) current.get("order_id");
+        requireOrderScope(adminId, orderId);
+        if ("STORE_MANAGER".equals(access.staffRole(adminId)) && "REFUNDED".equals(status))
+            throw new SecurityException("Возврат денег подтверждает администратор");
         if ("REFUNDED".equals(status) && !"REFUNDED".equals(current.get("status"))) {
             refundPayment(orderId);
             compensateEarnedBonuses(orderId);
@@ -303,6 +338,16 @@ public class OrderService {
 
     public Map<String, Object> adminAnalytics(UUID adminId) {
         access.require(adminId, "orders:read");
+        if ("STORE_MANAGER".equals(access.staffRole(adminId))) {
+            UUID locationId = access.scopedLocation(adminId);
+            access.requireLocation(adminId, "stock:write", locationId);
+            Map<String, Object> scoped = new LinkedHashMap<>();
+            scoped.put("orders", jdbc.queryForMap("SELECT COUNT(*) AS total,COUNT(*) FILTER (WHERE o.created_at>=NOW()-INTERVAL '30 days') AS \"last30Days\",COALESCE(SUM(o.total_amount) FILTER (WHERE o.status<>'CANCELLED'),0) AS revenue FROM orders o JOIN deliveries d ON d.order_id=o.id WHERE d.pickup_store_id=?", locationId));
+            scoped.put("returns", jdbc.queryForMap("SELECT COUNT(*) AS total,COUNT(*) FILTER (WHERE r.status='REQUESTED') AS requested FROM return_requests r JOIN deliveries d ON d.order_id=r.order_id WHERE d.pickup_store_id=?", locationId));
+            scoped.put("lowStock", jdbc.queryForObject("SELECT COUNT(*) FROM location_stock WHERE location_id=? AND quantity BETWEEN 0 AND 3", Integer.class, locationId));
+            scoped.put("topProducts", jdbc.queryForList("SELECT p.id,p.name,SUM(oi.quantity) AS quantity,SUM(oi.quantity*oi.price) AS revenue FROM order_items oi JOIN products p ON p.id=oi.product_id JOIN orders o ON o.id=oi.order_id JOIN deliveries d ON d.order_id=o.id WHERE d.pickup_store_id=? AND o.status<>'CANCELLED' GROUP BY p.id,p.name ORDER BY quantity DESC LIMIT 10", locationId));
+            return scoped;
+        }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("orders", jdbc.queryForMap("SELECT COUNT(*) AS total,COUNT(*) FILTER (WHERE created_at>=NOW()-INTERVAL '30 days') AS \"last30Days\",COALESCE(SUM(total_amount) FILTER (WHERE status<>'CANCELLED'),0) AS revenue FROM orders"));
         result.put("returns", jdbc.queryForMap("SELECT COUNT(*) AS total,COUNT(*) FILTER (WHERE status='REQUESTED') AS requested FROM return_requests"));
@@ -311,7 +356,7 @@ public class OrderService {
         return result;
     }
 
-    /** Начисляет бонусы один раз при подтверждении заказа. */
+    /** Начисляет бонусы один раз после получения заказа. */
     private void creditEarnedOnce(UUID orderId) {
         Map<String, Object> order = jdbc.queryForMap("SELECT user_id,bonuses_earned FROM orders WHERE id=? FOR UPDATE", orderId);
         int earned = ((Number) order.get("bonuses_earned")).intValue();
@@ -321,7 +366,7 @@ public class OrderService {
         UUID userId = (UUID) order.get("user_id");
         jdbc.update("INSERT INTO loyalty_accounts(user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", userId);
         jdbc.update("UPDATE loyalty_accounts SET balance=balance+?,lifetime_earned=lifetime_earned+?,tier=CASE WHEN lifetime_earned+?>=10000 THEN 'SUNSET' WHEN lifetime_earned+?>=3000 THEN 'GOLDEN HOUR' ELSE 'SUNRISE' END,updated_at=NOW() WHERE user_id=?", earned, earned, earned, earned, userId);
-        jdbc.update("INSERT INTO loyalty_transactions(user_id,order_id,amount,type,description) VALUES (?,?,?,'EARN','Бонусы за подтвержденный заказ')", userId, orderId, earned);
+        jdbc.update("INSERT INTO loyalty_transactions(user_id,order_id,amount,type,description) VALUES (?,?,?,'EARN','Бонусы за полученный заказ')", userId, orderId, earned);
     }
 
     @Transactional
@@ -344,7 +389,7 @@ public class OrderService {
     }
 
     private Map<String, Object> getOrder(UUID orderId) {
-        Map<String, Object> order = jdbc.query("SELECT * FROM orders WHERE id=?", rs -> rs.next() ? orderMap(rs) : null, orderId);
+        Map<String, Object> order = jdbc.query("SELECT o.*, (SELECT delivery_method FROM deliveries WHERE order_id=o.id LIMIT 1) AS delivery_method FROM orders o WHERE o.id=?", rs -> rs.next() ? orderMap(rs) : null, orderId);
         if (order == null) throw new IllegalArgumentException("Заказ не найден");
         order.put("items", jdbc.queryForList("SELECT oi.product_id AS \"productId\",oi.color_id AS \"colorId\",c.name AS \"colorName\",oi.size_id AS \"sizeId\",s.name AS \"sizeName\",COALESCE(p.name,'Товар') AS name,COALESCE((SELECT i.url FROM product_images pi JOIN images i ON i.id=pi.image_id WHERE pi.product_id=oi.product_id ORDER BY pi.created_at LIMIT 1),'') AS \"imageUrl\",oi.quantity,oi.price FROM order_items oi LEFT JOIN products p ON p.id=oi.product_id LEFT JOIN colors c ON c.id=oi.color_id LEFT JOIN sizes s ON s.id=oi.size_id WHERE oi.order_id=?", orderId));
         return order;
@@ -455,6 +500,15 @@ public class OrderService {
         jdbc.update("INSERT INTO order_events(order_id,event_type,title,details) VALUES (?,?,?,?)", orderId, type, title, details);
     }
 
+    private void requireOrderScope(UUID staffId, UUID orderId) {
+        if (!"STORE_MANAGER".equals(access.staffRole(staffId))) return;
+        UUID locationId = access.scopedLocation(staffId);
+        access.requireLocation(staffId, "stock:write", locationId);
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM deliveries WHERE order_id=? AND pickup_store_id=?",
+                Integer.class, orderId, locationId);
+        if (count == null || count != 1) throw new SecurityException("Нет доступа к заказу другого магазина");
+    }
+
     private String normalizeDeliveryMethod(String requested, String address) {
         if ("pickup".equalsIgnoreCase(requested)) return "pickup";
         if (address != null && address.trim().toUpperCase(Locale.ROOT).startsWith("SUNSET ")) return "pickup";
@@ -467,7 +521,7 @@ public class OrderService {
 
     private boolean isAllowedTransition(String from, String to) {
         return switch (from) {
-            case "PENDING" -> Set.of("CONFIRMED", "CANCELLED").contains(to);
+            case "PENDING" -> Set.of("ASSEMBLING", "CANCELLED").contains(to);
             case "CONFIRMED" -> Set.of("ASSEMBLING", "CANCELLED").contains(to);
             case "ASSEMBLING" -> Set.of("SHIPPED", "CANCELLED").contains(to);
             case "SHIPPED" -> "DELIVERED".equals(to);
@@ -480,6 +534,7 @@ public class OrderService {
         row.put("id", rs.getObject("id", UUID.class)); row.put("orderNumber", rs.getString("order_number")); row.put("userId", rs.getObject("user_id", UUID.class));
         row.put("customerName", rs.getString("customer_name")); row.put("customerEmail", rs.getString("customer_email")); row.put("customerPhone", rs.getString("customer_phone"));
         row.put("status", rs.getString("status")); row.put("subtotal", rs.getBigDecimal("subtotal")); row.put("discountAmount", rs.getBigDecimal("discount_amount"));
+        row.put("deliveryMethod", rs.getString("delivery_method"));
         row.put("bonusesUsed", rs.getInt("bonuses_used")); row.put("bonusesEarned", rs.getInt("bonuses_earned")); row.put("promoCode", rs.getString("promo_code")); row.put("totalAmount", rs.getBigDecimal("total_amount")); row.put("createdAt", rs.getTimestamp("created_at").toInstant());
         return row;
     }

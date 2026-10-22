@@ -195,7 +195,7 @@ export async function getProfile(token: string): Promise<UserProfile> {
   return readJson<UserProfile>(await fetch("/api/v1/auth/profile", { headers: bearer(token) }));
 }
 
-export type IamIdentity = { role: string; permissions: string[] };
+export type IamIdentity = { role: string; staffRole?: string | null; locationId?: string | null; permissions: string[] };
 
 export async function getIamIdentity(token: string): Promise<IamIdentity> {
   return readJson<IamIdentity>(await fetch("/api/v1/auth/iam/me", { headers: bearer(token) }));
@@ -208,6 +208,12 @@ export async function getIamUserPermissions(token: string, id: string): Promise<
 export async function updateIamUserPermissions(token: string, id: string, permissions: string[]): Promise<IamIdentity> {
   return readJson<IamIdentity>(await fetch(`/api/v1/auth/iam/staff/${encodeURIComponent(id)}/permissions`, {
     method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify({ permissions }),
+  }));
+}
+
+export async function updateIamUserRole(token: string, id: string, roleCode: string, locationId: string | null): Promise<IamIdentity> {
+  return readJson<IamIdentity>(await fetch(`/api/v1/auth/iam/staff/${encodeURIComponent(id)}/role`, {
+    method: "PUT", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify({ roleCode, locationId }),
   }));
 }
 

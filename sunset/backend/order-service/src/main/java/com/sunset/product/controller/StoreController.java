@@ -16,9 +16,18 @@ public class StoreController {
     public StoreController(StoreRepository repository, JdbcTemplate jdbc) { this.repository = repository; this.jdbc = jdbc; }
     @GetMapping public List<Store> list() { return repository.findByActiveTrueAndKindOrderByCityAscNameAsc("STORE"); }
     @GetMapping("/admin") public List<Store> listAdmin(@RequestHeader("user-id") UUID userId) {
-        List<String> permissions = new IamAccess(jdbc).permissions(userId);
+        IamAccess access = new IamAccess(jdbc);
+        List<String> permissions = access.permissions(userId);
         if (!permissions.contains("stores:manage") && !permissions.contains("stock:write"))
             throw new SecurityException("Недостаточно прав для просмотра точек");
+        if (access.isAdmin(userId)) return repository.findAllByOrderByKindAscCityAscNameAsc();
+        String role = access.staffRole(userId);
+        if ("WAREHOUSE_ADMIN".equals(role) || "STORE_MANAGER".equals(role)) {
+            UUID locationId = access.scopedLocation(userId);
+            return locationId == null ? List.of() : repository.findById(locationId)
+                    .filter(Store::isActive).filter(store -> ("WAREHOUSE_ADMIN".equals(role) ? "WAREHOUSE" : "STORE").equals(store.getKind()))
+                    .map(List::of).orElseGet(List::of);
+        }
         return repository.findAllByOrderByKindAscCityAscNameAsc();
     }
     @PostMapping public Store create(@RequestHeader("user-id") UUID userId, @RequestBody Store store) {

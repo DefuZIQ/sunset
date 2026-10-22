@@ -185,8 +185,27 @@ export interface paths {
         };
         /** Права пользователя для администратора */
         get: operations["getIamUserPermissions"];
-        /** Назначить точечные права сотруднику */
+        /** Изменить индивидуальные права сотрудника без назначенной роли (старый режим) */
         put: operations["updateIamUserPermissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/iam/staff/{id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Назначить рабочую роль и точку сотруднику */
+        put: operations["updateIamUserRole"];
         post?: never;
         delete?: never;
         options?: never;
@@ -701,7 +720,7 @@ export interface paths {
         };
         /** Подробности заказа */
         get: operations["getMyOrder"];
-        /** Изменить получателя или получение до подтверждения */
+        /** Изменить получателя или получение до начала сборки */
         put: operations["updatePendingOrder"];
         post?: never;
         delete?: never;
@@ -1087,10 +1106,22 @@ export interface components {
     schemas: {
         IamIdentity: {
             role: string;
+            staffRole?: string | null;
+            /** Format: uuid */
+            locationId?: string | null;
             permissions: string[];
         };
         IamPermissionUpdate: {
             permissions: string[];
+        };
+        IamRoleUpdate: {
+            /**
+             * @description ADMIN может назначать только владелец
+             * @enum {string}
+             */
+            roleCode: "CUSTOMER" | "ADMIN" | "WAREHOUSE_ADMIN" | "STORE_MANAGER" | "CONTENT_MARKETING";
+            /** Format: uuid */
+            locationId?: string | null;
         };
         Message: {
             message?: string;
@@ -1353,6 +1384,8 @@ export interface components {
             customerPhone?: string;
             /** @enum {string} */
             status: "PENDING" | "CONFIRMED" | "ASSEMBLING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+            /** @enum {string|null} */
+            deliveryMethod?: "courier" | "pickup" | null;
             subtotal?: number;
             discountAmount?: number;
             bonusesUsed?: number;
@@ -2030,6 +2063,34 @@ export interface operations {
         };
         responses: {
             /** @description Права сохранены */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IamIdentity"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateIamUserRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IamRoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Роль сохранена */
             200: {
                 headers: {
                     [name: string]: unknown;

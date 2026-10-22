@@ -25,6 +25,14 @@ CREATE TABLE IF NOT EXISTS iam_user_permissions (
     PRIMARY KEY (user_id, permission)
 );
 
+CREATE TABLE IF NOT EXISTS iam_staff_role_assignments (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    role_code VARCHAR(40) NOT NULL,
+    location_id UUID,
+    assigned_by UUID,
+    assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,

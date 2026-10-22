@@ -83,9 +83,17 @@
         "responses": { "200": { "description": "Права пользователя", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "403": { "$ref": "#/components/responses/Forbidden" } }
       },
       "put": {
-        "tags": ["Administration"], "operationId": "updateIamUserPermissions", "summary": "Назначить точечные права сотруднику", "security": [{ "bearerAuth": [] }],
+        "tags": ["Administration"], "operationId": "updateIamUserPermissions", "summary": "Изменить индивидуальные права сотрудника без назначенной роли (старый режим)", "security": [{ "bearerAuth": [] }],
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamPermissionUpdate" } } } },
         "responses": { "200": { "description": "Права сохранены", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/auth/iam/staff/{id}/role": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Administration"], "operationId": "updateIamUserRole", "summary": "Назначить рабочую роль и точку сотруднику", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamRoleUpdate" } } } },
+        "responses": { "200": { "description": "Роль сохранена", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "403": { "$ref": "#/components/responses/Forbidden" } }
       }
     },
     "/auth/profile": {
@@ -347,7 +355,7 @@
         "responses": { "200": { "description": "Заказ, состав, получение, оплата и события", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       },
       "put": {
-        "tags": ["Orders"], "operationId": "updatePendingOrder", "summary": "Изменить получателя или получение до подтверждения", "security": [{ "bearerAuth": [] }],
+        "tags": ["Orders"], "operationId": "updatePendingOrder", "summary": "Изменить получателя или получение до начала сборки", "security": [{ "bearerAuth": [] }],
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdatePendingOrderRequest" } } } },
         "responses": { "200": { "description": "Обновлённый заказ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
@@ -519,8 +527,9 @@
       "NotFound": { "description": "Ресурс не найден", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
     },
     "schemas": {
-      "IamIdentity": { "type": "object", "required": ["role", "permissions"], "properties": { "role": { "type": "string" }, "permissions": { "type": "array", "items": { "type": "string" } } } },
+      "IamIdentity": { "type": "object", "required": ["role", "permissions"], "properties": { "role": { "type": "string" }, "staffRole": { "type": "string", "nullable": true }, "locationId": { "type": "string", "format": "uuid", "nullable": true }, "permissions": { "type": "array", "items": { "type": "string" } } } },
       "IamPermissionUpdate": { "type": "object", "required": ["permissions"], "properties": { "permissions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true } } },
+      "IamRoleUpdate": { "type": "object", "required": ["roleCode"], "properties": { "roleCode": { "type": "string", "enum": ["CUSTOMER", "ADMIN", "WAREHOUSE_ADMIN", "STORE_MANAGER", "CONTENT_MARKETING"], "description": "ADMIN может назначать только владелец" }, "locationId": { "type": "string", "format": "uuid", "nullable": true } } },
       "Message": { "type": "object", "properties": { "message": { "type": "string" } } },
       "ApiError": {
         "type": "object", "required": ["code", "message", "fieldErrors", "requestId", "timestamp"],
@@ -632,6 +641,7 @@
           "id": { "type": "string", "format": "uuid" }, "orderNumber": { "type": "string" }, "userId": { "type": "string", "format": "uuid" },
           "customerName": { "type": "string" }, "customerEmail": { "type": "string" }, "customerPhone": { "type": "string" },
           "status": { "type": "string", "enum": ["PENDING", "CONFIRMED", "ASSEMBLING", "SHIPPED", "DELIVERED", "CANCELLED"] },
+          "deliveryMethod": { "type": "string", "nullable": true, "enum": ["courier", "pickup"] },
           "subtotal": { "type": "number" }, "discountAmount": { "type": "number" },
           "bonusesUsed": { "type": "integer" }, "bonusesEarned": { "type": "integer" }, "promoCode": { "type": "string", "nullable": true },
           "totalAmount": { "type": "number" }, "createdAt": { "type": "string", "format": "date-time" },

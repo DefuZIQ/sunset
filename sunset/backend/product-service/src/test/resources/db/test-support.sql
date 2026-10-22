@@ -16,6 +16,14 @@ CREATE TABLE IF NOT EXISTS iam_user_permissions (
     PRIMARY KEY (user_id, permission)
 );
 
+CREATE TABLE IF NOT EXISTS iam_staff_role_assignments (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    role_code VARCHAR(40) NOT NULL,
+    location_id UUID,
+    assigned_by UUID,
+    assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Review verification reads the shared order-service tables in production.
 CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY,

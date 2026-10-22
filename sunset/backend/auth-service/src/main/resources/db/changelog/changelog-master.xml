@@ -43,4 +43,8 @@
         <sqlFile path="classpath:/db/migrations/V9__mandatory_staff_mfa.sql"/>
     </changeSet>
 
+    <changeSet id="16" author="codex">
+        <sqlFile path="classpath:/db/migrations/V10__staff_role_assignments.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

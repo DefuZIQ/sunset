@@ -33,6 +33,9 @@ class OrderPostgresIntegrationTest {
     private static final UUID PRODUCT_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
     private static final UUID COLOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
     private static final UUID SIZE_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
+    private static final UUID STORE_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
+    private static final UUID OTHER_STORE_ID = UUID.fromString("50000000-0000-0000-0000-000000000002");
+    private static final UUID STORE_MANAGER_ID = UUID.fromString("10000000-0000-0000-0000-000000000004");
 
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine")
             .withDatabaseName("sunset_order_test")
@@ -75,12 +78,14 @@ class OrderPostgresIntegrationTest {
         jdbc.update("INSERT INTO colors(id,name,hex_code) VALUES (?,?,?)", COLOR_ID, "Карамельный", "#A56B46");
         jdbc.update("INSERT INTO sizes(id,name,type,gender,region,sort_order) VALUES (?,?,?,?,?,?)", SIZE_ID, "M", "clothes", "female", "RU", 20);
         jdbc.update("INSERT INTO product_stock(product_id,size_id,color_id,quantity) VALUES (?,?,?,5)", PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("INSERT INTO stores(id,name,city,address,kind,active) VALUES (?,?,?,?,'STORE',TRUE) ON CONFLICT (id) DO NOTHING",
+                STORE_ID, "SUNSET Тестовый", "Нижний Новгород", "Большая Покровская, 34");
         jdbc.update("INSERT INTO location_stock(location_id,product_id,size_id,color_id,quantity) VALUES ('00000000-0000-4000-8000-000000000001',?,?,?,5)", PRODUCT_ID, SIZE_ID, COLOR_ID);
         jdbc.update("INSERT INTO loyalty_accounts(user_id,balance,lifetime_earned,tier) VALUES (?,?,?,?)", CUSTOMER_ID, 1000, 0, "SUNRISE");
     }
 
     @Test
-    void confirmsThenCancelsOrderWithCompleteCompensation() {
+    void assemblesThenCancelsOrderWithoutEarlyBonusCredit() {
         Map<String, Object> created = service.create(CUSTOMER_ID, order("checkout-complete", "WELCOME10", 500, 1, "CARD"));
         UUID orderId = (UUID) created.get("id");
 
@@ -90,10 +95,10 @@ class OrderPostgresIntegrationTest {
         assertThat(stock()).isEqualTo(4);
         assertThat(transactionCount("EARN")).isZero();
 
-        service.updateStatus(ADMIN_ID, orderId, "CONFIRMED");
+        service.updateStatus(ADMIN_ID, orderId, "ASSEMBLING");
 
-        assertThat(balance()).isEqualTo(655);
-        assertThat(transactionCount("EARN")).isEqualTo(1);
+        assertThat(balance()).isEqualTo(500);
+        assertThat(transactionCount("EARN")).isZero();
 
         Map<String, Object> cancelled = service.cancel(CUSTOMER_ID, orderId);
 
@@ -103,13 +108,58 @@ class OrderPostgresIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String.class, orderId)).isEqualTo("REFUNDED");
         assertThat(jdbc.queryForObject("SELECT status FROM stock_reservations WHERE order_id=?", String.class, orderId)).isEqualTo("RELEASED");
         assertThat(jdbc.queryForObject("SELECT usage_count FROM promotions WHERE code='WELCOME10'", Integer.class)).isZero();
-        assertThat(transactionCount("CANCEL_ADJUST")).isEqualTo(2);
+        assertThat(transactionCount("CANCEL_ADJUST")).isEqualTo(1);
 
         // Network retries and double clicks must not refund stock or bonuses twice.
         service.cancel(CUSTOMER_ID, orderId);
         assertThat(balance()).isEqualTo(1000);
         assertThat(stock()).isEqualTo(5);
-        assertThat(transactionCount("CANCEL_ADJUST")).isEqualTo(2);
+        assertThat(transactionCount("CANCEL_ADJUST")).isEqualTo(1);
+    }
+
+    @Test
+    void creditsBonusOnlyAfterDeliveryAndOnlyOnce() {
+        Map<String, Object> created = service.create(CUSTOMER_ID, order("delivered-bonus", null, 0, 1, "CARD"));
+        UUID orderId = (UUID) created.get("id");
+        int earned = ((Number) created.get("bonusesEarned")).intValue();
+
+        service.updateStatus(ADMIN_ID, orderId, "ASSEMBLING");
+        service.updateStatus(ADMIN_ID, orderId, "SHIPPED");
+        assertThat(jdbc.queryForObject("SELECT delivery_status FROM deliveries WHERE order_id=?", String.class, orderId))
+                .isEqualTo("ready_for_pickup");
+        assertThat(jdbc.queryForObject("SELECT tracking_number FROM deliveries WHERE order_id=?", String.class, orderId))
+                .isNull();
+        assertThat(balance()).isEqualTo(1000);
+        assertThat(transactionCount("EARN")).isZero();
+
+        service.updateStatus(ADMIN_ID, orderId, "DELIVERED");
+        service.updateStatus(ADMIN_ID, orderId, "DELIVERED");
+        assertThat(balance()).isEqualTo(1000 + earned);
+        assertThat(transactionCount("EARN")).isEqualTo(1);
+    }
+
+    @Test
+    void storeManagerSeesAndProcessesOnlyOwnPickupOrders() {
+        jdbc.update("INSERT INTO stores(id,name,city,address,kind,active) VALUES (?,?,?,?,'STORE',TRUE) ON CONFLICT (id) DO NOTHING",
+                OTHER_STORE_ID, "SUNSET Другой", "Нижний Новгород", "Другая улица, 1");
+        jdbc.update("INSERT INTO users(id,email,password,role) VALUES (?,?,?,'STAFF')",
+                STORE_MANAGER_ID, "manager@sunset.test", "hash");
+        jdbc.update("INSERT INTO iam_staff_role_assignments(user_id,role_code,location_id) VALUES (?,'STORE_MANAGER',?)",
+                STORE_MANAGER_ID, STORE_ID);
+
+        UUID ownOrder = (UUID) service.create(CUSTOMER_ID, order("own-store", null, 0, 1, "CARD")).get("id");
+        CreateOrderRequest otherRequest = new CreateOrderRequest("Иван Соколов", "customer@sunset.test", "+79990000001",
+                "SUNSET Другой, Нижний Новгород, Другая улица, 1", "pickup", "CARD",
+                "other-store", null, 0, OTHER_STORE_ID,
+                List.of(new OrderItemRequest(PRODUCT_ID, COLOR_ID, SIZE_ID, 1)));
+        UUID otherOrder = (UUID) service.create(CUSTOMER_ID, otherRequest).get("id");
+
+        assertThat(service.adminOrders(STORE_MANAGER_ID)).extracting(item -> item.get("id")).containsExactly(ownOrder);
+        assertThat(service.updateStatus(STORE_MANAGER_ID, ownOrder, "ASSEMBLING").get("status")).isEqualTo("ASSEMBLING");
+        assertThatThrownBy(() -> service.updateStatus(STORE_MANAGER_ID, otherOrder, "ASSEMBLING"))
+                .isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> service.updateStatus(STORE_MANAGER_ID, ownOrder, "CANCELLED"))
+                .isInstanceOf(SecurityException.class);
     }
 
     @Test
@@ -235,7 +285,7 @@ class OrderPostgresIntegrationTest {
     private CreateOrderRequest order(String key, String promoCode, int bonuses, int quantity, String paymentMethod) {
         return new CreateOrderRequest("Иван Соколов", "customer@sunset.test", "+79990000001",
                 "SUNSET Нижний Новгород, Большая Покровская, 34", "pickup", paymentMethod,
-                key, promoCode, bonuses, null, List.of(new OrderItemRequest(PRODUCT_ID, COLOR_ID, SIZE_ID, quantity)));
+                key, promoCode, bonuses, STORE_ID, List.of(new OrderItemRequest(PRODUCT_ID, COLOR_ID, SIZE_ID, quantity)));
     }
 
     private int balance() {

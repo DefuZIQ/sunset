@@ -114,6 +114,37 @@ class AuthPostgresIntegrationTest {
     }
 
     @Test
+    void adminAssignsPresetRoleWithoutCreatingAnOwner() {
+        UUID adminId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "admin-role@sunset.test", "initial-pass-123", "Анна", "Админ")).getUuid());
+        UUID staffId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "content-role@sunset.test", "initial-pass-123", "Иван", "Контент")).getUuid());
+        jdbc.update("UPDATE users SET role='ADMIN' WHERE id=?", adminId);
+        var adminAuth = new UsernamePasswordAuthenticationToken(adminId, null);
+        IamAccess access = new IamAccess(jdbc);
+
+        assertThatThrownBy(() -> iam.updateRole(adminAuth, staffId, new IamController.RoleUpdate("OWNER", null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> iam.updateRole(adminAuth, staffId, new IamController.RoleUpdate("ADMIN", null)))
+                .isInstanceOf(SecurityException.class);
+        iam.updateRole(adminAuth, staffId, new IamController.RoleUpdate("CONTENT_MARKETING", null));
+        assertThat(access.staffRole(staffId)).isEqualTo("CONTENT_MARKETING");
+        assertThat(access.permissions(staffId)).containsExactly("catalog:write", "promotions:manage", "reviews:moderate");
+        assertThatThrownBy(() -> access.require(staffId, "stock:write")).isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> iam.updatePermissions(adminAuth, staffId,
+                new IamController.PermissionUpdate(List.of("stock:write")))).isInstanceOf(IllegalArgumentException.class);
+
+        iam.updateRole(adminAuth, staffId, new IamController.RoleUpdate("CUSTOMER", null));
+        assertThat(access.staffRole(staffId)).isNull();
+        assertThat(access.permissions(staffId)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT role FROM users WHERE id=?", String.class, staffId)).isEqualTo("CUSTOMER");
+
+        jdbc.update("INSERT INTO iam_staff_role_assignments(user_id,role_code) VALUES (?,'OWNER')", adminId);
+        iam.updateRole(adminAuth, staffId, new IamController.RoleUpdate("ADMIN", null));
+        assertThat(jdbc.queryForObject("SELECT role FROM users WHERE id=?", String.class, staffId)).isEqualTo("ADMIN");
+    }
+
+    @Test
     void registrationAndLoginPersistCredentialsAndRole() {
         var registered = service.registerUser(new RegisterRequest("client@sunset.test", "initial-pass-123", "Иван", "Соколов"));
         UUID userId = UUID.fromString(registered.getUuid());
