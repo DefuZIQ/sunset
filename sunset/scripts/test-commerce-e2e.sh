@@ -79,6 +79,8 @@ export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_1_PREDICATES_0='Path=/products
 export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_2_ID=order-e2e
 export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_2_URI=http://127.0.0.1:8083
 export SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_ROUTES_2_PREDICATES_0='Path=/order/**'
+export AUTH_SESSION_VALIDATION_URL=http://127.0.0.1:8081/auth/session/validate
+export AUTH_ADMIN_SESSION_VALIDATION_URL=http://127.0.0.1:8081/auth/session/admin/validate
 start_service gateway backend/api-gateway/target/api-gateway.jar 8080
 
 maven_args=(--batch-mode -q -pl backend/order-service -am
