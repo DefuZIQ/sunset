@@ -853,7 +853,7 @@ test('admin order, return, promotion and bonus actions use versioned writes', as
       const response = path.endsWith('/bonuses') ? { userId: 'user-1', balance: 200, applied: 100 }
         : path.endsWith('/promotions') ? { id: 'promo-1', code: 'NEW10', title: 'Новинка', active: true }
           : path.includes('/returns/') ? { id: 'return-1', status: 'APPROVED' }
-            : { id: 'order-1', status: 'CONFIRMED' };
+            : { id: 'order-1', status: 'ASSEMBLING' };
       return route.fulfill({ status: method === 'POST' && path.endsWith('/promotions') ? 201 : 200, json: response });
     }
     const response = path.endsWith('/orders')
@@ -873,7 +873,7 @@ test('admin order, return, promotion and bonus actions use versioned writes', as
   await page.goto('/admin/');
   await expect(page.getByText('2 товаров · 1 клиентов')).toBeVisible();
   await openAdminSection(page, 'Заказы');
-  await page.locator('.admin-table select').selectOption('CONFIRMED');
+  await page.locator('.admin-table select').selectOption('ASSEMBLING');
   await expect.poll(() => writes.length).toBe(1);
   await openAdminSection(page, 'Возвраты');
   await page.locator('.admin-table select').selectOption('APPROVED');
@@ -894,7 +894,7 @@ test('admin order, return, promotion and bonus actions use versioned writes', as
     ['POST', '/api/v1/order/admin/promotions'],
     ['POST', '/api/v1/order/admin/users/user-1/bonuses'],
   ]);
-  expect(writes[0].body).toEqual({ status: 'CONFIRMED' });
+  expect(writes[0].body).toEqual({ status: 'ASSEMBLING' });
   expect(writes[1].body).toEqual({ status: 'APPROVED' });
   expect(writes[2].body).toMatchObject({ code: 'NEW10', title: 'Новинка', discountPercent: 10 });
   expect(writes[3].body).toMatchObject({ amount: 100 });
@@ -1491,24 +1491,24 @@ test('staff sees only IAM-authorized administration sections', async ({ page }) 
   await expect(page.locator('.admin-tabs').getByRole('button', { name: 'Доступ' })).toHaveCount(0);
 });
 
-test('admin assigns a limited permission to an existing account', async ({ page }) => {
+test('admin assigns a warehouse role scoped to one location', async ({ page }) => {
   const userId = '77777777-7777-7777-7777-777777777777';
   let saved = null;
   await page.route('**/api/v1/order/admin/users', (route) => route.fulfill({ json: [{ id: userId, email: 'staff@example.test', firstName: 'Иван', lastName: 'Сотрудник', role: 'CUSTOMER', orderCount: 0, orderTotal: 0, bonusBalance: 0 }] }));
-  await page.route(`**/api/v1/auth/iam/staff/${userId}/permissions`, async (route) => {
-    if (route.request().method() === 'PUT') {
-      saved = route.request().postDataJSON();
-      await route.fulfill({ json: { role: 'STAFF', permissions: saved.permissions } });
-    } else await route.fulfill({ json: { role: 'CUSTOMER', permissions: [] } });
+  await page.route(`**/api/v1/auth/iam/staff/${userId}/permissions`, (route) => route.fulfill({ json: { role: 'CUSTOMER', staffRole: null, locationId: null, permissions: [] } }));
+  await page.route(`**/api/v1/auth/iam/staff/${userId}/role`, async (route) => {
+    saved = route.request().postDataJSON();
+    await route.fulfill({ json: { role: 'STAFF', staffRole: saved.roleCode, locationId: saved.locationId, permissions: ['stock:write'] } });
   });
   await setAdminCookie(page);
   await page.goto('/admin/');
   await openAdminSection(page, 'Доступ');
   await page.getByLabel('Учётная запись').selectOption(userId);
-  await page.getByLabel('Остатки магазинов и склада').check();
-  await page.getByRole('button', { name: 'Сохранить права' }).click();
-  await expect(page.getByText('Права сотрудника сохранены. Изменения действуют сразу.')).toBeVisible();
-  expect(saved).toEqual({ permissions: ['stock:write'] });
+  await page.getByLabel('Новая роль').selectOption('WAREHOUSE_ADMIN');
+  await page.getByLabel('Склад', { exact: true }).selectOption('warehouse-1');
+  await page.getByRole('button', { name: 'Назначить роль' }).click();
+  await expect(page.getByText('Роль сохранена. Прежние сеансы завершены; сотруднику нужно войти заново.')).toBeVisible();
+  expect(saved).toEqual({ roleCode: 'WAREHOUSE_ADMIN', locationId: 'warehouse-1' });
 });
 
 test('admin has a separate session from the storefront account', async ({ page }) => {

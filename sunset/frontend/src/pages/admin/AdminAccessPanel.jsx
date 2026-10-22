@@ -74,7 +74,7 @@ export default function AdminAccessPanel({ users, locations = [], onSaved, canMa
             {roleCode === "LEGACY" && <option value="LEGACY">Выберите роль вместо индивидуальных прав</option>}
             {Object.entries(roleLabels).filter(([code]) => code !== "ADMIN" || canManageAdmins).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
           </select></label>
-          {scoped && <label>{roleCode === "WAREHOUSE_ADMIN" ? "Склад" : "Магазин"}<select value={locationId} onChange={(event) => setLocationId(event.target.value)} disabled={loading} required>
+          {scoped && <label>{roleCode === "WAREHOUSE_ADMIN" ? "Склад" : "Магазин"}<select aria-label={roleCode === "WAREHOUSE_ADMIN" ? "Склад" : "Магазин"} value={locationId} onChange={(event) => setLocationId(event.target.value)} disabled={loading} required>
             <option value="">Выберите точку</option>
             {eligibleLocations.map((location) => <option key={location.id} value={location.id}>{location.name} · {location.city}</option>)}
           </select></label>}
