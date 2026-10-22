@@ -11,6 +11,8 @@ if ($spec.openapi -ne '3.0.3' -or $spec.servers[0].url -ne '/api/v1') {
 
 $controllerSources = @{
     '/auth' = 'backend/auth-service/src/main/java/com/sunset/auth/controller/AuthController.java'
+    '/auth/mfa' = 'backend/auth-service/src/main/java/com/sunset/auth/controller/MfaController.java'
+    '/auth/iam' = 'backend/auth-service/src/main/java/com/sunset/auth/controller/IamController.java'
     '/auth/addresses' = 'backend/auth-service/src/main/java/com/sunset/auth/controller/CustomerAddressController.java'
     '/products' = 'backend/product-service/src/main/java/com/sunset/product/controller/ProductController.java'
     '/order' = 'backend/order-service/src/main/java/com/sunset/product/controller/OrderController.java'
@@ -20,7 +22,8 @@ $controllerSources = @{
 }
 $publicRoutes = @(
     'POST /auth/register', 'POST /auth/login',
-    'GET /products/all', 'GET /products/all/availability', 'POST /products/by-uuid',
+    'POST /auth/mfa/login', 'POST /auth/mfa/setup/start', 'POST /auth/mfa/setup/confirm',
+    'GET /products/all', 'GET /products/search', 'GET /products/all/availability', 'POST /products/by-uuid',
     'GET /products/categories/tree', 'GET /products/reviews/{id}', 'GET /products/reviews/{id}/comments', 'GET /products/review-photos/{id}',
     'GET /order/promotions', 'GET /order/stores', 'POST /subscriptions'
 )
@@ -53,8 +56,10 @@ foreach ($routePath in $spec.paths.Keys) {
         $key = "$($method.ToUpper()) $routePath"
         if ($key -in $publicRoutes) {
             if ($operation.security) { throw "Public operation marked protected: $key" }
-        } elseif (-not $operation.security -or -not $operation.security[0].Contains('bearerAuth')) {
-            throw "Protected operation lacks Bearer security: $key"
+        } elseif (-not $operation.security -or -not (@($operation.security | Where-Object {
+            $_.Contains('bearerAuth') -or $_.Contains('adminCookie')
+        }).Count)) {
+            throw "Protected operation lacks Bearer or admin-cookie security: $key"
         }
         if ($routePath -match '\{id\}' -and
             -not (@($spec.paths[$routePath].parameters | Where-Object {
