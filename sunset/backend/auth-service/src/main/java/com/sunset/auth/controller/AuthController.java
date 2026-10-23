@@ -44,6 +44,11 @@ public class AuthController {
         return authService.loginUser(loginRequest);
     }
 
+    @PostMapping("/staff/login")
+    public AuthResponse staffLogin(@RequestBody LoginRequest loginRequest) {
+        return authService.loginStaff(loginRequest);
+    }
+
     @GetMapping("/profile")
     public UserDTO profile(Authentication authentication) {
         return authService.getProfile((UUID) authentication.getPrincipal());

@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { ADMIN_COOKIE_SESSION, adjustAdminBonuses, cancelMyOrder, changePassword, countUnreadNotifications, createAdminProduct, createAdminPromotion, createCustomerAddress, createOrder, createOrderReturn, deleteAdminProduct, deleteCustomerAddress, deleteOwnProductReview, getAdminSession, getCategoryTree,
   getAddressGeocoderStatus, getAdminAnalytics, getLoyaltyAccount, getMyOrder, getProductById, getSubscriptionStatus, listAdminOrders,
   listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listMyOrders,
-  listAdminReviews, listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, lookupAddress,
+  listAdminReviews, listCustomerAddresses, listNotifications, listProductReviews, listProducts, listPromotions, loginCustomer, loginStaff, lookupAddress,
     markNotificationRead, markProductReviewHelpful, moderateAdminReview, quoteDelivery, registerCustomer, saveAdminReviewReply, saveProductReview, voteProductReview,
   subscribeNewsletter, unsubscribeNewsletter, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock, updatePendingOrder, updateProfile,
   updateCustomerAddress, uploadProductReviewPhoto, validatePromoCode, getProfile, syncCustomerAddresses, revokeSession,
@@ -471,6 +471,17 @@ test("registration and login use versioned public routes without bearer tokens",
   expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/auth/login", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: registered.email, password: "long-password" }),
+  });
+});
+
+test("staff login uses its own route without a bearer token", async () => {
+  const challenge = { token: null, mfaRequired: true, challengeToken: "one-time" };
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => challenge });
+  vi.stubGlobal("fetch", fetchMock);
+  const credentials = { email: "staff@example.test", password: "staff-password" };
+  await expect(loginStaff(credentials)).resolves.toEqual(challenge);
+  expect(fetchMock).toHaveBeenCalledWith("/api/v1/auth/staff/login", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(credentials),
   });
 });
 

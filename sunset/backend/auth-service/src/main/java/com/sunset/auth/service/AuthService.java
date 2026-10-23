@@ -55,17 +55,33 @@ public class AuthService {
 
     @Transactional
     public AuthResponse loginUser(LoginRequest request) {
+        return login(request, false);
+    }
+
+    @Transactional
+    public AuthResponse loginStaff(LoginRequest request) {
+        return login(request, true);
+    }
+
+    private AuthResponse login(LoginRequest request, boolean staffOnly) {
         Optional<User> optionalUser = userRepository.findByEmail(request.getEmail());
         if (optionalUser.isEmpty()) {
+            if (staffOnly) throw new InvalidPasswordException("Неверные данные для входа сотрудника");
             throw new UserNotFoundException("User with email " + request.getEmail() + " not found");
         }
 
         User user = optionalUser.get();
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            if (staffOnly) throw new InvalidPasswordException("Неверные данные для входа сотрудника");
             throw new InvalidPasswordException("Invalid password for user " + request.getEmail());
         }
 
-        if ("ADMIN".equalsIgnoreCase(user.getRole()) || "STAFF".equalsIgnoreCase(user.getRole())) {
+        boolean staff = "ADMIN".equalsIgnoreCase(user.getRole()) || "STAFF".equalsIgnoreCase(user.getRole());
+        if (staffOnly && !staff) {
+            throw new InvalidPasswordException("Неверные данные для входа сотрудника");
+        }
+
+        if (staff) {
             AuthResponse challenge = new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(),
                     user.getLastName(), user.getPhone(), user.getRole(), null);
             if (mfa.enabled(user.getId())) {

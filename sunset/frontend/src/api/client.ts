@@ -164,6 +164,12 @@ export async function loginCustomer(request: LoginRequest): Promise<MfaLoginResp
   }));
 }
 
+export async function loginStaff(request: LoginRequest): Promise<MfaLoginResponse> {
+  return readJson<MfaLoginResponse>(await fetch("/api/v1/auth/staff/login", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request),
+  }));
+}
+
 export async function verifyMfaLogin(challengeToken: string, code: string): Promise<AuthResponse> {
   return readJson<AuthResponse>(await fetch("/api/v1/auth/mfa/login", {
     method: "POST", headers: { "Content-Type": "application/json" },

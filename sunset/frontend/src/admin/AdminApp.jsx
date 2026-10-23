@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { HashRouter } from "react-router-dom";
 import Admin from "../pages/Admin";
 import ErrorBoundary from "../components/ErrorBoundary";
-import { ADMIN_COOKIE_SESSION, ApiHttpError, getAdminSession, getIamIdentity, loginCustomer, revokeSession, setAdminCsrfToken, verifyMfaLogin } from "../api/client";
+import { ADMIN_COOKIE_SESSION, ApiHttpError, getAdminSession, getIamIdentity, loginStaff, revokeSession, setAdminCsrfToken, verifyMfaLogin } from "../api/client";
 import AdminMfaPanel from "./AdminMfaPanel";
 import AdminMfaSetup from "./AdminMfaSetup";
 import { storefrontUrl } from "./adminUrls";
@@ -40,7 +40,7 @@ export default function AdminApp() {
     setBusy(true);
     setMessage("");
     try {
-      const result = await loginCustomer({ email, password });
+      const result = await loginStaff({ email, password });
       if (result.mfaRequired && result.challengeToken) {
         setChallengeToken(result.challengeToken);
         setPassword("");

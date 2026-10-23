@@ -566,7 +566,7 @@ test('expired session is cleared after the versioned profile rejects it', async 
 });
 
 test('admin login requires a second factor before saving a session', async ({ page }) => {
-  await page.route('**/api/v1/auth/login', (route) => route.fulfill({ json: {
+  await page.route('**/api/v1/auth/staff/login', (route) => route.fulfill({ json: {
     token: null, mfaRequired: true, challengeToken: 'one-time-challenge', role: 'ADMIN',
   } }));
   await page.route('**/api/v1/auth/mfa/login', (route) => {
@@ -589,7 +589,7 @@ test('admin login requires a second factor before saving a session', async ({ pa
 });
 
 test('admin without MFA must finish setup and save recovery codes before entering', async ({ page }) => {
-  await page.route('**/api/v1/auth/login', (route) => route.fulfill({ json: {
+  await page.route('**/api/v1/auth/staff/login', (route) => route.fulfill({ json: {
     token: null, mfaEnrollmentRequired: true, setupToken: 'setup-challenge', role: 'ADMIN',
   } }));
   await page.route('**/api/v1/auth/mfa/setup/start', (route) => {
@@ -1512,7 +1512,7 @@ test('admin assigns a warehouse role scoped to one location', async ({ page }) =
 });
 
 test('admin has a separate session from the storefront account', async ({ page }) => {
-  await page.route('**/api/v1/auth/login', (route) => route.fulfill({ json: {
+  await page.route('**/api/v1/auth/staff/login', (route) => route.fulfill({ json: {
     uuid: '44444444-4444-4444-4444-444444444444', email: 'admin@example.test', role: 'ADMIN', token: null,
     mfaRequired: true, challengeToken: 'challenge',
   } }));

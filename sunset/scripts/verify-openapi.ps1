@@ -21,7 +21,7 @@ $controllerSources = @{
     '/subscriptions' = 'backend/notification-service/src/main/java/com/sunset/notification/NewsletterController.java'
 }
 $publicRoutes = @(
-    'POST /auth/register', 'POST /auth/login',
+    'POST /auth/register', 'POST /auth/login', 'POST /auth/staff/login',
     'POST /auth/mfa/login', 'POST /auth/mfa/setup/start', 'POST /auth/mfa/setup/confirm',
     'GET /products/all', 'GET /products/search', 'GET /products/all/availability', 'POST /products/by-uuid',
     'GET /products/categories/tree', 'GET /products/reviews/{id}', 'GET /products/reviews/{id}/comments', 'GET /products/review-photos/{id}',

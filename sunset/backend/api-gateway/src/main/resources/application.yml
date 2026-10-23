@@ -67,6 +67,7 @@ security:
     - /assistant/chat
     - /auth/register
     - /auth/login
+    - /auth/staff/login
     - /auth/mfa/login
     - /auth/mfa/setup/start
     - /auth/mfa/setup/confirm

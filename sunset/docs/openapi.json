@@ -25,6 +25,13 @@
         "responses": { "200": { "description": "Клиенту выдан JWT; сотруднику возвращён TOTP- или setup-challenge без JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
+    "/auth/staff/login": {
+      "post": {
+        "tags": ["Auth", "Administration"], "operationId": "loginStaff", "summary": "Отдельный вход сотрудника с обязательным MFA",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
+        "responses": { "200": { "description": "TOTP- или setup-challenge без JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
     "/auth/session/validate": {
       "get": {
         "tags": ["Auth"], "operationId": "validateSession", "summary": "Проверить действующий сеанс", "security": [{ "bearerAuth": [] }],

@@ -192,6 +192,25 @@ class AuthPostgresIntegrationTest {
     }
 
     @Test
+    void dedicatedStaffLoginRejectsCustomerAndRequiresMfa() {
+        UUID customerId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "realm-customer@sunset.test", "initial-pass-123", "Иван", "Клиент")).getUuid());
+        UUID staffId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "realm-staff@sunset.test", "initial-pass-123", "Анна", "Сотрудник")).getUuid());
+        jdbc.update("UPDATE users SET role='STAFF' WHERE id=?", staffId);
+
+        assertThatThrownBy(() -> service.loginStaff(new LoginRequest(
+                "realm-customer@sunset.test", "initial-pass-123"))).isInstanceOf(InvalidPasswordException.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM auth_sessions WHERE user_id=?", Integer.class, customerId))
+                .isZero();
+        assertThatThrownBy(() -> service.loginStaff(new LoginRequest(
+                "absent@sunset.test", "initial-pass-123"))).isInstanceOf(InvalidPasswordException.class);
+        var challenge = service.loginStaff(new LoginRequest("realm-staff@sunset.test", "initial-pass-123"));
+        assertThat(challenge.isMfaEnrollmentRequired()).isTrue();
+        assertThat(challenge.getToken()).isNull();
+    }
+
+    @Test
     void profileAndPasswordChangesSurviveDatabaseReload() {
         UUID userId = UUID.fromString(service.registerUser(
                 new RegisterRequest("profile@sunset.test", "initial-pass-123", "Анна", "Иванова")).getUuid());
