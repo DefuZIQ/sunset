@@ -69,8 +69,10 @@ class CommerceHttpJourneyIT {
             }
             String customerToken = login(base, customerEmail);
             String adminToken = enrollAdmin(base, adminEmail);
-            assertThat(request(base, "POST", "/auth/login", null,
+            assertThat(request(base, "POST", "/auth/staff/login", null,
                     loginBody(adminEmail), 200).path("role").asText()).isEqualTo("ADMIN");
+            assertThat(request(base, "POST", "/auth/login", null,
+                    loginBody(adminEmail), 401).path("code").asText()).isEqualTo("INVALID_CREDENTIALS");
             assertThat(request(base, "POST", "/auth/login", null,
                     loginBody(customerEmail).put("password", "incorrect"), 401)
                     .path("code").asText()).isEqualTo("INVALID_CREDENTIALS");
@@ -175,7 +177,7 @@ class CommerceHttpJourneyIT {
     }
 
     private String enrollAdmin(URI base, String email) throws Exception {
-        JsonNode challenge = request(base, "POST", "/auth/login", null, loginBody(email), 200);
+        JsonNode challenge = request(base, "POST", "/auth/staff/login", null, loginBody(email), 200);
         assertThat(challenge.path("mfaEnrollmentRequired").asBoolean()).isTrue();
         String setupToken = challenge.path("setupToken").asText();
         assertThat(setupToken).isNotBlank();
