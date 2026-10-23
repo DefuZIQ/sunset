@@ -56,7 +56,14 @@ public class AuthSessionService {
                          (s.mfa_verified AND EXISTS
                           (SELECT 1 FROM mfa_totp f WHERE f.user_id=u.id AND f.enabled))))
                     """, Boolean.class, sessionId, userId);
-            return Boolean.TRUE.equals(active) ? userId : null;
+            if (!Boolean.TRUE.equals(active)) return null;
+            String realm = claims.get("realm", String.class);
+            if (realm == null) return userId; // Existing tokens expire under their original policy.
+            List<String> roles = jdbc.query("SELECT role FROM users WHERE id=?",
+                    (rs, row) -> rs.getString(1), userId);
+            if (roles.isEmpty()) return null;
+            boolean staff = "ADMIN".equalsIgnoreCase(roles.get(0)) || "STAFF".equalsIgnoreCase(roles.get(0));
+            return (staff && "STAFF".equals(realm)) || (!staff && "CUSTOMER".equals(realm)) ? userId : null;
         } catch (IllegalArgumentException exception) {
             return null;
         }
@@ -72,6 +79,8 @@ public class AuthSessionService {
     public boolean isElevatedSession(String token, UUID userId) {
         Claims claims = jwt.parse(token);
         if (claims == null || claims.getId() == null || !userId.toString().equals(claims.getSubject())) return false;
+        String realm = claims.get("realm", String.class);
+        if (realm != null && !"STAFF".equals(realm)) return false;
         try {
             Boolean active = jdbc.queryForObject("""
                     SELECT EXISTS(SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.user_id

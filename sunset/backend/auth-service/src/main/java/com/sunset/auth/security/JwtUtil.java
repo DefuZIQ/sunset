@@ -26,11 +26,13 @@ public class JwtUtil {
     }
 
     public String generateToken(UUID userId, String role) {
-        long expiration = "ADMIN".equalsIgnoreCase(role) || "STAFF".equalsIgnoreCase(role)
+        boolean staff = "ADMIN".equalsIgnoreCase(role) || "STAFF".equalsIgnoreCase(role);
+        long expiration = staff
                 ? STAFF_EXPIRATION : CUSTOMER_EXPIRATION;
         long now = System.currentTimeMillis();
         return Jwts.builder()
                 .setSubject(userId.toString())
+                .claim("realm", staff ? "STAFF" : "CUSTOMER")
                 .setId(UUID.randomUUID().toString())
                 .setIssuedAt(new Date(now))
                 .setExpiration(new Date(now + expiration))

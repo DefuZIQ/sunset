@@ -185,6 +185,7 @@ class AuthPostgresIntegrationTest {
 
         var login = service.loginUser(new LoginRequest("client@sunset.test", "initial-pass-123"));
         assertThat(jwt.extractUserId(login.getToken())).isEqualTo(userId);
+        assertThat(jwt.parse(login.getToken()).get("realm", String.class)).isEqualTo("CUSTOMER");
         assertThatThrownBy(() -> service.registerUser(new RegisterRequest("client@sunset.test", "another-pass", "Иван", "Соколов")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Этот email уже используется");
@@ -208,6 +209,10 @@ class AuthPostgresIntegrationTest {
         var challenge = service.loginStaff(new LoginRequest("realm-staff@sunset.test", "initial-pass-123"));
         assertThat(challenge.isMfaEnrollmentRequired()).isTrue();
         assertThat(challenge.getToken()).isNull();
+
+        String mismatched = jwt.generateToken(customerId, "STAFF");
+        sessions.record(mismatched, customerId);
+        assertThat(sessions.authenticatedUser(mismatched)).isNull();
     }
 
     @Test
@@ -275,6 +280,7 @@ class AuthPostgresIntegrationTest {
                 .auth().getToken();
         assertThat(jwt.parse(token).getExpiration().getTime() - jwt.parse(token).getIssuedAt().getTime())
                 .isEqualTo(15 * 60 * 1000L);
+        assertThat(jwt.parse(token).get("realm", String.class)).isEqualTo("STAFF");
         assertThat(sessions.authenticatedUser(token)).isEqualTo(userId);
         assertThat(sessions.isElevatedSession(token, userId)).isTrue();
     }
