@@ -74,7 +74,9 @@ class AuthServiceTest {
         when(repository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         when(mfa.beginSetupChallenge(id)).thenReturn("setup-challenge");
 
-        var response = service.loginUser(new LoginRequest(user.getEmail(), "secret123"));
+        assertThrows(InvalidPasswordException.class,
+                () -> service.loginUser(new LoginRequest(user.getEmail(), "secret123")));
+        var response = service.loginStaff(new LoginRequest(user.getEmail(), "secret123"));
 
         assertTrue(response.isMfaEnrollmentRequired());
         assertEquals("setup-challenge", response.getSetupToken());

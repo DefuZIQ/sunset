@@ -200,6 +200,9 @@ class AuthPostgresIntegrationTest {
                 "realm-staff@sunset.test", "initial-pass-123", "Анна", "Сотрудник")).getUuid());
         jdbc.update("UPDATE users SET role='STAFF' WHERE id=?", staffId);
 
+        assertThatThrownBy(() -> service.loginUser(new LoginRequest(
+                "realm-staff@sunset.test", "initial-pass-123"))).isInstanceOf(InvalidPasswordException.class);
+
         assertThatThrownBy(() -> service.loginStaff(new LoginRequest(
                 "realm-customer@sunset.test", "initial-pass-123"))).isInstanceOf(InvalidPasswordException.class);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM auth_sessions WHERE user_id=?", Integer.class, customerId))
@@ -269,7 +272,7 @@ class AuthPostgresIntegrationTest {
         UUID userId = UUID.fromString(service.registerUser(new RegisterRequest(
                 "staff-session@sunset.test", "initial-pass-123", "Иван", "Сотрудник")).getUuid());
         jdbc.update("UPDATE users SET role='STAFF' WHERE id=?", userId);
-        var setup = service.loginUser(new LoginRequest("staff-session@sunset.test", "initial-pass-123"));
+        var setup = service.loginStaff(new LoginRequest("staff-session@sunset.test", "initial-pass-123"));
         assertThat(setup.getToken()).isNull();
         assertThat(setup.isMfaEnrollmentRequired()).isTrue();
         var enrollment = mfa.startSetup(setup.getSetupToken());
@@ -290,7 +293,7 @@ class AuthPostgresIntegrationTest {
         UUID userId = UUID.fromString(service.registerUser(new RegisterRequest(
                 "cookie-admin@sunset.test", "initial-pass-123", "Иван", "Админ")).getUuid());
         jdbc.update("UPDATE users SET role='ADMIN' WHERE id=?", userId);
-        var setup = service.loginUser(new LoginRequest("cookie-admin@sunset.test", "initial-pass-123"));
+        var setup = service.loginStaff(new LoginRequest("cookie-admin@sunset.test", "initial-pass-123"));
         mfa.startSetup(setup.getSetupToken());
         byte[] secret = new MfaSecretCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
                 .decrypt(jdbc.queryForObject("SELECT secret_ciphertext FROM mfa_totp WHERE user_id=?", String.class, userId), userId);
@@ -318,7 +321,7 @@ class AuthPostgresIntegrationTest {
         String oldToken = jwt.generateToken(adminId, "ADMIN");
         sessions.record(oldToken, adminId);
         assertThat(sessions.authenticatedUser(oldToken)).isNull();
-        var setup = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        var setup = service.loginStaff(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
         assertThat(setup.isMfaEnrollmentRequired()).isTrue();
         assertThat(setup.getToken()).isNull();
         var enrollment = mfa.startSetup(setup.getSetupToken());
@@ -334,7 +337,7 @@ class AuthPostgresIntegrationTest {
         assertThat(sessions.authenticatedUser(completed.auth().getToken())).isEqualTo(adminId);
         assertThat(mfa.confirmSetup(setup.getSetupToken(), TotpCodes.at(secret, Instant.now().getEpochSecond()))).isNull();
 
-        var challenge = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        var challenge = service.loginStaff(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
         assertThat(challenge.isMfaRequired()).isTrue();
         assertThat(challenge.getToken()).isNull();
         String nextCode = TotpCodes.at(secret, (Instant.now().getEpochSecond() / 30 + 1) * 30);
@@ -343,19 +346,19 @@ class AuthPostgresIntegrationTest {
         assertThat(sessions.authenticatedUser(verified.getToken())).isEqualTo(adminId);
         assertThat(mfa.verifyLogin(challenge.getChallengeToken(), nextCode)).isNull();
 
-        var replayChallenge = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        var replayChallenge = service.loginStaff(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
         assertThat(mfa.verifyLogin(replayChallenge.getChallengeToken(), nextCode)).isNull();
-        var supersedingChallenge = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        var supersedingChallenge = service.loginStaff(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
         assertThat(mfa.verifyLogin(replayChallenge.getChallengeToken(), recovery.get(0))).isNull();
         assertThat(mfa.verifyLogin(supersedingChallenge.getChallengeToken(), recovery.get(0))).isNotNull();
         assertThat(mfa.recoveryCodesRemaining(adminId)).isEqualTo(7);
 
-        var recoveryChallenge = service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
+        var recoveryChallenge = service.loginStaff(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"));
         var recovered = mfa.verifyLogin(recoveryChallenge.getChallengeToken(), recovery.get(2));
         assertThat(recovered).isNotNull();
         assertThat(mfa.recoveryCodesRemaining(adminId)).isEqualTo(6);
         assertThat(sessions.authenticatedUser(recovered.getToken())).isEqualTo(adminId);
-        assertThat(service.loginUser(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"))
+        assertThat(service.loginStaff(new LoginRequest("mfa-admin@sunset.test", "initial-pass-123"))
                 .isMfaRequired()).isTrue();
     }
 

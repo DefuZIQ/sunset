@@ -80,6 +80,9 @@ public class AuthService {
         if (staffOnly && !staff) {
             throw new InvalidPasswordException("Неверные данные для входа сотрудника");
         }
+        if (!staffOnly && staff) {
+            throw new InvalidPasswordException("Используйте вход для сотрудников");
+        }
 
         if (staff) {
             AuthResponse challenge = new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(),
