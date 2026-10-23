@@ -145,6 +145,36 @@ class AuthPostgresIntegrationTest {
     }
 
     @Test
+    void accessAuditIsVisibleOnlyToAdminAndCanBeFiltered() {
+        UUID adminId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "audit-admin@sunset.test", "initial-pass-123", "Анна", "Админ")).getUuid());
+        UUID staffId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "audit-staff@sunset.test", "initial-pass-123", "Иван", "Сотрудник")).getUuid());
+        UUID otherId = UUID.fromString(service.registerUser(new RegisterRequest(
+                "audit-other@sunset.test", "initial-pass-123", "Мария", "Покупатель")).getUuid());
+        jdbc.update("UPDATE users SET role='ADMIN' WHERE id=?", adminId);
+        var adminAuth = new UsernamePasswordAuthenticationToken(adminId, null);
+        var staffAuth = new UsernamePasswordAuthenticationToken(staffId, null);
+
+        iam.updateRole(adminAuth, staffId, new IamController.RoleUpdate("CONTENT_MARKETING", null));
+        iam.updatePermissions(adminAuth, otherId, new IamController.PermissionUpdate(List.of("stock:write")));
+
+        assertThatThrownBy(() -> iam.audit(staffAuth, 0, null)).isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> iam.audit(adminAuth, -1, null)).isInstanceOf(IllegalArgumentException.class);
+        var all = iam.audit(adminAuth, 0, null);
+        assertThat((List<?>) all.get("items")).hasSize(2);
+        assertThat(all.get("hasMore")).isEqualTo(false);
+        var filtered = iam.audit(adminAuth, 0, staffId);
+        assertThat((List<?>) filtered.get("items")).hasSize(1);
+        @SuppressWarnings("unchecked")
+        var event = (java.util.Map<String, Object>) ((List<?>) filtered.get("items")).get(0);
+        assertThat(event.get("actorEmail")).isEqualTo("audit-admin@sunset.test");
+        assertThat(event.get("targetEmail")).isEqualTo("audit-staff@sunset.test");
+        assertThat(event.get("newPermissions")).isEqualTo("CONTENT_MARKETING");
+        assertThat((List<?>) iam.audit(adminAuth, 1, staffId).get("items")).isEmpty();
+    }
+
+    @Test
     void registrationAndLoginPersistCredentialsAndRole() {
         var registered = service.registerUser(new RegisterRequest("client@sunset.test", "initial-pass-123", "Иван", "Соколов"));
         UUID userId = UUID.fromString(registered.getUuid());

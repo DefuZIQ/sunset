@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ADMIN_COOKIE_SESSION, getIamUserPermissions, updateIamUserRole } from "../../api/client";
+import { ADMIN_COOKIE_SESSION, getIamAudit, getIamUserPermissions, updateIamUserRole } from "../../api/client";
 
 const roleLabels = {
   CUSTOMER: "Покупатель — без доступа к админке",
@@ -14,6 +14,44 @@ const permissionLabels = {
   "customers:read": "Клиенты", "customers:bonuses:write": "Бонусы", "stores:manage": "Магазины",
 };
 
+function accessLabel(value) {
+  if (!value) return "Нет доступа";
+  const [role, scope] = value.split(":");
+  if (roleLabels[role]) return `${roleLabels[role]}${scope ? ` · ${scope}` : ""}`;
+  return value.split(",").map((permission) => permissionLabels[permission] || permission).join(", ");
+}
+
+function AccessAudit({ targetId, refreshKey }) {
+  const [page, setPage] = useState(0);
+  const [result, setResult] = useState({ items: [], hasMore: false });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => { setPage(0); }, [targetId]);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    getIamAudit(ADMIN_COOKIE_SESSION, page, targetId || undefined)
+      .then((data) => { if (active) setResult(data); })
+      .catch((failure) => { if (active) setError(failure.message || "Не удалось загрузить журнал"); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [page, targetId, refreshKey]);
+
+  return <div className="admin-iam__audit">
+    <div className="admin-iam__audit-heading"><div><h3>История изменений доступа</h3><p>{targetId ? "Записи выбранной учётной записи" : "Последние изменения всех сотрудников"}</p></div><button type="button" onClick={() => setPage(0)} disabled={loading || page === 0}>К последним</button></div>
+    {error && <p role="alert">{error}</p>}
+    {loading ? <p role="status">Загружаем историю…</p> : !error && !result.items.length ? <p>Изменений пока нет.</p> : null}
+    {!loading && !error && result.items.length > 0 && <ol className="admin-iam__audit-list">{result.items.map((event) => <li key={event.id}>
+      <div><strong>{event.targetEmail || "Удалённая учётная запись"}</strong><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString("ru-RU")}</time></div>
+      <p>{accessLabel(event.oldPermissions)} <span aria-hidden="true">→</span> {accessLabel(event.newPermissions)}</p>
+      <small>Изменил: {event.actorEmail || "Удалённая учётная запись"}</small>
+    </li>)}</ol>}
+    <div className="admin-iam__audit-pages"><button type="button" disabled={loading || page === 0} onClick={() => setPage((current) => current - 1)}>Назад</button><span>Страница {page + 1}</span><button type="button" disabled={loading || !result.hasMore} onClick={() => setPage((current) => current + 1)}>Далее</button></div>
+  </div>;
+}
+
 export default function AdminAccessPanel({ users, locations = [], onSaved, canManageAdmins = false }) {
   const [userId, setUserId] = useState("");
   const [current, setCurrent] = useState(null);
@@ -21,6 +59,7 @@ export default function AdminAccessPanel({ users, locations = [], onSaved, canMa
   const [locationId, setLocationId] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [auditRefresh, setAuditRefresh] = useState(0);
   const scoped = roleCode === "WAREHOUSE_ADMIN" || roleCode === "STORE_MANAGER";
   const eligibleLocations = useMemo(() => locations.filter((location) =>
     location.active !== false && location.kind === (roleCode === "WAREHOUSE_ADMIN" ? "WAREHOUSE" : "STORE")), [locations, roleCode]);
@@ -53,6 +92,7 @@ export default function AdminAccessPanel({ users, locations = [], onSaved, canMa
       const result = await updateIamUserRole(ADMIN_COOKIE_SESSION, userId, roleCode, scoped ? locationId : null);
       setCurrent(result);
       setMessage("Роль сохранена. Прежние сеансы завершены; сотруднику нужно войти заново.");
+      setAuditRefresh((current) => current + 1);
       onSaved?.();
     } catch (error) { setMessage(error.message || "Не удалось сохранить роль"); }
     finally { setLoading(false); }
@@ -84,5 +124,6 @@ export default function AdminAccessPanel({ users, locations = [], onSaved, canMa
       </>}
     </form>
     {message && <p role="status">{message}</p>}
+    <AccessAudit targetId={userId} refreshKey={auditRefresh} />
   </section>;
 }

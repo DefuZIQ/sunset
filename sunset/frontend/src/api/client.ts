@@ -196,6 +196,14 @@ export async function getProfile(token: string): Promise<UserProfile> {
 }
 
 export type IamIdentity = { role: string; staffRole?: string | null; locationId?: string | null; permissions: string[] };
+export type IamAuditEvent = { id: string; actorId: string | null; actorEmail: string | null; targetId: string | null; targetEmail: string | null; oldPermissions: string; newPermissions: string; occurredAt: string };
+export type IamAuditPage = { items: IamAuditEvent[]; page: number; hasMore: boolean };
+
+export async function getIamAudit(token: string, page = 0, targetId?: string): Promise<IamAuditPage> {
+  const query = new URLSearchParams({ page: String(page) });
+  if (targetId) query.set("targetId", targetId);
+  return readJson<IamAuditPage>(await fetch(`/api/v1/auth/iam/audit?${query}`, { headers: bearer(token) }));
+}
 
 export async function getIamIdentity(token: string): Promise<IamIdentity> {
   return readJson<IamIdentity>(await fetch("/api/v1/auth/iam/me", { headers: bearer(token) }));

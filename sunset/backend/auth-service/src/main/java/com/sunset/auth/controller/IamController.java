@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -54,6 +55,29 @@ public class IamController {
                 SELECT u.id, u.email, u.first_name AS "firstName", u.last_name AS "lastName", u.role
                 FROM users u WHERE u.role IN ('ADMIN', 'STAFF') ORDER BY u.created_at
                 """);
+    }
+
+    @GetMapping("/audit")
+    public Map<String, Object> audit(Authentication authentication,
+                                     @RequestParam(defaultValue = "0") int page,
+                                     @RequestParam(required = false) UUID targetId) {
+        access.requireAdmin((UUID) authentication.getPrincipal());
+        if (page < 0 || page > 1000) throw new IllegalArgumentException("Некорректная страница журнала");
+        String sql = """
+                SELECT a.id, a.actor_id AS "actorId", actor.email AS "actorEmail",
+                       a.target_id AS "targetId", target.email AS "targetEmail",
+                       a.old_permissions AS "oldPermissions", a.new_permissions AS "newPermissions",
+                       a.occurred_at AS "occurredAt"
+                FROM iam_access_audit a
+                LEFT JOIN users actor ON actor.id = a.actor_id
+                LEFT JOIN users target ON target.id = a.target_id
+                """ + (targetId == null ? "" : "WHERE a.target_id = ? ")
+                + "ORDER BY a.occurred_at DESC, a.id DESC LIMIT 21 OFFSET ?";
+        List<Map<String, Object>> rows = targetId == null
+                ? jdbc.queryForList(sql, page * 20)
+                : jdbc.queryForList(sql, targetId, page * 20);
+        return Map.of("items", rows.subList(0, Math.min(rows.size(), 20)),
+                "page", page, "hasMore", rows.size() > 20);
     }
 
     @PutMapping("/staff/{id}/permissions")

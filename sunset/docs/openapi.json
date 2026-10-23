@@ -76,6 +76,16 @@
         "responses": { "200": { "description": "IAM-доступ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
       }
     },
+    "/auth/iam/audit": {
+      "get": {
+        "tags": ["Administration"], "operationId": "getIamAudit", "summary": "История изменений доступа сотрудников", "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 1000, "default": 0 } },
+          { "name": "targetId", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Страница журнала (20 записей)", "content": { "application/json": { "schema": { "type": "object", "required": ["items", "page", "hasMore"], "properties": { "items": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "actorId": { "type": "string", "format": "uuid", "nullable": true }, "actorEmail": { "type": "string", "nullable": true }, "targetId": { "type": "string", "format": "uuid", "nullable": true }, "targetEmail": { "type": "string", "nullable": true }, "oldPermissions": { "type": "string" }, "newPermissions": { "type": "string" }, "occurredAt": { "type": "string", "format": "date-time" } } } }, "page": { "type": "integer" }, "hasMore": { "type": "boolean" } } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
     "/auth/iam/staff/{id}/permissions": {
       "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
       "get": {
