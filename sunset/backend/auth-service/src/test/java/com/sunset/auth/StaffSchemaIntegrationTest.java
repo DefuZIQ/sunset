@@ -1,5 +1,7 @@
 package com.sunset.auth;
 
+import com.sunset.auth.security.MfaSecretCipher;
+import com.sunset.auth.service.StaffAccountCopier;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
@@ -11,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,6 +69,78 @@ class StaffSchemaIntegrationTest {
                     VALUES ('%s','unknown:permission')
                     """.formatted(owner)))
                     .isInstanceOf(SQLException.class);
+        }
+    }
+
+    @Test
+    void copiesEmployeeWithNewIdButLeavesCustomerHistoryUntouched() throws Exception {
+        String legacyDatabase = "sunset_legacy_" + UUID.randomUUID().toString().replace("-", "");
+        try (Connection target = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
+            execute(target, "CREATE SCHEMA staff_copy_test");
+            target.setSchema("staff_copy_test");
+            ScriptUtils.executeSqlScript(target, new ClassPathResource("db/staff/V1__staff_identity.sql"));
+            execute(target, "CREATE DATABASE " + legacyDatabase);
+            String legacyUrl = POSTGRES.getJdbcUrl().replace("/sunset_staff_test", "/" + legacyDatabase);
+            try (Connection source = DriverManager.getConnection(
+                    legacyUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
+                execute(source, "CREATE TABLE users(id uuid PRIMARY KEY,email text,password text,"
+                        + "first_name text,last_name text,phone text,role text,created_at timestamptz)");
+                execute(source, "CREATE TABLE iam_staff_role_assignments(user_id uuid PRIMARY KEY,"
+                        + "role_code text,location_id uuid)");
+                execute(source, "CREATE TABLE iam_user_permissions(user_id uuid,permission text)");
+                execute(source, "CREATE TABLE mfa_totp(user_id uuid,secret_ciphertext text,enabled boolean,"
+                        + "last_used_step bigint,failed_attempts integer,locked_until timestamptz,created_at timestamptz)");
+                execute(source, "CREATE TABLE mfa_recovery_codes(user_id uuid,code_hash char(64))");
+                execute(source, "CREATE TABLE orders(id uuid,user_id uuid)");
+                UUID oldId = UUID.randomUUID();
+                UUID orderId = UUID.randomUUID();
+                MfaSecretCipher cipher = new MfaSecretCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+                byte[] secret = "old-totp-secret".getBytes(StandardCharsets.UTF_8);
+                try (PreparedStatement insert = source.prepareStatement("""
+                        INSERT INTO users VALUES (?,'owner@sunset.test','bcrypt-hash','Anna','Owner',
+                                                 '+79990000000','ADMIN',NOW())
+                        """)) {
+                    insert.setObject(1, oldId);
+                    insert.executeUpdate();
+                }
+                execute(source, "INSERT INTO iam_staff_role_assignments VALUES ('" + oldId + "','OWNER',NULL)");
+                execute(source, "INSERT INTO iam_user_permissions VALUES ('" + oldId + "','catalog:write')");
+                try (PreparedStatement insert = source.prepareStatement("""
+                        INSERT INTO mfa_totp VALUES (?,?,TRUE,42,0,NULL,NOW())
+                        """)) {
+                    insert.setObject(1, oldId);
+                    insert.setString(2, cipher.encrypt(secret, oldId));
+                    insert.executeUpdate();
+                }
+                execute(source, "INSERT INTO mfa_recovery_codes VALUES ('" + oldId + "','" + "a".repeat(64) + "')");
+                execute(source, "INSERT INTO orders VALUES ('" + orderId + "','" + oldId + "')");
+
+                UUID newId = StaffAccountCopier.copy(source, target, oldId, cipher);
+                assertThat(newId).isNotEqualTo(oldId);
+                assertThat(StaffAccountCopier.copy(source, target, oldId, cipher)).isEqualTo(newId);
+                assertThat(scalar(source, "SELECT count(*) FROM orders WHERE user_id='" + oldId + "'"))
+                        .isEqualTo(1);
+                assertThat(scalar(source, "SELECT count(*) FROM users WHERE id='" + oldId
+                        + "' AND role='ADMIN'")).isEqualTo(1);
+                assertThat(scalar(target, "SELECT count(*) FROM staff_accounts WHERE id='" + newId
+                        + "' AND legacy_user_id='" + oldId + "' AND role_code='OWNER'"))
+                        .isEqualTo(1);
+                assertThat(scalar(target, "SELECT count(*) FROM staff_permissions WHERE staff_id='" + newId + "'"))
+                        .isEqualTo(1);
+                assertThat(scalar(target, "SELECT count(*) FROM staff_mfa_recovery_codes WHERE staff_id='" + newId
+                        + "'")).isEqualTo(1);
+                try (PreparedStatement query = target.prepareStatement(
+                        "SELECT secret_ciphertext FROM staff_mfa_totp WHERE staff_id=?")) {
+                    query.setObject(1, newId);
+                    try (ResultSet rows = query.executeQuery()) {
+                        assertThat(rows.next()).isTrue();
+                        assertThat(cipher.decrypt(rows.getString(1), newId)).isEqualTo(secret);
+                        assertThatThrownBy(() -> cipher.decrypt(rows.getString(1), oldId))
+                                .isInstanceOf(IllegalStateException.class);
+                    }
+                }
+            }
         }
     }
 
