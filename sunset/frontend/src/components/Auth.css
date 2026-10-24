@@ -10,3 +10,10 @@
 @media (max-width: 760px) { .login_background, .reg_background { min-height: 100svh; padding: calc(72px + 1rem) 0 1rem; } .login_form, .reg_form { padding: 2rem 1.5rem; } }
 @media (max-width: 380px) { .login_form, .reg_form { padding-inline: 1.1rem; } }
 .auth-notice { margin: 0 0 18px; color: #5f704e; font-size: 14px; line-height: 1.45; }
+.auth-error { margin: 1rem 0 0; color: #a03931; font-size: 14px; line-height: 1.5; }
+.auth-missing { margin-top: 1.5rem; padding: 1.25rem; border: 1px solid #d9ccc0; background: #f7f2ed; color: #55473d; font-size: 14px; line-height: 1.5; }
+.auth-missing p { margin: 0 0 .75rem; }
+.auth-missing-title { color: #3d3530; font-size: 18px; font-weight: 600; }
+.auth-missing-hint { color: #76675d; }
+.auth-missing-link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; margin-top: .25rem; padding: .65rem 1.25rem; background: #3d3530; color: #fffdfb; text-decoration: none; transition: background .2s ease, transform .2s ease; }
+.auth-missing-link:hover, .auth-missing-link:focus-visible { background: #634f42; color: #fffdfb; transform: translateY(-2px); }
