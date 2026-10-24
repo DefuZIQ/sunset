@@ -102,6 +102,38 @@ class JwtFilterTest {
         verify(sessions, never()).isActive(token);
     }
 
+    @Test void customerBearerCannotEnterStaffRoute() {
+        String secret = "test-secret-that-is-at-least-32-bytes";
+        JwtFilter filter = new JwtFilter(new WhitelistConfig(), sessions, new AdminCookieCsrf(secret));
+        ReflectionTestUtils.setField(filter, "secretKey", secret);
+        String token = Jwts.builder().setSubject("customer-user").claim("realm", "CUSTOMER")
+                .signWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8))).compact();
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/order/admin/orders")
+                .header("Authorization", "Bearer " + token).build());
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        verifyNoInteractions(chain, sessions);
+    }
+
+    @Test void staffBearerCannotEnterCustomerOrderRoute() {
+        String secret = "test-secret-that-is-at-least-32-bytes";
+        JwtFilter filter = new JwtFilter(new WhitelistConfig(), sessions, new AdminCookieCsrf(secret));
+        ReflectionTestUtils.setField(filter, "secretKey", secret);
+        String token = Jwts.builder().setSubject("staff-user").claim("realm", "STAFF")
+                .signWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8))).compact();
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/order/my")
+                .header("Authorization", "Bearer " + token).build());
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        verifyNoInteractions(chain, sessions);
+    }
+
     @Test void protectedPathWithoutTokenReturnsUnauthorized() {
         WhitelistConfig config = new WhitelistConfig();
         config.setWhitelistPaths(List.of("/auth/login"));

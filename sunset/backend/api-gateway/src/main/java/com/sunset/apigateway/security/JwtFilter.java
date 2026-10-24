@@ -77,6 +77,14 @@ public class JwtFilter implements GlobalFilter, Ordered {
                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                 return exchange.getResponse().setComplete();
             }
+            if (realm != null && !"STAFF".equals(realm) && !"CUSTOMER".equals(realm)) {
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }
+            if (!publicRequest && isStaffOnlyPath(request) != "STAFF".equals(realm)) {
+                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                return exchange.getResponse().setComplete();
+            }
             log.debug("JWT валиден. user-id: {}", userId);
 
             return (cookieAuth ? sessionVerifier.isAdminActive(token)
@@ -113,6 +121,19 @@ public class JwtFilter implements GlobalFilter, Ordered {
     private static boolean safeMethod(ServerHttpRequest request) {
         HttpMethod method = request.getMethod();
         return HttpMethod.GET.equals(method) || HttpMethod.HEAD.equals(method) || HttpMethod.OPTIONS.equals(method);
+    }
+
+    private static boolean isStaffOnlyPath(ServerHttpRequest request) {
+        String path = request.getURI().getPath();
+        return path.startsWith("/auth/iam/")
+                || path.startsWith("/auth/admin/")
+                || path.startsWith("/auth/session/admin/")
+                || path.startsWith("/auth/mfa/")
+                || path.startsWith("/auth/staff/")
+                || path.equals("/products/admin") || path.startsWith("/products/admin/")
+                || path.startsWith("/order/admin/")
+                || path.equals("/order/stores/admin")
+                || (path.equals("/order/stores") && !HttpMethod.GET.equals(request.getMethod()));
     }
 
     private ServerWebExchange withTrustedUserId(ServerWebExchange exchange, String userId) {

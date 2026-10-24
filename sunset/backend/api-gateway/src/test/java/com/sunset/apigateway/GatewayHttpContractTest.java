@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GatewayHttpContractTest {
     private static final String SECRET = "gateway-http-contract-secret-at-least-32-bytes";
     private static final String CUSTOMER_ID = "10000000-0000-0000-0000-000000000001";
+    private static final String STAFF_ID = "10000000-0000-0000-0000-000000000002";
     private static final AtomicReference<ForwardedRequest> FORWARDED = new AtomicReference<>();
     private static final AtomicInteger REQUEST_COUNT = new AtomicInteger();
     private static final DisposableServer AUTH_VALIDATOR = HttpServer.create().port(0)
@@ -64,6 +65,7 @@ class GatewayHttpContractTest {
         registry.add("jwt.secret", () -> SECRET);
         registry.add("auth.session-validation-url", () -> "http://localhost:" + AUTH_VALIDATOR.port() + "/auth/session/validate");
         registry.add("auth.admin-session-validation-url", () -> "http://localhost:" + AUTH_VALIDATOR.port() + "/auth/session/admin/validate");
+        registry.add("auth.staff-session-validation-url", () -> "http://localhost:" + AUTH_VALIDATOR.port() + "/auth/session/validate");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].id", () -> "auth-test");
         registry.add("spring.cloud.gateway.server.webflux.routes[0].uri", () -> "http://localhost:" + DOWNSTREAM.port());
         registry.add("spring.cloud.gateway.server.webflux.routes[0].predicates[0]", () -> "Path=/auth/**");
@@ -309,13 +311,13 @@ class GatewayHttpContractTest {
         assertThat(REQUEST_COUNT.get()).isZero();
 
         client.put().uri(path)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + staffToken())
                 .header("user-id", "forged-admin")
                 .bodyValue("{\"reply\":\"Thanks\"}")
                 .exchange().expectStatus().isOk();
         assertThat(FORWARDED.get().method()).isEqualTo("PUT");
         assertThat(FORWARDED.get().path()).isEqualTo("/products/admin/reviews/20000000-0000-0000-0000-000000000001/reply");
-        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+        assertThat(FORWARDED.get().userId()).isEqualTo(STAFF_ID);
         assertThat(FORWARDED.get().body()).contains("Thanks");
     }
 
@@ -328,12 +330,12 @@ class GatewayHttpContractTest {
         assertThat(REQUEST_COUNT.get()).isZero();
 
         client.put().uri(path)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + staffToken())
                 .header("user-id", "forged-admin")
                 .bodyValue("{\"isHidden\":true}")
                 .exchange().expectStatus().isOk();
         assertThat(FORWARDED.get().path()).isEqualTo("/products/admin/reviews/20000000-0000-0000-0000-000000000001/moderation");
-        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+        assertThat(FORWARDED.get().userId()).isEqualTo(STAFF_ID);
     }
 
     @Test
@@ -364,20 +366,20 @@ class GatewayHttpContractTest {
         assertThat(REQUEST_COUNT.get()).isZero();
 
         client.get().uri("/api/v1/order/admin/users")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + staffToken())
                 .header("user-id", "forged-admin")
                 .exchange()
                 .expectStatus().isOk();
 
         assertThat(REQUEST_COUNT.get()).isEqualTo(1);
         assertThat(FORWARDED.get().path()).isEqualTo("/order/admin/users");
-        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+        assertThat(FORWARDED.get().userId()).isEqualTo(STAFF_ID);
     }
 
     @Test
     void versionedAdminWriteForwardsMethodBodyAndTrustedIdentity() {
         client.patch().uri("/api/v1/order/admin/orders/20000000-0000-0000-0000-000000000001/status")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CUSTOMER_ID))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + staffToken())
                 .header("user-id", "forged-admin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{\"status\":\"CONFIRMED\"}")
@@ -387,7 +389,7 @@ class GatewayHttpContractTest {
         assertThat(REQUEST_COUNT.get()).isEqualTo(1);
         assertThat(FORWARDED.get().method()).isEqualTo("PATCH");
         assertThat(FORWARDED.get().path()).isEqualTo("/order/admin/orders/20000000-0000-0000-0000-000000000001/status");
-        assertThat(FORWARDED.get().userId()).isEqualTo(CUSTOMER_ID);
+        assertThat(FORWARDED.get().userId()).isEqualTo(STAFF_ID);
         assertThat(FORWARDED.get().body()).contains("\"status\":\"CONFIRMED\"");
     }
 
@@ -501,6 +503,12 @@ class GatewayHttpContractTest {
 
     private String token(String subject) {
         return Jwts.builder().setSubject(subject)
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    private String staffToken() {
+        return Jwts.builder().setSubject(STAFF_ID).claim("realm", "STAFF")
                 .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
                 .compact();
     }
