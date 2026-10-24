@@ -14,3 +14,6 @@ spring:
   security:
     jwt:
       secret: test-secret-that-is-at-least-32-bytes
+
+mfa:
+  encryption-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
