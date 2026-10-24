@@ -4,7 +4,9 @@ import com.sunset.auth.security.MfaSecretCipher;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +41,7 @@ public final class StaffMigrationCli {
                 UUID newId = StaffAccountCopier.copy(source, target, oldId, cipher);
                 StaffAccountCopier.installRuntimeIdentity(target, newId);
             }
+            ensureOwner(target);
             source.rollback();
             System.out.println("Copied and verified staff accounts: " + staffIds.size());
         }
@@ -48,5 +51,38 @@ public final class StaffMigrationCli {
         String value = System.getenv(name);
         if (value == null || value.isBlank()) throw new IllegalArgumentException("Missing " + name);
         return value;
+    }
+
+    /** An old installation may have an administrator but no explicit OWNER assignment. */
+    private static void ensureOwner(Connection target) throws SQLException {
+        UUID candidate;
+        try (Statement query = target.createStatement(); ResultSet rows = query.executeQuery(
+                "SELECT id FROM staff_accounts WHERE role_code='ADMIN' ORDER BY created_at,id LIMIT 1")) {
+            candidate = rows.next() ? rows.getObject(1, UUID.class) : null;
+        }
+        try (Statement query = target.createStatement(); ResultSet rows = query.executeQuery(
+                "SELECT EXISTS(SELECT 1 FROM iam_staff_role_assignments WHERE role_code='OWNER')")) {
+            if (rows.next() && rows.getBoolean(1)) return;
+        }
+        if (candidate == null) throw new IllegalStateException("No owner or administrator was copied");
+        target.setAutoCommit(false);
+        try {
+            try (PreparedStatement update = target.prepareStatement(
+                    "UPDATE staff_accounts SET role_code='OWNER',updated_at=NOW() WHERE id=? AND role_code='ADMIN'")) {
+                update.setObject(1, candidate);
+                if (update.executeUpdate() != 1) throw new IllegalStateException("Could not promote owner");
+            }
+            try (PreparedStatement insert = target.prepareStatement(
+                    "INSERT INTO iam_staff_role_assignments(user_id,role_code) VALUES (?,'OWNER')")) {
+                insert.setObject(1, candidate);
+                insert.executeUpdate();
+            }
+            target.commit();
+        } catch (Exception error) {
+            target.rollback();
+            throw error;
+        } finally {
+            target.setAutoCommit(true);
+        }
     }
 }
