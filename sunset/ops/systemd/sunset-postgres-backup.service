@@ -1,13 +1,13 @@
 [Unit]
-Description=SUNSET PostgreSQL logical backup and integrity check
+Description=SUNSET customer, staff and commerce PostgreSQL backup
 Requires=docker.service
 After=docker.service
 
 [Service]
 Type=oneshot
 User=root
-WorkingDirectory=/home/defuziq/sunset
-ExecStart=/bin/sh /home/defuziq/sunset/scripts/backup-postgres.sh /home/defuziq/sunset /home/defuziq/backups
+WorkingDirectory=/home/defuziq/sunset-staging-db-split/sunset
+ExecStart=/bin/sh /home/defuziq/sunset-staging-db-split/sunset/scripts/backup-postgres-cluster.sh /home/defuziq/sunset-staging-db-split/sunset /home/defuziq/backups /home/defuziq/sunset/.env
 UMask=0077
 TimeoutStartSec=15min
 Nice=10
