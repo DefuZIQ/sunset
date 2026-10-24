@@ -11,6 +11,7 @@ import com.sunset.auth.exceptions.InvalidPasswordException;
 import com.sunset.auth.model.User;
 import com.sunset.auth.repository.UserRepository;
 import com.sunset.auth.security.JwtUtil;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,9 @@ import java.time.LocalDate;
 
 @Service
 public class AuthService {
+
+    @Value("${auth.realm:LEGACY}")
+    private String authRealm = "LEGACY";
 
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
@@ -36,6 +40,7 @@ public class AuthService {
     }
 
     public AuthResponse registerUser(RegisterRequest request) {
+        if ("STAFF".equalsIgnoreCase(authRealm)) throw new SecurityException("Регистрация покупателей недоступна");
         // Проверка на существующего пользователя
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Этот email уже используется");
@@ -55,11 +60,13 @@ public class AuthService {
 
     @Transactional
     public AuthResponse loginUser(LoginRequest request) {
+        if ("STAFF".equalsIgnoreCase(authRealm)) throw new InvalidPasswordException("Неверный email или пароль");
         return login(request, false);
     }
 
     @Transactional
     public AuthResponse loginStaff(LoginRequest request) {
+        if ("CUSTOMER".equalsIgnoreCase(authRealm)) throw new InvalidPasswordException("Неверные данные для входа сотрудника");
         return login(request, true);
     }
 

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -56,6 +57,18 @@ class AuthServiceTest {
                 () -> service.registerUser(new RegisterRequest("client@example.com", "secret123", "Иван", "Иванов")));
         assertEquals("Этот email уже используется", error.getMessage());
         verify(repository, never()).save(any());
+    }
+
+    @Test void isolatedRealmsCannotUseEachOthersLoginOrRegistration() {
+        ReflectionTestUtils.setField(service, "authRealm", "STAFF");
+        assertThrows(SecurityException.class,
+                () -> service.registerUser(new RegisterRequest("client@example.com", "secret123", "Иван", "Иванов")));
+        assertThrows(InvalidPasswordException.class,
+                () -> service.loginUser(new LoginRequest("client@example.com", "secret123")));
+        ReflectionTestUtils.setField(service, "authRealm", "CUSTOMER");
+        assertThrows(InvalidPasswordException.class,
+                () -> service.loginStaff(new LoginRequest("staff@example.com", "secret123")));
+        verifyNoInteractions(repository);
     }
 
     @Test void logsInAndIssuesToken() {

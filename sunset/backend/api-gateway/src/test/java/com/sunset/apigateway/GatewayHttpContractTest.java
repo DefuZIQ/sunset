@@ -472,7 +472,9 @@ class GatewayHttpContractTest {
 
     @Test
     void adminCookieAuthenticatesReadsButRequiresCsrfForWrites() throws Exception {
-        String session = token(CUSTOMER_ID);
+        String session = Jwts.builder().setSubject(CUSTOMER_ID).claim("realm", "STAFF")
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
+                .compact();
         client.get().uri("/api/v1/order/admin/orders")
                 .cookie("SUNSET_ADMIN_SESSION", session)
                 .exchange().expectStatus().isOk();

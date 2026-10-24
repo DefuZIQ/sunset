@@ -87,6 +87,16 @@ public class AuthController {
         cookieSession.clear(request, response);
     }
 
+    @PostMapping("/staff/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void staffLogout(Authentication authentication, @RequestHeader("Authorization") String authorization,
+                            HttpServletRequest request, HttpServletResponse response) {
+        if (!sessions.isElevatedSession(authorization.substring(7), (UUID) authentication.getPrincipal())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        logout(authentication, authorization, request, response);
+    }
+
     @GetMapping("/admin/session")
     public Map<String, String> adminSession(Authentication authentication,
                                             @RequestHeader("Authorization") String authorization) {

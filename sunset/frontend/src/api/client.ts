@@ -202,6 +202,7 @@ export async function getProfile(token: string): Promise<UserProfile> {
 }
 
 export type IamIdentity = { role: string; staffRole?: string | null; locationId?: string | null; permissions: string[] };
+export type StaffAccount = { id: string; email: string; firstName: string; lastName: string; role: string };
 export type IamAuditEvent = { id: string; actorId: string | null; actorEmail: string | null; targetId: string | null; targetEmail: string | null; oldPermissions: string; newPermissions: string; occurredAt: string };
 export type IamAuditPage = { items: IamAuditEvent[]; page: number; hasMore: boolean };
 
@@ -213,6 +214,18 @@ export async function getIamAudit(token: string, page = 0, targetId?: string): P
 
 export async function getIamIdentity(token: string): Promise<IamIdentity> {
   return readJson<IamIdentity>(await fetch("/api/v1/auth/iam/me", { headers: bearer(token) }));
+}
+
+export async function listStaffAccounts(token: string): Promise<StaffAccount[]> {
+  return readJson<StaffAccount[]>(await fetch("/api/v1/auth/iam/staff", { headers: bearer(token) }));
+}
+
+export async function createStaffAccount(token: string, request: {
+  email: string; password: string; firstName: string; lastName: string; roleCode: string; locationId: string | null;
+}): Promise<IamIdentity> {
+  return readJson<IamIdentity>(await fetch("/api/v1/auth/iam/staff", {
+    method: "POST", headers: { "Content-Type": "application/json", ...bearer(token) }, body: JSON.stringify(request),
+  }));
 }
 
 export async function getIamUserPermissions(token: string, id: string): Promise<IamIdentity> {
@@ -243,8 +256,8 @@ export async function changePassword(token: string, request: ChangePasswordReque
   }));
 }
 
-export async function revokeSession(token: string): Promise<void> {
-  const response = await fetch("/api/v1/auth/logout", { method: "POST", headers: bearer(token) });
+export async function revokeSession(token: string, staff = false): Promise<void> {
+  const response = await fetch(staff ? "/api/v1/auth/staff/logout" : "/api/v1/auth/logout", { method: "POST", headers: bearer(token) });
   // An expired or already revoked bearer is no longer a live server session.
   if (!response.ok && response.status !== 401) throw new ApiHttpError(response.status, "Не удалось завершить сеанс на сервере");
 }

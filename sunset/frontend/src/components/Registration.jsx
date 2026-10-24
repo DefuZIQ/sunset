@@ -80,7 +80,9 @@ export default function Registration({ setUser }) {
       }
 
     } catch (err) {
-      setError(err.message || "Ошибка сети или сервера");
+      setError(err.message === "Этот email уже используется"
+        ? "Аккаунт с этим email уже существует. Войдите, чтобы открыть свои заказы."
+        : err.message || "Ошибка сети или сервера");
     } finally {
       setLoading(false);
     }

@@ -2,18 +2,21 @@ package com.sunset.auth.controller;
 
 import com.sunset.contract.IamAccess;
 import com.sunset.auth.service.AuthSessionService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -21,13 +24,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/auth/iam")
 public class IamController {
+    @Value("${auth.realm:LEGACY}")
+    private String authRealm = "LEGACY";
     private final JdbcTemplate jdbc;
     private final IamAccess access;
     private final AuthSessionService sessions;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public IamController(JdbcTemplate jdbc, AuthSessionService sessions) {
         this.jdbc = jdbc;
@@ -102,16 +109,44 @@ public class IamController {
         for (String permission : permissions) {
             jdbc.update("INSERT INTO iam_user_permissions(user_id,permission,granted_by) VALUES (?,?,?)", id, permission, actorId);
         }
-        jdbc.update("UPDATE users SET role=?,updated_at=NOW() WHERE id=?", permissions.isEmpty() ? "CUSTOMER" : "STAFF", id);
+        String nextRole = permissions.isEmpty() && !"STAFF".equalsIgnoreCase(authRealm) ? "CUSTOMER" : "STAFF";
+        jdbc.update("UPDATE users SET role=?,updated_at=NOW() WHERE id=?", nextRole, id);
         jdbc.update("INSERT INTO iam_access_audit(actor_id,target_id,old_permissions,new_permissions) VALUES (?,?,?,?)",
                 actorId, id, oldPermissions, String.join(",", permissions));
         sessions.revokeAll(id);
-        return Map.of("userId", id, "role", permissions.isEmpty() ? "CUSTOMER" : "STAFF", "permissions", permissions);
+        return Map.of("userId", id, "role", nextRole, "permissions", permissions);
     }
 
     public record PermissionUpdate(List<String> permissions) {}
 
     public record RoleUpdate(String roleCode, UUID locationId) {}
+
+    public record StaffCreate(String email, String password, String firstName, String lastName,
+                              String roleCode, UUID locationId) {}
+
+    @PostMapping("/staff")
+    @Transactional
+    public Map<String, Object> createStaff(Authentication authentication, @RequestBody StaffCreate request) {
+        UUID actorId = (UUID) authentication.getPrincipal();
+        access.requireAdmin(actorId);
+        if (!"STAFF".equalsIgnoreCase(authRealm)) throw new SecurityException("Создание сотрудников доступно только в служебной базе");
+        if (request == null || request.email() == null || !request.email().trim().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
+            throw new IllegalArgumentException("Укажите корректный email");
+        if (request.password() == null || request.password().length() < 8 || request.password().length() > 72)
+            throw new IllegalArgumentException("Пароль должен содержать от 8 до 72 символов");
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=?)", Boolean.class, email)))
+            throw new IllegalArgumentException("Этот email уже используется");
+        UUID staffId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id,email,password,first_name,last_name,role,created_at,updated_at) VALUES (?,?,?,?,?,'STAFF',NOW(),NOW())",
+                staffId, email, passwordEncoder.encode(request.password()),
+                request.firstName() == null ? "" : request.firstName().trim(),
+                request.lastName() == null ? "" : request.lastName().trim());
+        Map<String, Object> role = updateRole(authentication, staffId,
+                new RoleUpdate(request.roleCode(), request.locationId()));
+        role.put("email", email);
+        return role;
+    }
 
     @PutMapping("/staff/{id}/role")
     @Transactional
@@ -124,6 +159,8 @@ public class IamController {
         if (roleCode == null || !Set.of("CUSTOMER", "ADMIN", "WAREHOUSE_ADMIN", "STORE_MANAGER", "CONTENT_MARKETING").contains(roleCode)) {
             throw new IllegalArgumentException("Неизвестная роль");
         }
+        if ("STAFF".equalsIgnoreCase(authRealm) && "CUSTOMER".equals(roleCode))
+            throw new IllegalArgumentException("Клиентские аккаунты управляются отдельно");
         boolean actorOwner = access.isOwner(actorId);
         if ("ADMIN".equals(roleCode) && !actorOwner) throw new SecurityException("Назначать администраторов может только владелец");
         boolean scoped = "WAREHOUSE_ADMIN".equals(roleCode) || "STORE_MANAGER".equals(roleCode);
@@ -131,9 +168,11 @@ public class IamController {
         if (scoped) {
             if (locationId == null) throw new IllegalArgumentException("Выберите магазин или склад для этой роли");
             String kind = "WAREHOUSE_ADMIN".equals(roleCode) ? "WAREHOUSE" : "STORE";
-            Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM stores WHERE id=? AND kind=? AND active=TRUE",
-                    Integer.class, locationId, kind);
-            if (count == null || count != 1) throw new IllegalArgumentException("Выбранная точка не подходит этой роли");
+            if (!"STAFF".equalsIgnoreCase(authRealm)) {
+                Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM stores WHERE id=? AND kind=? AND active=TRUE",
+                        Integer.class, locationId, kind);
+                if (count == null || count != 1) throw new IllegalArgumentException("Выбранная точка не подходит этой роли");
+            }
         } else if (locationId != null) {
             throw new IllegalArgumentException("Для этой роли точка не назначается");
         }

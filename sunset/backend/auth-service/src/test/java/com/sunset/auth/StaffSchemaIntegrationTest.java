@@ -119,6 +119,25 @@ class StaffSchemaIntegrationTest {
                 UUID newId = StaffAccountCopier.copy(source, target, oldId, cipher);
                 assertThat(newId).isNotEqualTo(oldId);
                 assertThat(StaffAccountCopier.copy(source, target, oldId, cipher)).isEqualTo(newId);
+                execute(target, "CREATE TABLE users(id uuid PRIMARY KEY,email text UNIQUE,password text,"
+                        + "first_name text,last_name text,phone text,role text,created_at timestamptz,updated_at timestamptz)");
+                execute(target, "CREATE TABLE iam_staff_role_assignments(user_id uuid PRIMARY KEY,"
+                        + "role_code text,location_id uuid)");
+                execute(target, "CREATE TABLE iam_user_permissions(user_id uuid,permission text,"
+                        + "PRIMARY KEY(user_id,permission))");
+                execute(target, "CREATE TABLE mfa_totp(user_id uuid PRIMARY KEY,secret_ciphertext text,"
+                        + "enabled boolean,last_used_step bigint,failed_attempts integer,locked_until timestamptz,"
+                        + "created_at timestamptz)");
+                execute(target, "CREATE TABLE mfa_recovery_codes(user_id uuid,code_hash char(64),"
+                        + "PRIMARY KEY(user_id,code_hash))");
+                StaffAccountCopier.installRuntimeIdentity(target, newId);
+                StaffAccountCopier.installRuntimeIdentity(target, newId);
+                assertThat(scalar(target, "SELECT count(*) FROM users WHERE id='" + newId
+                        + "' AND role='ADMIN'")).isEqualTo(1);
+                assertThat(scalar(target, "SELECT count(*) FROM mfa_totp WHERE user_id='" + newId
+                        + "'")).isEqualTo(1);
+                assertThat(scalar(target, "SELECT count(*) FROM iam_staff_role_assignments WHERE user_id='" + newId
+                        + "' AND role_code='OWNER'")).isEqualTo(1);
                 assertThat(scalar(source, "SELECT count(*) FROM orders WHERE user_id='" + oldId + "'"))
                         .isEqualTo(1);
                 assertThat(scalar(source, "SELECT count(*) FROM users WHERE id='" + oldId

@@ -96,7 +96,7 @@ export default function AdminApp() {
   async function signOut() {
     if (status === "admin" || status === "denied") {
       setBusy(true);
-      try { await revokeSession(ADMIN_COOKIE_SESSION); }
+      try { await revokeSession(ADMIN_COOKIE_SESSION, true); }
       catch (error) {
         setMessage(error.message || "Не удалось завершить сеанс на сервере");
         setBusy(false);

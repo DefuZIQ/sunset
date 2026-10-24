@@ -1,13 +1,14 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import AdminAccessPanel from "./AdminAccessPanel";
-import { getIamAudit, getIamUserPermissions, updateIamUserRole } from "../../api/client";
+import { createStaffAccount, getIamAudit, getIamUserPermissions, updateIamUserRole } from "../../api/client";
 
 vi.mock("../../api/client", () => ({
   ADMIN_COOKIE_SESSION: "ADMIN_COOKIE_SESSION",
   getIamAudit: vi.fn(),
   getIamUserPermissions: vi.fn(),
   updateIamUserRole: vi.fn(),
+  createStaffAccount: vi.fn(),
 }));
 
 beforeEach(() => { vi.clearAllMocks(); getIamAudit.mockResolvedValue({ items: [], page: 0, hasMore: false }); });
@@ -52,4 +53,18 @@ test("shows access history for the selected account", async () => {
   expect(await screen.findByText(/Изменил: owner@example.test/)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Учётная запись"), { target: { value: "staff-1" } });
   await waitFor(() => expect(getIamAudit).toHaveBeenCalledWith("ADMIN_COOKIE_SESSION", 0, "staff-1"));
+});
+
+test("creates an isolated staff account", async () => {
+  createStaffAccount.mockResolvedValue({ role: "STAFF", permissions: ["catalog:write"] });
+  render(<AdminAccessPanel users={[]} />);
+  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new-staff@example.test" } });
+  fireEvent.change(screen.getByLabelText("Имя"), { target: { value: "Анна" } });
+  fireEvent.change(screen.getByLabelText("Фамилия"), { target: { value: "Иванова" } });
+  fireEvent.change(screen.getByLabelText("Временный пароль"), { target: { value: "temporary-password" } });
+  fireEvent.click(screen.getByRole("button", { name: "Добавить сотрудника" }));
+  await waitFor(() => expect(createStaffAccount).toHaveBeenCalledWith("ADMIN_COOKIE_SESSION", {
+    email: "new-staff@example.test", password: "temporary-password", firstName: "Анна",
+    lastName: "Иванова", roleCode: "CONTENT_MARKETING", locationId: null,
+  }));
 });

@@ -29,6 +29,11 @@ spring:
               uri: http://notification-service:8084
               predicates:
                 - Path=/subscriptions/**
+            - id: staff-auth-service
+              order: -1
+              uri: http://staff-auth-service:8081
+              predicates:
+                - Path=/auth/staff/**,/auth/mfa/**,/auth/iam/**,/auth/admin/**,/auth/session/admin/**
           globalcors:
             cors-configurations:
               '[/**]':

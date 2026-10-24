@@ -83,6 +83,25 @@ class JwtFilterTest {
         return captor.getValue();
     }
 
+    @Test void staffBearerUsesOnlyStaffSessionVerifier() {
+        String secret = "test-secret-that-is-at-least-32-bytes";
+        JwtFilter filter = new JwtFilter(new WhitelistConfig(), sessions, new AdminCookieCsrf(secret));
+        ReflectionTestUtils.setField(filter, "secretKey", secret);
+        String token = Jwts.builder().setSubject("staff-user").claim("realm", "STAFF")
+                .signWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8))).compact();
+        when(sessions.isStaffActive(token)).thenReturn(Mono.just(true));
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+        when(chain.filter(any())).thenReturn(Mono.empty());
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/auth/iam/me")
+                .header("Authorization", "Bearer " + token).build());
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals("staff-user", argumentCaptor(chain).getRequest().getHeaders().getFirst("user-id"));
+        verify(sessions).isStaffActive(token);
+        verify(sessions, never()).isActive(token);
+    }
+
     @Test void protectedPathWithoutTokenReturnsUnauthorized() {
         WhitelistConfig config = new WhitelistConfig();
         config.setWhitelistPaths(List.of("/auth/login"));
@@ -147,6 +166,7 @@ class JwtFilterTest {
         JwtFilter filter = new JwtFilter(new WhitelistConfig(), sessions, csrf);
         ReflectionTestUtils.setField(filter, "secretKey", secret);
         String token = Jwts.builder().setSubject("trusted-user")
+                .claim("realm", "STAFF")
                 .signWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8))).compact();
         GatewayFilterChain chain = mock(GatewayFilterChain.class);
         when(chain.filter(any())).thenReturn(Mono.empty());

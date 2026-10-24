@@ -5,7 +5,7 @@ import AdminStockPanel from "./admin/AdminStockPanel";
 import AdminReviewsPanel from "./admin/AdminReviewsPanel";
 import AdminAccessPanel from "./admin/AdminAccessPanel";
 import AdminNavIcon from "./admin/AdminNavIcon";
-import { adjustAdminBonuses, createAdminProduct, createAdminPromotion, deleteAdminProduct, getAdminAnalytics, getAdminLocationStock, getCategoryTree, listAdminLocations, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock } from "../api/client";
+import { adjustAdminBonuses, createAdminProduct, createAdminPromotion, deleteAdminProduct, getAdminAnalytics, getAdminLocationStock, getCategoryTree, listAdminLocations, listAdminOrders, listAdminPromotions, listAdminReturns, listAdminUsers, listAdminVariants, listProducts, listStaffAccounts, updateAdminOrderStatus, updateAdminProduct, updateAdminReturnStatus, updateAdminStock } from "../api/client";
 import { ADMIN_COOKIE_SESSION } from "../api/client";
 import "./Admin.css";
 
@@ -18,7 +18,7 @@ const sections=[["overview","Обзор","orders:read"],["orders","Заказы"
 
 export default function Admin({ identity = { role: "ADMIN", permissions: [] }, securityPanel = null }) {
   const can = useCallback((permission) => identity.role === "ADMIN" || identity.permissions?.includes(permission), [identity]);
-  const [tab,setTab]=useState("overview"); const [orders,setOrders]=useState([]); const [users,setUsers]=useState([]); const [promos,setPromos]=useState([]); const [products,setProducts]=useState([]); const [categoryTree,setCategoryTree]=useState([]); const [returns,setReturns]=useState([]); const [analytics,setAnalytics]=useState(null); const [message,setMessage]=useState("");
+  const [tab,setTab]=useState("overview"); const [orders,setOrders]=useState([]); const [users,setUsers]=useState([]); const [staff,setStaff]=useState([]); const [promos,setPromos]=useState([]); const [products,setProducts]=useState([]); const [categoryTree,setCategoryTree]=useState([]); const [returns,setReturns]=useState([]); const [analytics,setAnalytics]=useState(null); const [message,setMessage]=useState("");
   const [menuOpen,setMenuOpen]=useState(false); const [refreshing,setRefreshing]=useState(false); const [lastUpdated,setLastUpdated]=useState(null);
   const menuButtonRef=useRef(null);
   const [orderQuery,setOrderQuery]=useState(""); const [orderStatus,setOrderStatus]=useState("ALL"); const [userQuery,setUserQuery]=useState("");
@@ -30,12 +30,13 @@ export default function Admin({ identity = { role: "ADMIN", permissions: [] }, s
     const token=adminToken();
     if(!token){setMessage("Войдите в аккаунт администратора");return;}
     setRefreshing(true);
-    const [ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult,locationsResult]=await Promise.allSettled([
+    const [ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult,locationsResult,staffResult]=await Promise.allSettled([
       can("orders:read")?listAdminOrders(token):[],can("customers:read")?listAdminUsers(token):[],can("promotions:manage")?listAdminPromotions(token):[],listProducts(),
-      can("stock:write")?listAdminVariants(token):{colors:[],sizes:[]},getCategoryTree(),can("orders:read")?listAdminReturns(token):[],can("orders:read")?getAdminAnalytics(token):null,can("stock:write")?listAdminLocations(token):[],
+      can("stock:write")?listAdminVariants(token):{colors:[],sizes:[]},getCategoryTree(),can("orders:read")?listAdminReturns(token):[],can("orders:read")?getAdminAnalytics(token):null,can("stock:write")?listAdminLocations(token):[],identity.role==="ADMIN"?listStaffAccounts(token):[],
     ]);
     if(ordersResult.status==="fulfilled")setOrders(ordersResult.value);
     if(usersResult.status==="fulfilled")setUsers(usersResult.value);
+    if(staffResult.status==="fulfilled")setStaff(staffResult.value);
     if(promosResult.status==="fulfilled")setPromos(promosResult.value);
     if(catalogResult.status==="fulfilled"){
       const catalog=catalogResult.value;
@@ -55,12 +56,12 @@ export default function Admin({ identity = { role: "ADMIN", permissions: [] }, s
       setLocations(locationsResult.value);
       setStockLocationId((current)=>locationsResult.value.some((item)=>item.id===current)?current:locationsResult.value.find((item)=>item.kind==="WAREHOUSE")?.id||locationsResult.value[0]?.id||"");
     }
-    const failed=[ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult,locationsResult]
+    const failed=[ordersResult,usersResult,promosResult,catalogResult,variantsResult,treeResult,returnsResult,analyticsResult,locationsResult,staffResult]
       .find((result)=>result.status==="rejected");
     if(failed)setMessage(failed.reason?.message||"Часть данных магазина не загрузилась");
     setLastUpdated(new Date());
     setRefreshing(false);
-  },[can]);
+  },[can,identity.role]);
   useEffect(()=>{load();},[load]);
   useEffect(()=>{if(!menuOpen)return;const onKeyDown=(event)=>{if(event.key==="Escape"){setMenuOpen(false);menuButtonRef.current?.focus();}};window.addEventListener("keydown",onKeyDown);return()=>window.removeEventListener("keydown",onKeyDown);},[menuOpen]);
   useEffect(()=>{if(!can("orders:read"))setTab(can("catalog:write")?"products":can("stock:write")?"stock":can("reviews:moderate")?"reviews":can("promotions:manage")?"promos":can("customers:read")?"users":"overview");},[can]);
@@ -168,7 +169,7 @@ export default function Admin({ identity = { role: "ADMIN", permissions: [] }, s
 
     {tab==="reviews"&&<AdminReviewsPanel />}
 
-    {tab==="access"&&identity.role==="ADMIN"&&<AdminAccessPanel users={users} locations={locations} onSaved={load} canManageAdmins={identity.staffRole==="OWNER"} />}
+    {tab==="access"&&identity.role==="ADMIN"&&<AdminAccessPanel users={staff} locations={locations} onSaved={load} canManageAdmins={identity.staffRole==="OWNER"} />}
 
     {tab==="promos"&&<><form className="admin-form" onSubmit={createPromo}><p className="page-kicker">Маркетинг</p><h2>Запустить промокод</h2><div><label>Код<input required value={promo.code} onChange={(e)=>setPromo({...promo,code:e.target.value.toUpperCase()})}/></label><label>Название<input required value={promo.title} onChange={(e)=>setPromo({...promo,title:e.target.value})}/></label></div><label>Описание<textarea value={promo.description} onChange={(e)=>setPromo({...promo,description:e.target.value})}/></label><div><label>Скидка, %<input type="number" min="0" max="100" value={promo.discountPercent} onChange={(e)=>setPromo({...promo,discountPercent:e.target.value})}/></label><label>Минимальный заказ<input type="number" min="0" value={promo.minOrder} onChange={(e)=>setPromo({...promo,minOrder:e.target.value})}/></label></div><button className="primary-action">Запустить акцию</button></form><div className="promo-admin-list">{promos.map((item)=><article key={item.id}><strong>{item.code}</strong><span>{item.title}</span><small>{item.active?"Активен":"Остановлен"} · использований: {item.usage_count}</small></article>)}</div></>}
 

@@ -50,6 +50,79 @@ public final class StaffAccountCopier {
         }
     }
 
+    /**
+     * Materialize a copied identity in the isolated Auth runtime schema. This
+     * is an explicit second step: a failed copy never changes the live login
+     * table, and repeating the step never creates another account.
+     */
+    public static void installRuntimeIdentity(Connection staff, UUID staffId) throws SQLException {
+        if (!staff.getAutoCommit()) throw new IllegalArgumentException("Требуется отдельная транзакция целевой базы");
+        boolean committed = false;
+        staff.setAutoCommit(false);
+        try {
+            try (PreparedStatement insert = staff.prepareStatement("""
+                    INSERT INTO users(id,email,password,first_name,last_name,phone,role,created_at,updated_at)
+                    SELECT id,email,password_hash,first_name,last_name,phone,
+                           CASE WHEN role_code IN ('OWNER','ADMIN') THEN 'ADMIN' ELSE 'STAFF' END,
+                           created_at,NOW()
+                    FROM staff_accounts WHERE id=?
+                    ON CONFLICT (id) DO NOTHING
+                    """)) {
+                insert.setObject(1, staffId);
+                insert.executeUpdate();
+            }
+            try (PreparedStatement check = staff.prepareStatement("""
+                    SELECT a.id FROM staff_accounts a JOIN users u ON u.id=a.id
+                    WHERE a.id=? AND lower(a.email)=lower(u.email) AND a.password_hash=u.password
+                    """)) {
+                check.setObject(1, staffId);
+                try (ResultSet rows = check.executeQuery()) {
+                    if (!rows.next()) throw new IllegalStateException("Служебная учётная запись не скопирована");
+                }
+            }
+            try (PreparedStatement insert = staff.prepareStatement("""
+                    INSERT INTO iam_staff_role_assignments(user_id,role_code,location_id)
+                    SELECT id,role_code,location_id FROM staff_accounts
+                    WHERE id=? AND role_code IN ('OWNER','WAREHOUSE_ADMIN','STORE_MANAGER','CONTENT_MARKETING')
+                    ON CONFLICT (user_id) DO NOTHING
+                    """)) {
+                insert.setObject(1, staffId);
+                insert.executeUpdate();
+            }
+            try (PreparedStatement insert = staff.prepareStatement("""
+                    INSERT INTO iam_user_permissions(user_id,permission)
+                    SELECT staff_id,permission FROM staff_permissions WHERE staff_id=?
+                    ON CONFLICT (user_id,permission) DO NOTHING
+                    """)) {
+                insert.setObject(1, staffId);
+                insert.executeUpdate();
+            }
+            try (PreparedStatement insert = staff.prepareStatement("""
+                    INSERT INTO mfa_totp(user_id,secret_ciphertext,enabled,last_used_step,
+                                         failed_attempts,locked_until,created_at)
+                    SELECT staff_id,secret_ciphertext,enabled,last_used_step,
+                           failed_attempts,locked_until,created_at
+                    FROM staff_mfa_totp WHERE staff_id=? ON CONFLICT (user_id) DO NOTHING
+                    """)) {
+                insert.setObject(1, staffId);
+                insert.executeUpdate();
+            }
+            try (PreparedStatement insert = staff.prepareStatement("""
+                    INSERT INTO mfa_recovery_codes(user_id,code_hash)
+                    SELECT staff_id,code_hash FROM staff_mfa_recovery_codes WHERE staff_id=?
+                    ON CONFLICT (user_id,code_hash) DO NOTHING
+                    """)) {
+                insert.setObject(1, staffId);
+                insert.executeUpdate();
+            }
+            staff.commit();
+            committed = true;
+        } finally {
+            if (!committed) staff.rollback();
+            staff.setAutoCommit(true);
+        }
+    }
+
     private static String databaseName(Connection connection) throws SQLException {
         try (PreparedStatement query = connection.prepareStatement("SELECT current_database()");
              ResultSet rows = query.executeQuery()) {

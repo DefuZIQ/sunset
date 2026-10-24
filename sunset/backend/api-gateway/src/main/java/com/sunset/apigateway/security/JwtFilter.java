@@ -72,9 +72,15 @@ public class JwtFilter implements GlobalFilter, Ordered {
                     .getBody();
 
             String userId = claims.getSubject();
+            String realm = claims.get("realm", String.class);
+            if (cookieAuth && !"STAFF".equals(realm)) {
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }
             log.debug("JWT валиден. user-id: {}", userId);
 
-            return (cookieAuth ? sessionVerifier.isAdminActive(token) : sessionVerifier.isActive(token))
+            return (cookieAuth ? sessionVerifier.isAdminActive(token)
+                    : "STAFF".equals(realm) ? sessionVerifier.isStaffActive(token) : sessionVerifier.isActive(token))
                     .onErrorResume(error -> {
                         log.error("Проверка сеанса в Auth Service недоступна: {}", error.toString());
                         exchange.getResponse().setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
