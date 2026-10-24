@@ -1,14 +1,12 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { loginCustomer } from "../api/client";
-import { adminUrl } from "../admin/adminUrls";
 import "./Auth.css";
 
 export default function Login({ setUser }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const [adminRequired, setAdminRequired] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,17 +15,11 @@ export default function Login({ setUser }) {
     e.preventDefault();
 
     setError(null);
-    setAdminRequired(false);
     loginCustomer({ email, password })
       .then((data) => {
-        if (data.mfaEnrollmentRequired) {
+        if (data.mfaEnrollmentRequired || data.mfaRequired) {
           setPassword("");
-          setAdminRequired(true);
-          return;
-        }
-        if (data.mfaRequired && data.challengeToken) {
-          setPassword("");
-          setAdminRequired(true);
+          setError("Вход в покупательский кабинет для этой учётной записи пока недоступен.");
           return;
         }
         finishLogin(data);
@@ -90,7 +82,6 @@ export default function Login({ setUser }) {
               </button>
             </form>
             {error && <p style={{ color: "red" }}>{error}</p>}
-            {adminRequired && <p role="status">Вход сотрудников защищён двухфакторной проверкой. <a href={adminUrl()}>Продолжить в админке</a></p>}
           </div>
         </div>
       </div>
