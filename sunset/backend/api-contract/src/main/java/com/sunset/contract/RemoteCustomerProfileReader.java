@@ -8,6 +8,8 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
+import java.util.Arrays;
+import java.util.List;
 
 /** Internal-only, fail-closed lookup; no fallback to a shared database. */
 public final class RemoteCustomerProfileReader implements CustomerProfileReader {
@@ -34,6 +36,20 @@ public final class RemoteCustomerProfileReader implements CustomerProfileReader 
             return profile;
         } catch (HttpClientErrorException.NotFound error) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Клиент не найден", error);
+        } catch (RestClientException error) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Сервис клиентов недоступен", error);
+        }
+    }
+
+    @Override public List<CustomerDirectoryEntry> list(int offset, int limit) {
+        if (offset < 0 || limit < 1 || limit > 200) throw new IllegalArgumentException("Некорректная страница клиентов");
+        try {
+            CustomerDirectoryEntry[] entries = client.get()
+                    .uri(uri -> uri.path("/internal/customers").queryParam("offset", offset)
+                            .queryParam("limit", limit).build())
+                    .header("X-Sunset-Service-Token", secret).retrieve().body(CustomerDirectoryEntry[].class);
+            if (entries == null) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Неполный ответ сервиса клиентов");
+            return Arrays.asList(entries);
         } catch (RestClientException error) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Сервис клиентов недоступен", error);
         }

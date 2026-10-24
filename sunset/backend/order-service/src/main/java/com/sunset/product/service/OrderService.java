@@ -4,6 +4,7 @@ import com.sunset.contract.IamAccess;
 import com.sunset.contract.IamAuthorizer;
 import com.sunset.contract.CustomerProfile;
 import com.sunset.contract.CustomerProfileReader;
+import com.sunset.contract.CustomerDirectoryEntry;
 import com.sunset.contract.LocalCustomerProfileReader;
 
 import com.sunset.product.dto.OrderDtos.CreateOrderRequest;
@@ -240,7 +241,40 @@ public class OrderService {
     }
     public List<Map<String, Object>> adminUsers(UUID userId) {
         access.require(userId, "customers:read");
-        return jdbc.queryForList("SELECT u.id,u.email,u.first_name AS \"firstName\",u.last_name AS \"lastName\",u.phone,u.birthday,u.role,u.created_at AS \"createdAt\",COALESCE(l.balance,0) AS \"bonusBalance\",COUNT(o.id) AS \"orderCount\",COALESCE(SUM(o.total_amount),0) AS \"orderTotal\" FROM users u LEFT JOIN loyalty_accounts l ON l.user_id=u.id LEFT JOIN orders o ON o.user_id=u.id GROUP BY u.id,l.balance ORDER BY u.created_at DESC");
+        List<CustomerDirectoryEntry> customers = new ArrayList<>();
+        int offset = 0;
+        List<CustomerDirectoryEntry> page;
+        do {
+            page = profiles.list(offset, 200);
+            customers.addAll(page);
+            offset += page.size();
+        } while (page.size() == 200);
+
+        Map<UUID, Object> balances = new HashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList("SELECT user_id,balance FROM loyalty_accounts"))
+            balances.put((UUID) row.get("user_id"), row.get("balance"));
+        Map<UUID, Map<String, Object>> orderStats = new HashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList("SELECT user_id,COUNT(*) AS order_count,COALESCE(SUM(total_amount),0) AS order_total FROM orders GROUP BY user_id"))
+            orderStats.put((UUID) row.get("user_id"), row);
+
+        List<Map<String, Object>> result = new ArrayList<>(customers.size());
+        for (CustomerDirectoryEntry customer : customers) {
+            Map<String, Object> stats = orderStats.getOrDefault(customer.id(), Map.of());
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", customer.id());
+            item.put("email", customer.email());
+            item.put("firstName", customer.firstName());
+            item.put("lastName", customer.lastName());
+            item.put("phone", customer.phone());
+            item.put("birthday", customer.birthday());
+            item.put("role", customer.role());
+            item.put("createdAt", customer.createdAt());
+            item.put("bonusBalance", balances.getOrDefault(customer.id(), 0));
+            item.put("orderCount", stats.getOrDefault("order_count", 0L));
+            item.put("orderTotal", stats.getOrDefault("order_total", BigDecimal.ZERO));
+            result.add(item);
+        }
+        return result;
     }
     public List<Map<String, Object>> adminPromotions(UUID userId) { access.require(userId, "promotions:manage"); return jdbc.queryForList("SELECT * FROM promotions ORDER BY created_at DESC"); }
 
@@ -322,10 +356,10 @@ public class OrderService {
         access.require(adminId, "orders:read");
         if ("STORE_MANAGER".equals(access.staffRole(adminId))) {
             access.requireLocation(adminId, "stock:write", access.scopedLocation(adminId));
-            return jdbc.queryForList("SELECT r.*,o.order_number AS \"orderNumber\",u.email FROM return_requests r JOIN orders o ON o.id=r.order_id JOIN users u ON u.id=r.user_id JOIN deliveries d ON d.order_id=o.id WHERE d.pickup_store_id=? ORDER BY r.created_at DESC",
+            return jdbc.queryForList("SELECT r.*,o.order_number AS \"orderNumber\",o.customer_email AS email FROM return_requests r JOIN orders o ON o.id=r.order_id JOIN deliveries d ON d.order_id=o.id WHERE d.pickup_store_id=? ORDER BY r.created_at DESC",
                     access.scopedLocation(adminId));
         }
-        return jdbc.queryForList("SELECT r.*,o.order_number AS \"orderNumber\",u.email FROM return_requests r JOIN orders o ON o.id=r.order_id JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC");
+        return jdbc.queryForList("SELECT r.*,o.order_number AS \"orderNumber\",o.customer_email AS email FROM return_requests r JOIN orders o ON o.id=r.order_id ORDER BY r.created_at DESC");
     }
 
     @Transactional

@@ -40,5 +40,7 @@ class InternalCustomerControllerTest {
                 .build();
         mvc.perform(get("/internal/customers/{id}", UUID.randomUUID()))
                 .andExpect(status().isForbidden());
+        mvc.perform(get("/internal/customers"))
+                .andExpect(status().isForbidden());
     }
 }

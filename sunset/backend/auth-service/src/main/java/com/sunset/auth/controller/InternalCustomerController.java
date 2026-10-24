@@ -1,6 +1,7 @@
 package com.sunset.auth.controller;
 
 import com.sunset.contract.CustomerProfile;
+import com.sunset.contract.CustomerDirectoryEntry;
 import com.sunset.contract.LocalCustomerProfileReader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.UUID;
+import java.util.List;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /** Available only on customer Auth inside the service network. */
 @RestController
@@ -35,9 +38,21 @@ public class InternalCustomerController {
     @GetMapping("/{id}")
     public CustomerProfile get(@PathVariable("id") UUID id,
                                @RequestHeader(value = "X-Sunset-Service-Token", required = false) String token) {
+        verifyToken(token);
+        return profiles.get(id);
+    }
+
+    @GetMapping
+    public List<CustomerDirectoryEntry> list(@RequestParam(value = "offset", defaultValue = "0") int offset,
+                                             @RequestParam(value = "limit", defaultValue = "200") int limit,
+                                             @RequestHeader(value = "X-Sunset-Service-Token", required = false) String token) {
+        verifyToken(token);
+        return profiles.list(offset, limit);
+    }
+
+    private void verifyToken(String token) {
         if (!"CUSTOMER".equalsIgnoreCase(realm) || secret.length < 32 || token == null ||
                 !MessageDigest.isEqual(secret, token.getBytes(StandardCharsets.UTF_8)))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        return profiles.get(id);
     }
 }
