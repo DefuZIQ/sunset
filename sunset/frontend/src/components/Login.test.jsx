@@ -2,9 +2,17 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { expect, test, vi } from "vitest";
 import Login from "./Login";
-import { loginCustomer } from "../api/client";
+import { ApiHttpError, loginCustomer } from "../api/client";
 
-vi.mock("../api/client", () => ({ loginCustomer: vi.fn() }));
+vi.mock("../api/client", () => ({
+  loginCustomer: vi.fn(),
+  ApiHttpError: class ApiHttpError extends Error {
+    constructor(status, message) {
+      super(message);
+      this.status = status;
+    }
+  },
+}));
 
 test("customer login does not redirect staff credentials to the admin site", async () => {
   loginCustomer.mockResolvedValueOnce({ mfaRequired: true, challengeToken: "challenge" });
@@ -14,7 +22,34 @@ test("customer login does not redirect staff credentials to the admin site", asy
   fireEvent.change(screen.getByPlaceholderText("Пароль"), { target: { value: "password" } });
   fireEvent.click(screen.getByRole("button", { name: "Войти" }));
 
-  expect(await screen.findByText("Вход в покупательский кабинет для этой учётной записи пока недоступен.")).toBeInTheDocument();
+  expect(await screen.findByText("Покупательской учётной записи нет")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Зарегистрироваться" })).toHaveAttribute("href", "/register");
+  expect(screen.getByText(/понадобится другой email/)).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Продолжить в админке" })).not.toBeInTheDocument();
   expect(screen.queryByPlaceholderText("Одноразовый код")).not.toBeInTheDocument();
+});
+
+test("missing customer account offers registration", async () => {
+  loginCustomer.mockRejectedValueOnce(new ApiHttpError(404, "Пользователь не найден"));
+  render(<MemoryRouter><Login setUser={vi.fn()} /></MemoryRouter>);
+
+  fireEvent.change(screen.getByPlaceholderText("Email"), { target: { value: "new@example.test" } });
+  fireEvent.change(screen.getByPlaceholderText("Пароль"), { target: { value: "password" } });
+  fireEvent.click(screen.getByRole("button", { name: "Войти" }));
+
+  expect(await screen.findByText("Покупательской учётной записи нет")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Зарегистрироваться" })).toHaveAttribute("href", "/register");
+  expect(screen.queryByText(/понадобится другой email/)).not.toBeInTheDocument();
+});
+
+test("wrong password remains a login error", async () => {
+  loginCustomer.mockRejectedValueOnce(new ApiHttpError(401, "Неверный email или пароль"));
+  render(<MemoryRouter><Login setUser={vi.fn()} /></MemoryRouter>);
+
+  fireEvent.change(screen.getByPlaceholderText("Email"), { target: { value: "customer@example.test" } });
+  fireEvent.change(screen.getByPlaceholderText("Пароль"), { target: { value: "wrong-password" } });
+  fireEvent.click(screen.getByRole("button", { name: "Войти" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Неверный email или пароль");
+  expect(screen.queryByText("Покупательской учётной записи нет")).not.toBeInTheDocument();
 });

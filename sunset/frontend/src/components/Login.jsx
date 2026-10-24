@@ -1,12 +1,13 @@
 import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { loginCustomer } from "../api/client";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ApiHttpError, loginCustomer } from "../api/client";
 import "./Auth.css";
 
 export default function Login({ setUser }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [missingCustomer, setMissingCustomer] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -15,16 +16,21 @@ export default function Login({ setUser }) {
     e.preventDefault();
 
     setError(null);
+    setMissingCustomer(null);
     loginCustomer({ email, password })
       .then((data) => {
         if (data.mfaEnrollmentRequired || data.mfaRequired) {
           setPassword("");
-          setError("Вход в покупательский кабинет для этой учётной записи пока недоступен.");
+          setMissingCustomer("staff");
           return;
         }
         finishLogin(data);
       })
       .catch((err) => {
+        if (err instanceof ApiHttpError && err.status === 404) {
+          setMissingCustomer("not-found");
+          return;
+        }
         setError(err.message || "Ошибка при входе");
       });
   };
@@ -81,7 +87,19 @@ export default function Login({ setUser }) {
                 Войти
               </button>
             </form>
-            {error && <p style={{ color: "red" }}>{error}</p>}
+            {missingCustomer && (
+              <div className="auth-missing" role="status">
+                <p className="auth-missing-title">Покупательской учётной записи нет</p>
+                <p>Зарегистрируйтесь, чтобы пользоваться личным кабинетом и оформлять заказы.</p>
+                {missingCustomer === "staff" && (
+                  <p className="auth-missing-hint">Этот email уже используется для входа сотрудников. Пока для нового покупательского аккаунта понадобится другой email.</p>
+                )}
+                <Link className="auth-missing-link" to="/register" state={missingCustomer === "not-found" ? { email } : { staffEmailInUse: true }}>
+                  Зарегистрироваться
+                </Link>
+              </div>
+            )}
+            {error && <p className="auth-error" role="alert">{error}</p>}
           </div>
         </div>
       </div>

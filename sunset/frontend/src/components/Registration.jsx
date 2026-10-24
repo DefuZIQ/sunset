@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { loginCustomer, registerCustomer } from "../api/client";
 import "./Auth.css";
 
 export default function Registration({ setUser }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const location = useLocation();
+  const [email, setEmail] = useState(() => location.state?.email || "");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState(null);
@@ -91,6 +92,9 @@ export default function Registration({ setUser }) {
         <div className="reg_inline row">
           <div className="reg_form col-6">
             <h1>Регистрация</h1>
+            {location.state?.staffEmailInUse && (
+              <p className="auth-notice" role="status">Для покупательского аккаунта пока укажите другой email: служебный адрес уже занят.</p>
+            )}
             <form onSubmit={handleSubmit}>
               <input
                 type="text"
