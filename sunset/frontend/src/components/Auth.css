@@ -88,7 +88,6 @@
 .auth-missing h1 { max-width: 12ch; }
 .auth-missing p { margin: 1rem 0 0; color: #76685e; font-size: .91rem; line-height: 1.6; overflow-wrap: anywhere; }
 .auth-missing p strong { color: #443329; font-weight: 600; }
-.auth-missing .auth-missing-hint { padding: .85rem 1rem; border-radius: 10px; background: #f8f2ec; color: #6b5749; font-size: .82rem; }
 .auth-missing .auth-primary { margin-top: 1.5rem; }
 .auth-text-button { display: block; margin: 1.1rem auto 0; padding: .3rem; border: 0; background: transparent; color: #6e5746; cursor: pointer; font: 600 .84rem 'Istok Web', sans-serif; text-decoration: underline; text-decoration-color: #bfac9b; text-underline-offset: .25rem; }
 .reg_info { display: none; }
