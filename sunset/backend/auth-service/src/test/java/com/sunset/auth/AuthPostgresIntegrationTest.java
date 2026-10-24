@@ -38,6 +38,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -82,7 +83,7 @@ class AuthPostgresIntegrationTest {
     }
 
     @Test
-    void internalIamRequiresServiceSecretAndNeverGrantsCustomerPermissions() {
+    void internalIamRequiresServiceSecretAndNeverGrantsCustomerPermissions() throws Exception {
         UUID customer = UUID.fromString(service.registerUser(new RegisterRequest(
                 "iam-customer@sunset.test", "initial-pass-123", "Иван", "Клиент")).getUuid());
         UUID admin = UUID.fromString(service.registerUser(new RegisterRequest(
@@ -94,6 +95,13 @@ class AuthPostgresIntegrationTest {
         assertThatThrownBy(() -> internal.identity(admin, "wrong-key")).isInstanceOf(ResponseStatusException.class);
         assertThat(internal.identity(customer, key).permissions()).isEmpty();
         assertThat(internal.identity(admin, key).permissions()).contains("catalog:write", "orders:manage");
+        var mvc = MockMvcBuilders.standaloneSetup(internal).build();
+        mvc.perform(get("/internal/iam/{id}", admin)
+                        .header("X-Sunset-Service-Token", key))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+        mvc.perform(get("/internal/iam/{id}", admin))
+                .andExpect(status().isForbidden());
     }
 
     @Test

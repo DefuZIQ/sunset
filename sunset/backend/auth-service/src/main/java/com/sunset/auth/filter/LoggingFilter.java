@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.Collections;
 
 @Component
 public class LoggingFilter implements Filter {
@@ -21,17 +20,8 @@ public class LoggingFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
 
         logger.info("Incoming request: {} {}", httpRequest.getMethod(), httpRequest.getRequestURI());
-        Collections.list(httpRequest.getHeaderNames())
-                .forEach(header ->
-                        logger.info("Header: {} = {}", header, httpRequest.getHeader(header))
-                );
-
-        if ("POST".equalsIgnoreCase(httpRequest.getMethod()) || "PUT".equalsIgnoreCase(httpRequest.getMethod())) {
-            CachedBodyHttpServletRequest wrappedRequest = new CachedBodyHttpServletRequest(httpRequest);
-            logger.info("Request body: {}", wrappedRequest.getRequestBody());
-            chain.doFilter(wrappedRequest, response);
-        } else {
-            chain.doFilter(request, response);
-        }
+        // Never log headers or bodies: they include passwords, MFA codes, bearer tokens
+        // and service-to-service credentials.
+        chain.doFilter(request, response);
     }
 }

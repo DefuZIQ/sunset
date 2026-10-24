@@ -32,7 +32,7 @@ public class InternalIamController {
     }
 
     @GetMapping("/{id}")
-    public IamIdentity identity(@PathVariable UUID id,
+    public IamIdentity identity(@PathVariable("id") UUID id,
                                 @RequestHeader(value = "X-Sunset-Service-Token", required = false) String token) {
         if (secret.length < 32 || token == null || !MessageDigest.isEqual(
                 secret, token.getBytes(StandardCharsets.UTF_8))) {
