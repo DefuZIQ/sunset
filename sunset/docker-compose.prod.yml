@@ -149,9 +149,9 @@ services:
     restart: unless-stopped
     logging: *log-rotation
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sunset}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sunset}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${COMMERCE_DB:-${POSTGRES_DB:-sunset}}
+      SPRING_DATASOURCE_USERNAME: ${COMMERCE_DB_USER:-${POSTGRES_USER:-sunset}}
+      SPRING_DATASOURCE_PASSWORD: ${COMMERCE_DB_PASSWORD:-${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}}
       SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       IAM_MODE: remote
       IAM_AUTH_URL: http://staff-auth-service:8081
@@ -182,9 +182,9 @@ services:
     restart: unless-stopped
     logging: *log-rotation
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sunset}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sunset}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${COMMERCE_DB:-${POSTGRES_DB:-sunset}}
+      SPRING_DATASOURCE_USERNAME: ${COMMERCE_DB_USER:-${POSTGRES_USER:-sunset}}
+      SPRING_DATASOURCE_PASSWORD: ${COMMERCE_DB_PASSWORD:-${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}}
       SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       IAM_MODE: remote
       IAM_AUTH_URL: http://staff-auth-service:8081
