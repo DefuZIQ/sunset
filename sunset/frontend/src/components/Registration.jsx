@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { loginCustomer, registerCustomer } from "../api/client";
 import "./Auth.css";
 
@@ -87,61 +87,70 @@ export default function Registration({ setUser }) {
   };
 
   return (
-    <div className="reg_background">
-      <div className="reg container">
+    <div className="reg_background auth-background">
+      <div className="reg container auth-container">
         <div className="reg_inline row">
-          <div className="reg_form col-6">
-            <h1>Регистрация</h1>
+          <div className="reg_form col-6 auth-card">
+            <div className="auth-card__brand" aria-hidden="true"><span>S</span><span>SUNSET</span></div>
+            <span className="auth-card__eyebrow">ЛИЧНЫЙ КАБИНЕТ</span>
+            <h1>Ваш стиль начинается здесь</h1>
+            <p className="auth-card__intro">Создайте аккаунт, чтобы сохранять избранное и следить за заказами.</p>
             {location.state?.staffEmailInUse && (
               <p className="auth-notice" role="status">Для покупательского аккаунта пока укажите другой email: служебный адрес уже занят.</p>
             )}
             <form onSubmit={handleSubmit}>
-              <input
+              <label className="auth-field"><span>Имя</span><input
                 type="text"
                 placeholder="Имя"
+                autoComplete="given-name"
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className="reg_input"
-              />
-              <input
+              /></label>
+              <label className="auth-field"><span>Фамилия</span><input
                 type="text"
                 placeholder="Фамилия"
+                autoComplete="family-name"
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className="reg_input"
-              />
-              <input
+              /></label>
+              <label className="auth-field"><span>Email</span><input
                 type="email"
                 placeholder="Email"
+                autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="reg_input"
-              />
-              <input
+              /></label>
+              <label className="auth-field"><span>Пароль</span><input
                 type="password"
                 placeholder="Пароль"
+                autoComplete="new-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="reg_input"
-              />
-              <input
+              /></label>
+              <label className="auth-field"><span>Повторите пароль</span><input
                 type="password"
                 placeholder="Подтверждение пароля"
+                autoComplete="new-password"
                 required
                 value={passwordConfirm}
                 onChange={(e) => setPasswordConfirm(e.target.value)}
                 className="reg_input"
-              />
-              <button type="submit" className="reg_btn" disabled={loading}>
-                {loading ? "Регистрация..." : "Зарегистрироваться"}
+              /></label>
+              <button type="submit" className="reg_btn auth-primary" disabled={loading}>
+                {loading ? "Регистрация..." : "Создать аккаунт"} <span aria-hidden="true">↗</span>
               </button>
-              {error && <p style={{ color: "red" }}>{error}</p>}
-              {success && <p style={{ color: "green" }}>{success}</p>}
+              {error && <p className="auth-error" role="alert">{error}</p>}
+              {success && <p className="auth-notice" role="status">{success}</p>}
             </form>
+            <p className="auth-card__switch">Уже есть аккаунт? <Link to="/login">Войти</Link></p>
           </div>
           <div className="reg_info col-6">
             <p>

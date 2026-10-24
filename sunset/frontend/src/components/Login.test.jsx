@@ -22,9 +22,9 @@ test("customer login does not redirect staff credentials to the admin site", asy
   fireEvent.change(screen.getByPlaceholderText("Пароль"), { target: { value: "password" } });
   fireEvent.click(screen.getByRole("button", { name: "Войти" }));
 
-  expect(await screen.findByText("Покупательской учётной записи нет")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Зарегистрироваться" })).toHaveAttribute("href", "/register");
-  expect(screen.getByText(/понадобится другой email/)).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Аккаунт не найден" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Создать аккаунт" })).toHaveAttribute("href", "/register");
+  expect(screen.getByText(/нужен другой адрес/)).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Продолжить в админке" })).not.toBeInTheDocument();
   expect(screen.queryByPlaceholderText("Одноразовый код")).not.toBeInTheDocument();
 });
@@ -37,9 +37,11 @@ test("missing customer account offers registration", async () => {
   fireEvent.change(screen.getByPlaceholderText("Пароль"), { target: { value: "password" } });
   fireEvent.click(screen.getByRole("button", { name: "Войти" }));
 
-  expect(await screen.findByText("Покупательской учётной записи нет")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Зарегистрироваться" })).toHaveAttribute("href", "/register");
-  expect(screen.queryByText(/понадобится другой email/)).not.toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Аккаунт не найден" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Создать аккаунт" })).toHaveAttribute("href", "/register");
+  expect(screen.queryByText(/нужен другой адрес/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Войти с другим email" }));
+  expect(screen.getByPlaceholderText("Email")).toHaveValue("new@example.test");
 });
 
 test("wrong password remains a login error", async () => {
@@ -51,5 +53,5 @@ test("wrong password remains a login error", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Войти" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Неверный email или пароль");
-  expect(screen.queryByText("Покупательской учётной записи нет")).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Аккаунт не найден" })).not.toBeInTheDocument();
 });
