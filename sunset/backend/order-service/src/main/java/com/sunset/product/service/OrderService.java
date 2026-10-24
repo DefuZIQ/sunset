@@ -2,6 +2,9 @@ package com.sunset.product.service;
 
 import com.sunset.contract.IamAccess;
 import com.sunset.contract.IamAuthorizer;
+import com.sunset.contract.CustomerProfile;
+import com.sunset.contract.CustomerProfileReader;
+import com.sunset.contract.LocalCustomerProfileReader;
 
 import com.sunset.product.dto.OrderDtos.CreateOrderRequest;
 import com.sunset.product.dto.OrderDtos.OrderItemRequest;
@@ -17,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -30,16 +32,19 @@ public class OrderService {
     private final JdbcTemplate jdbc;
     private final IamAuthorizer access;
     private final PaymentProvider paymentProvider;
+    private final CustomerProfileReader profiles;
 
     public OrderService(JdbcTemplate jdbc, PaymentProvider paymentProvider) {
-        this(jdbc, paymentProvider, new IamAccess(jdbc));
+        this(jdbc, paymentProvider, new IamAccess(jdbc), new LocalCustomerProfileReader(jdbc));
     }
 
     @Autowired
-    public OrderService(JdbcTemplate jdbc, PaymentProvider paymentProvider, IamAuthorizer access) {
+    public OrderService(JdbcTemplate jdbc, PaymentProvider paymentProvider, IamAuthorizer access,
+                        CustomerProfileReader profiles) {
         this.jdbc = jdbc;
         this.access = access;
         this.paymentProvider = paymentProvider;
+        this.profiles = profiles;
     }
 
     @Transactional
@@ -52,7 +57,7 @@ public class OrderService {
                     (rs, n) -> rs.getObject(1, UUID.class), userId, request.idempotencyKey().trim());
             if (!existing.isEmpty()) return getOrder(existing.get(0));
         }
-        Map<String, Object> customer = jdbc.queryForMap("SELECT email, first_name, last_name, phone, birthday FROM users WHERE id=?", userId);
+        CustomerProfile customer = profiles.get(userId);
         List<Map<String, Object>> lines = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
         for (OrderItemRequest item : request.items()) {
@@ -71,7 +76,7 @@ public class OrderService {
             lines.add(line);
         }
 
-        LocalDate birthday = customer.get("birthday") == null ? null : ((Date) customer.get("birthday")).toLocalDate();
+        LocalDate birthday = customer.birthday();
         boolean birthdayToday = birthday != null && birthday.getMonthValue() == LocalDate.now().getMonthValue()
                 && birthday.getDayOfMonth() == LocalDate.now().getDayOfMonth();
         Map<String, Object> promo = findPromotion(request.promoCode(), subtotal, birthdayToday);
@@ -112,9 +117,9 @@ public class OrderService {
 
         UUID orderId = UUID.randomUUID();
         String orderNumber = jdbc.queryForObject("SELECT 'SUN-' || LPAD(nextval('order_number_seq')::text,6,'0')", String.class);
-        String name = valueOr(request.customerName(), ((String) customer.get("first_name")) + " " + customer.get("last_name"));
-        String email = valueOr(request.customerEmail(), (String) customer.get("email"));
-        String phone = valueOr(request.customerPhone(), (String) customer.get("phone"));
+        String name = valueOr(request.customerName(), customer.displayName());
+        String email = valueOr(request.customerEmail(), customer.email());
+        String phone = valueOr(request.customerPhone(), customer.phone());
         if (phone == null || phone.isBlank()) throw new IllegalArgumentException("Укажите номер телефона получателя");
         jdbc.update("INSERT INTO orders(id,order_number,user_id,customer_name,customer_email,customer_phone,status,subtotal,discount_amount,bonuses_used,bonuses_earned,promo_code,total_amount,idempotency_key) VALUES (?,?,?,?,?,?,'PENDING',?,?,?,?,?,?,?)",
                 orderId, orderNumber, userId, name, email, phone, subtotal, discount, used, earned,
@@ -201,8 +206,8 @@ public class OrderService {
     public Map<String, Object> loyalty(UUID userId) {
         jdbc.update("INSERT INTO loyalty_accounts(user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING", userId);
         Map<String, Object> account = new LinkedHashMap<>(jdbc.queryForMap("SELECT balance,lifetime_earned AS \"lifetimeEarned\",tier,updated_at AS \"updatedAt\" FROM loyalty_accounts WHERE user_id=?", userId));
-        Date birthday = jdbc.queryForObject("SELECT birthday FROM users WHERE id=?", Date.class, userId);
-        boolean birthdayToday = birthday != null && birthday.toLocalDate().getMonthValue() == LocalDate.now().getMonthValue() && birthday.toLocalDate().getDayOfMonth() == LocalDate.now().getDayOfMonth();
+        LocalDate birthday = profiles.get(userId).birthday();
+        boolean birthdayToday = birthday != null && birthday.getMonthValue() == LocalDate.now().getMonthValue() && birthday.getDayOfMonth() == LocalDate.now().getDayOfMonth();
         account.put("birthdayToday", birthdayToday);
         account.put("birthdayBenefit", "Скидка 15% и двойные бонусы в день рождения");
         account.put("transactions", jdbc.queryForList("SELECT amount,type,description,created_at AS \"createdAt\" FROM loyalty_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 20", userId));
@@ -216,8 +221,8 @@ public class OrderService {
     public Map<String, Object> validatePromo(String code, BigDecimal subtotal, UUID userId) {
         boolean birthday = false;
         if (userId != null) {
-            Date value = jdbc.queryForObject("SELECT birthday FROM users WHERE id=?", Date.class, userId);
-            birthday = value != null && value.toLocalDate().getMonthValue() == LocalDate.now().getMonthValue() && value.toLocalDate().getDayOfMonth() == LocalDate.now().getDayOfMonth();
+            LocalDate value = profiles.get(userId).birthday();
+            birthday = value != null && value.getMonthValue() == LocalDate.now().getMonthValue() && value.getDayOfMonth() == LocalDate.now().getDayOfMonth();
         }
         Map<String, Object> promo = findPromotion(code, subtotal == null ? BigDecimal.ZERO : subtotal, birthday);
         if (promo == null) throw new IllegalArgumentException("Промокод недействителен или не подходит к заказу");
@@ -244,7 +249,7 @@ public class OrderService {
         access.require(adminId, "customers:bonuses:write");
         int amount = request == null || request.amount() == null ? 0 : request.amount();
         if (amount == 0 || Math.abs(amount) > 100000) throw new IllegalArgumentException("Укажите изменение бонусов от −100 000 до 100 000");
-        if (jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE id=?", Integer.class, targetUserId) == 0) throw new IllegalArgumentException("Клиент не найден");
+        profiles.get(targetUserId);
         jdbc.update("INSERT INTO loyalty_accounts(user_id) VALUES (?) ON CONFLICT (user_id) DO NOTHING",targetUserId);
         Integer balance = jdbc.queryForObject("SELECT balance FROM loyalty_accounts WHERE user_id=? FOR UPDATE",Integer.class,targetUserId);
         int newBalance = Math.max(0,(balance == null ? 0 : balance)+amount);

@@ -2,6 +2,8 @@ package com.sunset.product.service;
 
 import com.sunset.contract.IamAccess;
 import com.sunset.contract.IamAuthorizer;
+import com.sunset.contract.CustomerProfileReader;
+import com.sunset.contract.LocalCustomerProfileReader;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,10 +23,11 @@ public class ReviewCommentService {
     private static final String FIELDS = "id,review_id AS \"reviewId\",user_id AS \"userId\",author_name AS \"authorName\",body,created_at AS \"createdAt\"";
     private final JdbcTemplate jdbc;
     private final IamAuthorizer access;
+    private final CustomerProfileReader profiles;
 
-    public ReviewCommentService(JdbcTemplate jdbc) { this(jdbc, new IamAccess(jdbc)); }
+    public ReviewCommentService(JdbcTemplate jdbc) { this(jdbc, new IamAccess(jdbc), new LocalCustomerProfileReader(jdbc)); }
     @Autowired
-    public ReviewCommentService(JdbcTemplate jdbc, IamAuthorizer access) { this.jdbc = jdbc; this.access = access; }
+    public ReviewCommentService(JdbcTemplate jdbc, IamAuthorizer access, CustomerProfileReader profiles) { this.jdbc = jdbc; this.access = access; this.profiles = profiles; }
 
     public Map<String, Object> list(UUID reviewId, int offset) {
         requireVisibleReview(reviewId);
@@ -47,11 +50,7 @@ public class ReviewCommentService {
         if (body.length() < 2 || body.length() > 1000) {
             throw new IllegalArgumentException("Комментарий должен содержать от 2 до 1000 символов");
         }
-        List<Map<String, Object>> users = jdbc.queryForList("SELECT first_name,last_name FROM users WHERE id=?", userId);
-        if (users.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Войдите в аккаунт");
-        Map<String, Object> user = users.get(0);
-        String author = (Objects.toString(user.get("first_name"), "") + " " + Objects.toString(user.get("last_name"), "")).trim();
-        if (author.isBlank()) author = "Клиент SUNSET";
+        String author = profiles.get(userId).displayName();
         return jdbc.queryForMap("INSERT INTO review_comments(review_id,user_id,author_name,body) VALUES (?,?,?,?) RETURNING " + FIELDS,
                 reviewId, userId, author, body);
     }

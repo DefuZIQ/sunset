@@ -3,8 +3,11 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- Product reviews refer to the auth-service table in the shared production database.
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
+    phone VARCHAR(32),
+    birthday DATE,
     role VARCHAR(20) NOT NULL DEFAULT 'USER'
 );
 

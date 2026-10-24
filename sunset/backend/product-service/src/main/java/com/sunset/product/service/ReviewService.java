@@ -2,6 +2,8 @@ package com.sunset.product.service;
 
 import com.sunset.contract.IamAccess;
 import com.sunset.contract.IamAuthorizer;
+import com.sunset.contract.CustomerProfileReader;
+import com.sunset.contract.LocalCustomerProfileReader;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,12 +19,13 @@ public class ReviewService {
     private final JdbcTemplate jdbc;
     private final ReviewPhotoService photos;
     private final IamAuthorizer access;
+    private final CustomerProfileReader profiles;
     private static final String REVIEW_FIELDS = "r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",r.store_reply AS \"storeReply\",r.store_replied_at AS \"storeRepliedAt\",r.is_hidden AS \"isHidden\",r.moderated_at AS \"moderatedAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.vote='LIKE') AS \"helpfulCount\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.vote='LIKE') AS \"likeCount\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.vote='DISLIKE') AS \"dislikeCount\",(SELECT COUNT(*) FROM review_comments c WHERE c.review_id=r.id) AS \"commentCount\"";
 
-    public ReviewService(JdbcTemplate jdbc, ReviewPhotoService photos) { this(jdbc, photos, new IamAccess(jdbc)); }
+    public ReviewService(JdbcTemplate jdbc, ReviewPhotoService photos) { this(jdbc, photos, new IamAccess(jdbc), new LocalCustomerProfileReader(jdbc)); }
     @Autowired
-    public ReviewService(JdbcTemplate jdbc, ReviewPhotoService photos, IamAuthorizer access) {
-        this.jdbc = jdbc; this.photos = photos; this.access = access;
+    public ReviewService(JdbcTemplate jdbc, ReviewPhotoService photos, IamAuthorizer access, CustomerProfileReader profiles) {
+        this.jdbc = jdbc; this.photos = photos; this.access = access; this.profiles = profiles;
     }
 
     public List<Map<String, Object>> list(UUID productId) {
@@ -64,9 +67,7 @@ public class ReviewService {
         }
         if (body.length() < 3 || body.length() > 1500) throw new IllegalArgumentException("Отзыв должен содержать от 3 до 1500 символов");
         if (jdbc.queryForObject("SELECT COUNT(*) FROM products WHERE id=?", Integer.class, productId) == 0) throw new IllegalArgumentException("Товар не найден");
-        Map<String, Object> user = jdbc.queryForMap("SELECT first_name,last_name FROM users WHERE id=?", userId);
-        String author = (Objects.toString(user.get("first_name"), "") + " " + Objects.toString(user.get("last_name"), "")).trim();
-        if (author.isBlank()) author = "Клиент SUNSET";
+        String author = profiles.get(userId).displayName();
         boolean verified = Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.product_id=? AND o.user_id=? AND o.status='DELIVERED')", Boolean.class, productId, userId));
         jdbc.update("INSERT INTO product_reviews(product_id,user_id,author_name,rating,quality_rating,fit,photo_url,verified_purchase,body) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT (product_id,user_id) DO UPDATE SET author_name=EXCLUDED.author_name,rating=EXCLUDED.rating,quality_rating=EXCLUDED.quality_rating,fit=EXCLUDED.fit,photo_url=EXCLUDED.photo_url,verified_purchase=EXCLUDED.verified_purchase,body=EXCLUDED.body,updated_at=NOW()", productId,userId,author,rating,qualityRating,fit,photoUrl.isBlank()?null:photoUrl,verified,body);
         photos.removeUnused(userId, productId, photoUrl);

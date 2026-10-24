@@ -155,6 +155,8 @@ services:
       SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       IAM_MODE: remote
       IAM_AUTH_URL: http://staff-auth-service:8081
+      CUSTOMER_PROFILE_MODE: remote
+      CUSTOMER_PROFILE_AUTH_URL: http://auth-service:8081
       INTERNAL_IAM_SECRET: ${INTERNAL_IAM_SECRET:-}
       SPRING_APPLICATION_NAME: product-service
       MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
@@ -186,6 +188,8 @@ services:
       SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       IAM_MODE: remote
       IAM_AUTH_URL: http://staff-auth-service:8081
+      CUSTOMER_PROFILE_MODE: remote
+      CUSTOMER_PROFILE_AUTH_URL: http://auth-service:8081
       INTERNAL_IAM_SECRET: ${INTERNAL_IAM_SECRET:-}
       SPRING_APPLICATION_NAME: order-service
       MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
