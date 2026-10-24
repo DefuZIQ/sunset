@@ -24,7 +24,7 @@ test("customer login does not redirect staff credentials to the admin site", asy
 
   expect(await screen.findByRole("heading", { name: "Аккаунт не найден" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Создать аккаунт" })).toHaveAttribute("href", "/register");
-  expect(screen.getByText(/нужен другой адрес/)).toBeInTheDocument();
+  expect(screen.queryByText(/сотрудник|служебн|другой адрес/i)).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Продолжить в админке" })).not.toBeInTheDocument();
   expect(screen.queryByPlaceholderText("Одноразовый код")).not.toBeInTheDocument();
 });
@@ -39,7 +39,7 @@ test("missing customer account offers registration", async () => {
 
   expect(await screen.findByRole("heading", { name: "Аккаунт не найден" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Создать аккаунт" })).toHaveAttribute("href", "/register");
-  expect(screen.queryByText(/нужен другой адрес/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/сотрудник|служебн|другой адрес/i)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Войти с другим email" }));
   expect(screen.getByPlaceholderText("Email")).toHaveValue("new@example.test");
 });

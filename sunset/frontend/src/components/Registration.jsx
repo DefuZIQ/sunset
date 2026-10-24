@@ -95,9 +95,6 @@ export default function Registration({ setUser }) {
             <span className="auth-card__eyebrow">ЛИЧНЫЙ КАБИНЕТ</span>
             <h1>Ваш стиль начинается здесь</h1>
             <p className="auth-card__intro">Создайте аккаунт, чтобы сохранять избранное и следить за заказами.</p>
-            {location.state?.staffEmailInUse && (
-              <p className="auth-notice" role="status">Для покупательского аккаунта пока укажите другой email: служебный адрес уже занят.</p>
-            )}
             <form onSubmit={handleSubmit}>
               <label className="auth-field"><span>Имя</span><input
                 type="text"

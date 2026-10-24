@@ -75,10 +75,7 @@ export default function Login({ setUser }) {
                 <div className="auth-missing__icon" aria-hidden="true">✦</div>
                 <h1>Аккаунт не найден</h1>
                 <p>Покупательской учётной записи для <strong>{email}</strong> пока нет.</p>
-                {missingCustomer === "staff" && (
-                  <p className="auth-missing-hint">Этот email используется для входа сотрудников. Для регистрации покупателя пока нужен другой адрес.</p>
-                )}
-                <Link className="auth-primary" to="/register" state={missingCustomer === "not-found" ? { email } : { staffEmailInUse: true }}>
+                <Link className="auth-primary" to="/register" state={missingCustomer === "not-found" ? { email } : undefined}>
                   Создать аккаунт <span aria-hidden="true">↗</span>
                 </Link>
                 <button className="auth-text-button" type="button" onClick={() => { setMissingCustomer(null); setPassword(""); }}>
