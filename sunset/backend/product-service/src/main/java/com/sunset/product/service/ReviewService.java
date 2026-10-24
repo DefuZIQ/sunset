@@ -1,8 +1,10 @@
 package com.sunset.product.service;
 
 import com.sunset.contract.IamAccess;
+import com.sunset.contract.IamAuthorizer;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,9 +16,14 @@ import java.util.*;
 public class ReviewService {
     private final JdbcTemplate jdbc;
     private final ReviewPhotoService photos;
+    private final IamAuthorizer access;
     private static final String REVIEW_FIELDS = "r.id,r.user_id AS \"userId\",r.author_name AS \"authorName\",r.rating,r.quality_rating AS \"qualityRating\",r.fit,r.photo_url AS \"photoUrl\",r.verified_purchase AS \"verifiedPurchase\",r.body,r.created_at AS \"createdAt\",r.store_reply AS \"storeReply\",r.store_replied_at AS \"storeRepliedAt\",r.is_hidden AS \"isHidden\",r.moderated_at AS \"moderatedAt\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.vote='LIKE') AS \"helpfulCount\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.vote='LIKE') AS \"likeCount\",(SELECT COUNT(*) FROM product_review_helpful_votes v WHERE v.review_id=r.id AND v.vote='DISLIKE') AS \"dislikeCount\",(SELECT COUNT(*) FROM review_comments c WHERE c.review_id=r.id) AS \"commentCount\"";
 
-    public ReviewService(JdbcTemplate jdbc, ReviewPhotoService photos) { this.jdbc = jdbc; this.photos = photos; }
+    public ReviewService(JdbcTemplate jdbc, ReviewPhotoService photos) { this(jdbc, photos, new IamAccess(jdbc)); }
+    @Autowired
+    public ReviewService(JdbcTemplate jdbc, ReviewPhotoService photos, IamAuthorizer access) {
+        this.jdbc = jdbc; this.photos = photos; this.access = access;
+    }
 
     public List<Map<String, Object>> list(UUID productId) {
         return list(productId, null);
@@ -132,7 +139,7 @@ public class ReviewService {
     }
 
     private void ensureAdmin(UUID userId) {
-        new IamAccess(jdbc).require(userId, "reviews:moderate");
+        access.require(userId, "reviews:moderate");
     }
 
     public List<Map<String, Object>> categoryTree() {

@@ -1,6 +1,7 @@
 package com.sunset.product.service;
 
 import com.sunset.contract.IamAccess;
+import com.sunset.contract.IamAuthorizer;
 
 import com.sunset.product.dto.OrderDtos.CreateOrderRequest;
 import com.sunset.product.dto.OrderDtos.OrderItemRequest;
@@ -10,6 +11,7 @@ import com.sunset.product.dto.OrderDtos.ReturnRequest;
 import com.sunset.product.dto.OrderDtos.ReturnStatusRequest;
 import com.sunset.product.payment.PaymentProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,12 +28,17 @@ public class OrderService {
     private static final Set<String> STATUSES = Set.of("PENDING", "CONFIRMED", "ASSEMBLING", "SHIPPED", "DELIVERED", "CANCELLED");
     private static final Set<String> RETURN_STATUSES = Set.of("REQUESTED", "APPROVED", "REJECTED", "RECEIVED", "REFUNDED");
     private final JdbcTemplate jdbc;
-    private final IamAccess access;
+    private final IamAuthorizer access;
     private final PaymentProvider paymentProvider;
 
     public OrderService(JdbcTemplate jdbc, PaymentProvider paymentProvider) {
+        this(jdbc, paymentProvider, new IamAccess(jdbc));
+    }
+
+    @Autowired
+    public OrderService(JdbcTemplate jdbc, PaymentProvider paymentProvider, IamAuthorizer access) {
         this.jdbc = jdbc;
-        this.access = new IamAccess(jdbc);
+        this.access = access;
         this.paymentProvider = paymentProvider;
     }
 

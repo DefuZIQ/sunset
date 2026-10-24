@@ -14,6 +14,7 @@ import com.sunset.auth.service.AuthSessionService;
 import com.sunset.auth.service.MfaService;
 import com.sunset.auth.service.CustomerAddressService;
 import com.sunset.auth.controller.IamController;
+import com.sunset.auth.controller.InternalIamController;
 import com.sunset.auth.controller.MfaController;
 import com.sunset.auth.security.AdminCookieSession;
 import com.sunset.contract.IamAccess;
@@ -43,6 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest
 class AuthPostgresIntegrationTest {
@@ -77,6 +79,21 @@ class AuthPostgresIntegrationTest {
     @BeforeEach
     void clearUsers() {
         jdbc.execute("TRUNCATE TABLE user_roles, users CASCADE");
+    }
+
+    @Test
+    void internalIamRequiresServiceSecretAndNeverGrantsCustomerPermissions() {
+        UUID customer = UUID.fromString(service.registerUser(new RegisterRequest(
+                "iam-customer@sunset.test", "initial-pass-123", "Иван", "Клиент")).getUuid());
+        UUID admin = UUID.fromString(service.registerUser(new RegisterRequest(
+                "iam-admin@sunset.test", "initial-pass-123", "Анна", "Админ")).getUuid());
+        jdbc.update("UPDATE users SET role='ADMIN' WHERE id=?", admin);
+        String key = "test-internal-iam-secret-at-least-32-bytes";
+        InternalIamController internal = new InternalIamController(jdbc, key);
+        assertThatThrownBy(() -> internal.identity(admin, null)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> internal.identity(admin, "wrong-key")).isInstanceOf(ResponseStatusException.class);
+        assertThat(internal.identity(customer, key).permissions()).isEmpty();
+        assertThat(internal.identity(admin, key).permissions()).contains("catalog:write", "orders:manage");
     }
 
     @Test

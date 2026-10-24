@@ -1,8 +1,10 @@
 package com.sunset.product.service;
 
 import com.sunset.contract.IamAccess;
+import com.sunset.contract.IamAuthorizer;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,8 +15,10 @@ import java.util.*;
 public class AdminProductService {
     private static final UUID WAREHOUSE_ID = UUID.fromString("00000000-0000-4000-8000-000000000001");
     private final JdbcTemplate jdbc;
-    private final IamAccess access;
-    public AdminProductService(JdbcTemplate jdbc) { this.jdbc = jdbc; this.access = new IamAccess(jdbc); }
+    private final IamAuthorizer access;
+    public AdminProductService(JdbcTemplate jdbc) { this(jdbc, new IamAccess(jdbc)); }
+    @Autowired
+    public AdminProductService(JdbcTemplate jdbc, IamAuthorizer access) { this.jdbc = jdbc; this.access = access; }
 
     @Transactional
     public Map<String,Object> create(UUID userId, Map<String,Object> request) {

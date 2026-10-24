@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Shared-database IAM adapter. Replace SQL reads with Auth Service API when databases are separated. */
-public final class IamAccess {
+public final class IamAccess implements IamAuthorizer {
     public static final Set<String> PERMISSIONS = Set.of(
             "catalog:write", "stock:write", "orders:read", "orders:manage",
             "reviews:moderate", "promotions:manage", "customers:read",

@@ -28,6 +28,9 @@ export SPRING_DATASOURCE_URL="$E2E_JDBC_URL"
 export SPRING_DATASOURCE_USERNAME="$E2E_DB_USER"
 export SPRING_DATASOURCE_PASSWORD="$E2E_DB_PASSWORD"
 export SPRING_SECURITY_JWT_SECRET="$JWT_SECRET"
+export INTERNAL_IAM_SECRET=sunset-e2e-internal-iam-secret-32-bytes-only
+export IAM_MODE=remote
+export IAM_AUTH_URL=http://127.0.0.1:8081
 export SERVER_ADDRESS=127.0.0.1
 
 log_dir="$(mktemp -d)"

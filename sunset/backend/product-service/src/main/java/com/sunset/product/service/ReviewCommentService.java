@@ -1,9 +1,11 @@
 package com.sunset.product.service;
 
 import com.sunset.contract.IamAccess;
+import com.sunset.contract.IamAuthorizer;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,8 +20,11 @@ import java.util.UUID;
 public class ReviewCommentService {
     private static final String FIELDS = "id,review_id AS \"reviewId\",user_id AS \"userId\",author_name AS \"authorName\",body,created_at AS \"createdAt\"";
     private final JdbcTemplate jdbc;
+    private final IamAuthorizer access;
 
-    public ReviewCommentService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public ReviewCommentService(JdbcTemplate jdbc) { this(jdbc, new IamAccess(jdbc)); }
+    @Autowired
+    public ReviewCommentService(JdbcTemplate jdbc, IamAuthorizer access) { this.jdbc = jdbc; this.access = access; }
 
     public Map<String, Object> list(UUID reviewId, int offset) {
         requireVisibleReview(reviewId);
@@ -56,7 +61,7 @@ public class ReviewCommentService {
         List<UUID> authors = jdbc.query("SELECT user_id FROM review_comments WHERE id=?", (rs, row) -> rs.getObject(1, UUID.class), commentId);
         if (authors.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Комментарий не найден");
         if (!authors.get(0).equals(userId)) {
-            if (!new IamAccess(jdbc).permissions(userId).contains("reviews:moderate")) {
+            if (!access.permissions(userId).contains("reviews:moderate")) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Можно удалить только свой комментарий");
             }
         }

@@ -1,9 +1,11 @@
 package com.sunset.product.controller;
 import com.sunset.contract.IamAccess;
+import com.sunset.contract.IamAuthorizer;
 import com.sunset.product.model.Store;
 import com.sunset.product.repository.StoreRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
@@ -12,11 +14,12 @@ import java.util.UUID;
 @RequestMapping("/order/stores")
 public class StoreController {
     private final StoreRepository repository;
-    private final JdbcTemplate jdbc;
-    public StoreController(StoreRepository repository, JdbcTemplate jdbc) { this.repository = repository; this.jdbc = jdbc; }
+    private final IamAuthorizer access;
+    public StoreController(StoreRepository repository, JdbcTemplate jdbc) { this(repository, new IamAccess(jdbc)); }
+    @Autowired
+    public StoreController(StoreRepository repository, IamAuthorizer access) { this.repository = repository; this.access = access; }
     @GetMapping public List<Store> list() { return repository.findByActiveTrueAndKindOrderByCityAscNameAsc("STORE"); }
     @GetMapping("/admin") public List<Store> listAdmin(@RequestHeader("user-id") UUID userId) {
-        IamAccess access = new IamAccess(jdbc);
         List<String> permissions = access.permissions(userId);
         if (!permissions.contains("stores:manage") && !permissions.contains("stock:write"))
             throw new SecurityException("Недостаточно прав для просмотра точек");
@@ -31,7 +34,7 @@ public class StoreController {
         return repository.findAllByOrderByKindAscCityAscNameAsc();
     }
     @PostMapping public Store create(@RequestHeader("user-id") UUID userId, @RequestBody Store store) {
-        new IamAccess(jdbc).require(userId, "stores:manage");
+        access.require(userId, "stores:manage");
         if (!"STORE".equals(store.getKind()) && !"WAREHOUSE".equals(store.getKind())) {
             throw new IllegalArgumentException("Тип точки должен быть STORE или WAREHOUSE");
         }
