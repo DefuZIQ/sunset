@@ -34,6 +34,9 @@ done
 commerce_users=$(docker exec "$container" psql -U postgres -d sunset_commerce -Atqc \
   "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename='users'")
 test "$commerce_users" -eq 0 || { echo 'Customer users leaked into commerce backup' >&2; exit 1; }
+legacy_commerce=$(docker exec "$container" psql -U postgres -d sunset -Atqc \
+  "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('products','orders','product_stock','loyalty_transactions')")
+test "$legacy_commerce" -eq 0 || { echo 'Legacy commerce tables remain in customer backup' >&2; exit 1; }
 products=$(docker exec "$container" psql -U postgres -d sunset_commerce -Atqc \
   'SELECT count(*) FROM products')
 orders=$(docker exec "$container" psql -U postgres -d sunset_commerce -Atqc \

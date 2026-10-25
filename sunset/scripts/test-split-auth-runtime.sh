@@ -45,6 +45,14 @@ for database in sunset sunset_staff sunset_commerce; do
     --no-owner --no-acl --exit-on-error "/tmp/bundle/$database.dump" > /dev/null
 done
 
+if [ "${CLEAN_LEGACY_COMMERCE:-0}" = 1 ]; then
+  docker exec -i "$db" psql -U postgres -d sunset -v ON_ERROR_STOP=1 -q \
+    <"$(dirname "$0")/legacy-commerce-cleanup.sql"
+  customer_tables=$(docker exec "$db" psql -U postgres -d sunset -Atqc \
+    "SELECT count(*) FROM pg_tables WHERE schemaname='public'")
+  test "$customer_tables" -eq 16 || { echo 'Legacy cleanup left unexpected customer tables' >&2; exit 1; }
+fi
+
 jwt_secret=split-drill-jwt-secret-at-least-32-characters
 internal_secret=split-drill-internal-secret-at-least-32-characters
 mfa_key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
