@@ -39,6 +39,9 @@ jobs:
           JWT_SECRET: ci-validation-secret-at-least-32-bytes
           GRAFANA_ADMIN_PASSWORD: ci-not-used-at-runtime
           MFA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          STAFF_DB_USER: sunset_staff_ci
+          STAFF_DB_PASSWORD: ci-not-used-at-runtime
+          INTERNAL_IAM_SECRET: ci-internal-iam-secret-at-least-32-bytes
         run: docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml config --quiet
       - name: Validate web rollout script syntax
         run: sh -n scripts/deploy-web.sh scripts/test-deploy-web.sh && sh scripts/test-deploy-web.sh
@@ -136,4 +139,7 @@ jobs:
           JWT_SECRET: ci-validation-secret-at-least-32-bytes
           GRAFANA_ADMIN_PASSWORD: ci-not-used-at-runtime
           MFA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          STAFF_DB_USER: sunset_staff_ci
+          STAFF_DB_PASSWORD: ci-not-used-at-runtime
+          INTERNAL_IAM_SECRET: ci-internal-iam-secret-at-least-32-bytes
         run: docker compose -f docker-compose.prod.yml build

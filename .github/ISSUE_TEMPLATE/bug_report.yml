@@ -1,0 +1,47 @@
+name: Ошибка
+description: Сообщить о воспроизводимой ошибке SUNSET
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Область
+      options:
+        - Витрина
+        - Админка
+        - Android
+        - API и сервисы
+        - База данных
+        - Развёртывание
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Как воспроизвести
+      placeholder: Последовательность действий и тестовые данные без паролей и персональных сведений
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемый результат
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактический результат
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Среда и версия
+      placeholder: Например, production / Android 15 / версия или SHA коммита
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Скриншоты и логи
+      description: Перед публикацией удалите токены, пароли и персональные данные клиентов.

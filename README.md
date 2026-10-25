@@ -5,6 +5,7 @@ SUNSET — интернет-магазин одежды с покупатель�
 - Витрина: [t3ch.pro](https://t3ch.pro/)
 - Панель сотрудников: [admin.t3ch.pro](https://admin.t3ch.pro/)
 - Подробная документация: [sunset/docs/README.md](sunset/docs/README.md)
+- Задачи и релизы: [RELEASE_PROCESS.md](RELEASE_PROCESS.md)
 
 ## Архитектура
 
