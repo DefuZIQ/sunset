@@ -3,3 +3,5 @@
 *.sh text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+/android-app/gradlew text eol=lf
+/android-app/gradlew.bat text eol=crlf

@@ -11,6 +11,7 @@ export default function AssistantWidget() {
   const [listening, setListening] = useState(false);
   const [messages, setMessages] = useState([{ role: "assistant", text: "Привет! Я помогу подобрать вещь по стилю, размеру, цвету и бюджету." }]);
   const recognition = useRef(null);
+  const nativeVoiceHandler = useRef(null);
   const send = async (text = message) => {
     if (!text.trim() || loading) return;
     setMessages((m) => [...m, { role: "user", text }]); setMessage(""); setLoading(true);
@@ -30,6 +31,10 @@ export default function AssistantWidget() {
     finally { setLoading(false); }
   };
   const toggleVoice = () => {
+    if (navigator.userAgent.includes("SunsetAndroidApp/")) {
+      window.location.href = "sunset://voice";
+      return;
+    }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return alert("Голосовой ввод не поддерживается этим браузером");
     if (listening) { recognition.current?.stop(); return; }
@@ -38,6 +43,15 @@ export default function AssistantWidget() {
     r.onresult = e => { const text = e.results[0][0].transcript; setMessage(text); send(text); };
     recognition.current = r; r.start();
   };
+  nativeVoiceHandler.current = (event) => {
+    const transcript = typeof event.detail === "string" ? event.detail.trim() : "";
+    if (transcript) { setMessage(transcript); send(transcript); }
+  };
+  useEffect(() => {
+    const handleNativeVoice = (event) => nativeVoiceHandler.current?.(event);
+    window.addEventListener("sunset-native-voice-result", handleNativeVoice);
+    return () => window.removeEventListener("sunset-native-voice-result", handleNativeVoice);
+  }, []);
   useEffect(() => () => recognition.current?.stop(), []);
   return <div className="assistant-widget">{!open && <button className="assistant-launcher" onClick={() => setOpen(true)} aria-label="Открыть помощника"><span className="assistant-spark">✦</span><span className="assistant-launcher-label">Подобрать образ</span></button>}
     {open && <section className="assistant-panel"><header><div className="assistant-brand"><span className="assistant-brand-mark">✦</span><div><b>Помощник SUNSET</b><small><i/>Онлайн · подберу ваш образ</small></div></div><button className="assistant-close" onClick={() => setOpen(false)} aria-label="Закрыть помощника">×</button></header>

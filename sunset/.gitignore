@@ -28,6 +28,8 @@ target/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
+**/.gradle/
+**/local.properties
 
 ### Local caches and release artifacts ###
 **/.m2/

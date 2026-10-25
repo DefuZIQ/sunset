@@ -10,6 +10,7 @@
 - [Модель данных](DATA_MODEL.md)
 - [Автоматическое тестирование](TESTING.md)
 - [Отчёт о последнем прогоне](TEST_REPORT.md)
+- [Android-приложение: сборка и проверка](../android-app/README.md)
 - [План улучшений](improvements/ROADMAP.md)
 - [Полный аудит возможностей улучшения](improvements/IMPROVEMENT_AUDIT.md)
 - [Спецификация релиза P0](improvements/P0_IMPLEMENTATION_SPEC.md)
