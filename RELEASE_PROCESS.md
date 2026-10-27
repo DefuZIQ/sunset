@@ -29,3 +29,5 @@
 - **Секреты и персональные данные:** не включать в Issues, PR, артефакты CI и release notes. Тестовые сценарии не должны создавать реальные заказы на production.
 
 Публикация фронтенда и схема туннеля описаны в [документации VDS](sunset/deploy/vds/README.md); разделение БД и проверки восстановления — в [спецификации миграции](sunset/docs/improvements/COMMERCE_DATABASE_EXTRACTION.md).
+
+Для backend-кандидата используйте каталог резервной копии `sunset-cluster-*`, содержащий `sunset.dump`, `sunset_staff.dump`, `sunset_commerce.dump` и `SHA256SUMS`. Сначала проверьте восстановление через `sunset/scripts/test-restore-cluster.sh`, затем запустите `sunset/scripts/test-backend-candidates.sh` с этим каталогом и тегом кандидата. `sunset/scripts/deploy-backend-candidate.sh --check` принимает тот же каталог. Для staging checkout укажите путь к рабочему `.env` через `SUNSET_ENV_FILE`; сценарий сохраняет текущий образ для отката. Сервисы `auth-service` и `staff-auth-service` используют общий образ и переключаются вместе.
