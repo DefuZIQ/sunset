@@ -34,6 +34,15 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
   }, []);
 
   useEffect(() => {
+    if (!isSearchActive) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") popupSearchClose();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isSearchActive]);
+
+  useEffect(() => {
     if (!user) { setUnreadNotifications(0); return; }
     countUnreadNotifications(localStorage.getItem("authToken"))
       .then((data) => setUnreadNotifications(data.count || 0)).catch(() => {});
@@ -121,7 +130,8 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
 
       {/* Поисковый попап */}
       {isSearchActive && (
-        <div className="popup_search" role="dialog" aria-label="Поиск по каталогу" onClick={(event) => { if (event.target === event.currentTarget) popupSearchClose(); }} onKeyDown={(event) => { if (event.key === "Escape") popupSearchClose(); }}>
+        <div className="popup_search" role="dialog" aria-label="Поиск по каталогу">
+          <button className="popup_search_backdrop" type="button" aria-label="Закрыть поиск" onClick={popupSearchClose} />
           <form className="search-form" onSubmit={submitSearch}>
           <span className="search-label">ПОИСК ПО КАТАЛОГУ</span>
           <input
