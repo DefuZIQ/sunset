@@ -460,7 +460,7 @@ test('registration uses the versioned API then signs the customer in', async ({ 
   await page.getByPlaceholder('Email').fill('new@example.test');
   await page.getByPlaceholder('Пароль', { exact: true }).fill('correct-password');
   await page.getByPlaceholder('Подтверждение пароля').fill('correct-password');
-  await page.getByRole('button', { name: 'Зарегистрироваться' }).click();
+  await page.getByRole('button', { name: 'Создать аккаунт' }).click();
   await expect(page).toHaveURL(/#\/profile$/);
   expect(await page.evaluate(() => localStorage.getItem('authToken'))).toBe('new-token');
   expect(registered).toBe(true);
@@ -1494,8 +1494,8 @@ test('staff sees only IAM-authorized administration sections', async ({ page }) 
 test('admin assigns a warehouse role scoped to one location', async ({ page }) => {
   const userId = '77777777-7777-7777-7777-777777777777';
   let saved = null;
-  await page.route('**/api/v1/order/admin/users', (route) => route.fulfill({ json: [{ id: userId, email: 'staff@example.test', firstName: 'Иван', lastName: 'Сотрудник', role: 'CUSTOMER', orderCount: 0, orderTotal: 0, bonusBalance: 0 }] }));
-  await page.route(`**/api/v1/auth/iam/staff/${userId}/permissions`, (route) => route.fulfill({ json: { role: 'CUSTOMER', staffRole: null, locationId: null, permissions: [] } }));
+  await page.route('**/api/v1/auth/iam/staff', (route) => route.fulfill({ json: [{ id: userId, email: 'staff@example.test', firstName: 'Иван', lastName: 'Сотрудник', role: 'STAFF', staffRole: 'CONTENT_MARKETING' }] }));
+  await page.route(`**/api/v1/auth/iam/staff/${userId}/permissions`, (route) => route.fulfill({ json: { role: 'STAFF', staffRole: 'CONTENT_MARKETING', locationId: null, permissions: ['catalog:write'] } }));
   await page.route(`**/api/v1/auth/iam/staff/${userId}/role`, async (route) => {
     saved = route.request().postDataJSON();
     await route.fulfill({ json: { role: 'STAFF', staffRole: saved.roleCode, locationId: saved.locationId, permissions: ['stock:write'] } });
@@ -1520,7 +1520,7 @@ test('admin has a separate session from the storefront account', async ({ page }
     json: { role: 'ADMIN', token: null, csrfToken: 'test-csrf' },
     headers: { 'Set-Cookie': 'SUNSET_ADMIN_SESSION=test-admin-session; HttpOnly; Path=/api/v1; SameSite=Strict' },
   }));
-  await page.route('**/api/v1/auth/logout', (route) => {
+  await page.route('**/api/v1/auth/staff/logout', (route) => {
     expect(route.request().headers().authorization).toBeUndefined();
     expect(route.request().headers()['x-sunset-csrf']).toBe('test-csrf');
     return route.fulfill({ status: 204, headers: { 'Set-Cookie': 'SUNSET_ADMIN_SESSION=; Max-Age=0; Path=/api/v1' } });
