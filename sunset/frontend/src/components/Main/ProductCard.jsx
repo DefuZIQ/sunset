@@ -48,7 +48,7 @@ export default function ProductCard({ product }) {
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(row);
-    document.fonts?.ready.then(measure);
+    document.fonts?.ready.then(measure).catch(() => {});
     return () => { active = false; observer.disconnect(); };
   }, [availableSizes]);
   if (!product) return null;

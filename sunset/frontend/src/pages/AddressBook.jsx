@@ -91,7 +91,7 @@ export default function AddressBook({ user }) {
           <label className="map-confirm"><input type="checkbox" checked={pointConfirmed} onChange={(event) => setPointConfirmed(event.target.checked)} />Точка на карте соответствует адресу</label>
         </>}
       </div>
-      <div className="address-book__footer"><button className="primary-action" disabled={busy}>{busy ? "Сохраняем…" : "Сохранить адрес"}</button><button type="button" className="text-link" onClick={() => { setDraft(null); setEditingId(null); setError(""); }}>Отмена</button></div>
+      <div className="address-book__footer"><button type="submit" className="primary-action" disabled={busy}>{busy ? "Сохраняем…" : "Сохранить адрес"}</button><button type="button" className="text-link" onClick={() => { setDraft(null); setEditingId(null); setError(""); }}>Отмена</button></div>
     </form>}
     {error && <p className="account-form__error" role="alert">{error}</p>}
   </section>;

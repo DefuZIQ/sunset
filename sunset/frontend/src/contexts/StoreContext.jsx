@@ -24,7 +24,7 @@ const normalizeProduct = (product, index) => ({
 
 export function StoreProvider({ children }) {
   const [cachedProducts] = useState(readCatalogCache);
-  const [products, setProducts] = useState(() => cachedProducts?.map(normalizeProduct) ?? []);
+  const [products, setProducts] = useState(() => cachedProducts?.map((product, index) => normalizeProduct(product, index)) ?? []);
   const [categoryTree, setCategoryTree] = useState([]);
   const [loading, setLoading] = useState(cachedProducts === null);
   const [catalogError, setCatalogError] = useState(false);
@@ -34,7 +34,7 @@ export function StoreProvider({ children }) {
     listProducts(controller.signal)
       .then((data) => {
         if (!Array.isArray(data)) throw new Error("Invalid catalog response");
-        setProducts(data.map(normalizeProduct));
+        setProducts(data.map((product, index) => normalizeProduct(product, index)));
         writeCatalogCache(data);
         setCatalogError(false);
       })

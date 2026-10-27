@@ -115,7 +115,7 @@ function ReviewComments({ reviewId, initialCount = 0, viewerId }) {
 
   const toggle = () => {
     setOpen((current) => !current);
-    if (!open && !loaded) load();
+    if (!open && !loaded) void load();
   };
 
   const submit = async (event) => {
@@ -666,7 +666,7 @@ export default function ProductPage() {
             {photoUploadError && <div className="review-photo-error" role="alert"><span>{photoUploadError}</span><button type="button" onClick={clearSelectedReviewPhoto}>Продолжить без фото</button></div>}
             {!photoPreview && review.photoUrl && !removeExistingPhoto && <div className="review-photo-preview"><img src={review.photoUrl} alt="Текущее фото отзыва" /><span>Фото уже прикреплено к отзыву.</span><button type="button" onClick={() => setRemoveExistingPhoto(true)}>Удалить фото</button></div>}
             <label className="review-form__comment">Комментарий<textarea required minLength="3" maxLength="1500" value={review.body} onChange={(event) => setReview((current) => ({ ...current, body: event.target.value }))} placeholder="Расскажите о посадке, ткани и впечатлениях" /><small>{review.body.length} / 1500</small></label>
-            <button className="primary-action review-form__submit" disabled={savingReview || uploadingPhoto || Boolean(photoUploadError) || Boolean(reviewFile && !uploadedPhotoUrl)}>{savingReview ? "Сохраняем…" : uploadingPhoto ? "Загружаем фото…" : "Опубликовать"}<span aria-hidden="true">↗</span></button>
+            <button type="submit" className="primary-action review-form__submit" disabled={savingReview || uploadingPhoto || Boolean(photoUploadError) || Boolean(reviewFile && !uploadedPhotoUrl)}>{savingReview ? "Сохраняем…" : uploadingPhoto ? "Загружаем фото…" : "Опубликовать"}<span aria-hidden="true">↗</span></button>
             {reviewMessage && (reviewMessageType === "error" || reviewFormOpen) && <p className={`review-form__message ${reviewMessageType === "error" ? "is-error" : ""}`} role={reviewMessageType === "error" ? "alert" : "status"}>{reviewMessage}</p>}
           </form> : <div id="review-login" className={`review-login ${reviewFormOpen ? "is-open" : ""}`}><h3>Поделитесь впечатлением</h3><p>Чтобы оставить отзыв, войдите в личный кабинет.</p><Link className="primary-action" to="/login">Войти</Link></div>}
           </div>

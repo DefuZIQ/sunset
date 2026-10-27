@@ -40,12 +40,12 @@ export default function AssistantWidget() {
     if (listening) { recognition.current?.stop(); return; }
     const r = new SpeechRecognition(); r.lang = "ru-RU"; r.interimResults = false;
     r.onstart = () => setListening(true); r.onend = () => setListening(false);
-    r.onresult = e => { const text = e.results[0][0].transcript; setMessage(text); send(text); };
+    r.onresult = e => { const text = e.results[0][0].transcript; setMessage(text); void send(text); };
     recognition.current = r; r.start();
   };
   nativeVoiceHandler.current = (event) => {
     const transcript = typeof event.detail === "string" ? event.detail.trim() : "";
-    if (transcript) { setMessage(transcript); send(transcript); }
+    if (transcript) { setMessage(transcript); void send(transcript); }
   };
   useEffect(() => {
     const handleNativeVoice = (event) => nativeVoiceHandler.current?.(event);
@@ -56,7 +56,7 @@ export default function AssistantWidget() {
   return <div className="assistant-widget">{!open && <button className="assistant-launcher" onClick={() => setOpen(true)} aria-label="Открыть помощника"><span className="assistant-spark">✦</span><span className="assistant-launcher-label">Подобрать образ</span></button>}
     {open && <section className="assistant-panel"><header><div className="assistant-brand"><span className="assistant-brand-mark">✦</span><div><b>Помощник SUNSET</b><small><i/>Онлайн · подберу ваш образ</small></div></div><button className="assistant-close" onClick={() => setOpen(false)} aria-label="Закрыть помощника">×</button></header>
       <div className="assistant-messages">{messages.map((m, i) => <div className={`assistant-message ${m.role}`} key={i}>{m.text}{m.products?.length > 0 && <div className="assistant-products">{m.products.map(p => <Link to={`/catalog/product/${p.id}`} key={p.id}><img src={p.imageUrl} alt=""/><span>{p.name}<strong>{p.price} ₽</strong></span></Link>)}</div>}</div>)}{loading && <div className="assistant-message">Подбираю варианты…</div>}</div>
-      <form onSubmit={e => {e.preventDefault(); send();}}><input value={message} onChange={e => setMessage(e.target.value)} placeholder="Например: платье на вечер"/><button aria-label="Голосовой ввод" type="button" className={`assistant-voice ${listening ? "recording" : ""}`} onClick={toggleVoice}>●</button><button aria-label="Отправить" className="assistant-send" type="submit">↑</button></form>
+      <form onSubmit={e => {e.preventDefault(); void send();}}><input value={message} onChange={e => setMessage(e.target.value)} placeholder="Например: платье на вечер"/><button aria-label="Голосовой ввод" type="button" className={`assistant-voice ${listening ? "recording" : ""}`} onClick={toggleVoice}>●</button><button aria-label="Отправить" className="assistant-send" type="submit">↑</button></form>
     </section>}
   </div>;
 }

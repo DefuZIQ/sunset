@@ -18,11 +18,11 @@
 .filter-heading span { color: #9a8d84; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; }
 .filter-heading h2 { margin: .15rem 0 0; font: 400 1.9rem 'Istok Web', sans-serif; }
 .filter-heading__tools { display: flex; align-items: center; gap: .55rem; }
-.filter-heading__reset { color: #856e60; font: 600 .7rem 'Inter'; text-decoration: underline; text-underline-offset: 3px; }
+.filter-heading__reset { color: #856e60; font: 600 .7rem 'Inter', sans-serif; text-decoration: underline; text-underline-offset: 3px; }
 .filter-heading__reset:hover { color: #3d3530; }
 .filter-close { display: none; font-size: 2rem; color: #3d3530; }
 .filter-field { display: grid; gap: .55rem; margin: 1rem 0 1.4rem; }
-.filter-field span, .filter-section h3 { font: 600 .74rem 'Inter'; letter-spacing: .09em; text-transform: uppercase; }
+.filter-field span, .filter-section h3 { font: 600 .74rem 'Inter', sans-serif; letter-spacing: .09em; text-transform: uppercase; }
 .filter-field input, .price-row input { width: 100%; box-sizing: border-box; min-height: 43px; border: 1px solid #ded3c9; border-radius: 9px; padding: .7rem .8rem; background: #fffdfb; outline: 0; color: #3d3530; }
 .filter-field input:focus, .price-row input:focus { border-color: #997d6c; box-shadow: 0 0 0 3px rgba(153, 125, 108, .14); }
 .filter-section { padding: 1.3rem 0; border-top: 1px solid #e4d9d0; }

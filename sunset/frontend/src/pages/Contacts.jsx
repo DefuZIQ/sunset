@@ -15,6 +15,7 @@ function coordinates(store) {
 function StoresMap({ stores, selectedId, onSelect, mapRef }) {
   const elementRef = useRef(null);
   const markersRef = useRef(new Map());
+  const [mapError, setMapError] = useState(false);
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
   const locatedStores = stores.filter((store) => coordinates(store));
@@ -24,6 +25,7 @@ function StoresMap({ stores, selectedId, onSelect, mapRef }) {
     let cancelled = false;
     let map;
     let frame;
+    setMapError(false);
     import("leaflet").then(({ default: L }) => {
       if (cancelled || !elementRef.current) return;
       map = L.map(elementRef.current, { scrollWheelZoom: false });
@@ -51,6 +53,11 @@ function StoresMap({ stores, selectedId, onSelect, mapRef }) {
       });
       map.fitBounds(bounds, { padding: [36, 36], maxZoom: 14 });
       frame = requestAnimationFrame(() => map.invalidateSize());
+    }).catch(() => {
+      if (cancelled) return;
+      map?.remove();
+      mapRef.current = null;
+      setMapError(true);
     });
     return () => {
       cancelled = true;
@@ -68,7 +75,9 @@ function StoresMap({ stores, selectedId, onSelect, mapRef }) {
     }));
   }, [selectedId, stores]);
 
-  return locatedStores.length
+  return mapError
+    ? <div className="stores-map stores-map--empty" role="alert">Карта сейчас недоступна. Адреса магазинов указаны ниже.</div>
+    : locatedStores.length
     ? <div ref={elementRef} className="stores-map" role="img" aria-label={`Карта магазинов SUNSET: ${locatedStores.length} меток`} />
     : <div className="stores-map stores-map--empty">Для магазинов пока не указаны координаты карты.</div>;
 }

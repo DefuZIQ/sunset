@@ -121,7 +121,7 @@ export default function Header({ isAuthenticated, user, onLogout, isPopupOpen })
 
       {/* Поисковый попап */}
       {isSearchActive && (
-        <div className="popup_search" onClick={popupSearchClose}>
+        <div className="popup_search" role="dialog" aria-label="Поиск по каталогу" onClick={popupSearchClose} onKeyDown={(event) => { if (event.key === "Escape") popupSearchClose(); }}>
           <form className="search-form" onSubmit={submitSearch} onClick={(e) => e.stopPropagation()}>
           <span className="search-label">ПОИСК ПО КАТАЛОГУ</span>
           <input

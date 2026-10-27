@@ -126,7 +126,7 @@ export default function MainCatalog() {
   }, { replace });
 
   const options = useMemo(() => ({
-    categories: [...new Set(products.flatMap((product) => product.categories || []))].sort(),
+    categories: [...new Set(products.flatMap((product) => product.categories || []))].sort((a, b) => a.localeCompare(b, "ru")),
     colors: [...new Map(products.flatMap((product) => product.colors || []).map((color) => [color.name, color])).values()],
     sizes: Object.values(products.filter((product) => filter.gender === "all" || product.gender === filter.gender || product.gender === "UNISEX").flatMap((product) => product.stock || []).reduce((all, stock) => {
       const key = sizeKey(stock);
