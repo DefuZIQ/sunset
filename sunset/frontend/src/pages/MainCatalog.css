@@ -1,6 +1,6 @@
 .catalog-page { padding-top: 7.5rem; padding-bottom: 6rem; color: #3d3530; }
 .catalog-head { display: flex; justify-content: space-between; align-items: end; gap: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #dcd5cf; }
-.catalog-head h1 { margin: 0; font: 400 clamp(3rem, 7vw, 6.5rem)/.9 'Istok Web'; letter-spacing: -.05em; }
+.catalog-head h1 { margin: 0; font: 400 clamp(3rem, 7vw, 6.5rem)/.9 'Istok Web', sans-serif; letter-spacing: -.05em; }
 .catalog-head__controls { display: flex; gap: 1rem; align-items: center; color: #7c7068; white-space: nowrap; }
 .catalog-head__controls select { max-width: 210px; border: 0; border-bottom: 1px solid #aaa099; background: transparent; padding: .65rem 1.5rem .65rem .2rem; color: #3d3530; }
 .catalog-gender { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 620px; margin-top: 1.4rem; border: 1px solid #d6cec8; }
@@ -16,7 +16,7 @@
 .filter-sidebar { position: sticky; top: 92px; align-self: start; max-height: calc(100vh - 112px); overflow-y: auto; scrollbar-width: thin; width: auto; margin: 0; padding: 1.35rem; border: 1px solid #e5dad1; border-radius: 18px; background: #f7f2ed; box-shadow: 0 10px 30px rgba(51, 40, 33, .04); }
 .filter-heading { display: flex; justify-content: space-between; align-items: center; gap: .65rem; padding-bottom: .6rem; }
 .filter-heading span { color: #9a8d84; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; }
-.filter-heading h2 { margin: .15rem 0 0; font: 400 1.9rem 'Istok Web'; }
+.filter-heading h2 { margin: .15rem 0 0; font: 400 1.9rem 'Istok Web', sans-serif; }
 .filter-heading__tools { display: flex; align-items: center; gap: .55rem; }
 .filter-heading__reset { color: #856e60; font: 600 .7rem 'Inter'; text-decoration: underline; text-underline-offset: 3px; }
 .filter-heading__reset:hover { color: #3d3530; }

@@ -5,12 +5,12 @@
 .editorial-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 2rem; align-items: stretch; }
 .editorial-photo { min-height: 610px; background: url('../images/Background.png') center/cover; }
 .editorial-copy { display: flex; flex-direction: column; justify-content: center; padding: clamp(2rem, 6vw, 6rem); background: #eee8e2; }
-.editorial-copy h2 { font: 400 clamp(2rem, 4vw, 4rem)/1.05 'Istok Web'; margin: 0 0 1.5rem; }
+.editorial-copy h2 { font: 400 clamp(2rem, 4vw, 4rem)/1.05 'Istok Web', sans-serif; margin: 0 0 1.5rem; }
 .editorial-copy p { line-height: 1.8; color: #625750; }
 .values-grid, .contact-grid, .profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 4rem; background: #d9d1cb; }
 .value-card, .contact-card, .profile-card { padding: 2rem; background: #fffdfb; }
 .value-card span { display: block; color: #9d8b7e; font-size: .8rem; letter-spacing: .1em; margin-bottom: 1rem; }
-.value-card h3, .contact-card h3, .profile-card h3 { font: 400 1.45rem 'Istok Web'; margin: 0 0 1rem; }
+.value-card h3, .contact-card h3, .profile-card h3 { font: 400 1.45rem 'Istok Web', sans-serif; margin: 0 0 1rem; }
 .value-card p, .contact-card p, .profile-card p { color: #71665f; line-height: 1.65; }
 .contact-card a { color: #3d3530; }
 .map-card { margin-top: 2rem; min-height: 430px; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, .7fr); background: #e8e0d9; }
@@ -28,12 +28,12 @@
 .map-card__map { min-height: 430px; background: #d8cec5; overflow: hidden; }
 .map-card__map iframe { display: block; width: 100%; height: 100%; min-height: 430px; border: 0; filter: saturate(.7) contrast(.95); }
 .map-card__info { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: clamp(2rem, 5vw, 4rem); }
-.map-card strong { font: 400 clamp(1.7rem, 3vw, 2.4rem)/1.2 'Istok Web'; }
+.map-card strong { font: 400 clamp(1.7rem, 3vw, 2.4rem)/1.2 'Istok Web', sans-serif; }
 .map-card__info > p:not(.page-kicker) { color: #71665f; line-height: 1.6; }
 .map-card__info a { margin-top: 1.5rem; padding-bottom: .2rem; border-bottom: 1px solid #3d3530; color: #3d3530; text-decoration: none; }
 .empty-state { padding: 5rem 1rem; text-align: center; border: 1px solid #ded8d3; }
-.empty-state h2 { font: 400 2rem 'Istok Web'; }
-.text-link, .primary-action { display: inline-flex; padding: .85rem 1.5rem; border: 1px solid #3d3530; color: #3d3530; text-decoration: none; font: 1rem 'Istok Web'; }
+.empty-state h2 { font: 400 2rem 'Istok Web', sans-serif; }
+.text-link, .primary-action { display: inline-flex; padding: .85rem 1.5rem; border: 1px solid #3d3530; color: #3d3530; text-decoration: none; font: 1rem 'Istok Web', sans-serif; }
 .primary-action { background: #3d3530; color: #fffdfb; }
 .product-list-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2.5rem 1.25rem; }
 .cart-layout { display: grid; grid-template-columns: 1fr 360px; gap: 3rem; }
@@ -44,11 +44,11 @@
 .cart-line__image-link:hover img { transform: scale(1.035); }
 .cart-line__product-link { color: inherit; text-decoration: none; transition: color .2s ease; }
 .cart-line__product-link:hover { color: #8a5d45; }
-.cart-line h3 { margin: 0 0 .5rem; font: 400 1.2rem 'Istok Web'; }
+.cart-line h3 { margin: 0 0 .5rem; font: 400 1.2rem 'Istok Web', sans-serif; }
 .cart-line__actions { display: flex; gap: .65rem; align-items: center; }
 .cart-line__actions button { width: 34px; height: 34px; border: 1px solid #bcb2aa; }
 .cart-summary { background: #eee8e2; padding: 2rem; height: fit-content; }
-.cart-summary h2 { font: 400 1.7rem 'Istok Web'; margin-top: 0; }
+.cart-summary h2 { font: 400 1.7rem 'Istok Web', sans-serif; margin-top: 0; }
 .cart-summary__row { display: flex; justify-content: space-between; margin: 1rem 0; }
 .cart-summary .primary-action { width: 100%; justify-content: center; box-sizing: border-box; margin-top: 1rem; }
 .cart-summary button { cursor: pointer; }
@@ -66,8 +66,8 @@
 .checkout-note, .checkout-error { color: #984b45; line-height: 1.45; }.checkout-success, .checkout-discount { color: #60755a; }
 .promotion-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 .promotion-card { min-height: 350px; padding: clamp(1.5rem, 3vw, 2.5rem); box-sizing: border-box; background: #e9e1da; display: flex; flex-direction: column; align-items: flex-start; }
-.promotion-card--dark { background: #37302c; color: #fffdfb; }.promotion-card > span { margin-left: auto; font: 400 clamp(2.3rem,4vw,4rem) 'Istok Web'; }.promotion-card h2 { font: 400 1.8rem 'Istok Web'; margin: 1rem 0; }.promotion-card p { line-height: 1.6; }.promotion-card small { margin-top: auto; opacity: .7; }.promotion-card button { margin-top: 1rem; padding: .7rem 1rem; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; }
-.birthday-promo { margin-top: 1rem; padding: clamp(2rem,5vw,5rem); background: #d8c6b8; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }.birthday-promo h2 { max-width: 700px; font: 400 clamp(2rem,4vw,4rem)/1.05 'Istok Web'; margin: 0 0 1rem; }.birthday-promo p { max-width: 680px; line-height: 1.6; }
+.promotion-card--dark { background: #37302c; color: #fffdfb; }.promotion-card > span { margin-left: auto; font: 400 clamp(2.3rem,4vw,4rem) 'Istok Web', sans-serif; }.promotion-card h2 { font: 400 1.8rem 'Istok Web', sans-serif; margin: 1rem 0; }.promotion-card p { line-height: 1.6; }.promotion-card small { margin-top: auto; opacity: .7; }.promotion-card button { margin-top: 1rem; padding: .7rem 1rem; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; }
+.birthday-promo { margin-top: 1rem; padding: clamp(2rem,5vw,5rem); background: #d8c6b8; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }.birthday-promo h2 { max-width: 700px; font: 400 clamp(2rem,4vw,4rem)/1.05 'Istok Web', sans-serif; margin: 0 0 1rem; }.birthday-promo p { max-width: 680px; line-height: 1.6; }
 .profile-card--wide { grid-column: span 2; }
 .profile-card ul { padding-left: 1rem; line-height: 2; color: #71665f; }
 .auth-note { margin-top: 1.5rem; color: #71665f; }
@@ -75,7 +75,7 @@
 @media (max-width: 900px) { .cart-layout { grid-template-columns: 1fr; } .cart-summary { position: static; } .promotion-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .page-shell { padding-top: 6.5rem; } .values-grid, .contact-grid, .profile-grid { grid-template-columns: 1fr; } .profile-card--wide { grid-column: auto; } .product-list-grid { grid-template-columns: repeat(2, 1fr); } .cart-line { grid-template-columns: 80px 1fr; } .cart-line img, .cart-line__image-link { width: 80px; height: 105px; } .cart-line__actions { grid-column: 2; } .map-card { grid-template-columns: 1fr; } .map-card__map, .map-card__map iframe { min-height: 360px; } .promotion-grid { grid-template-columns: 1fr; }.birthday-promo { align-items:flex-start; flex-direction:column; } }
 @media (max-width: 480px) { .product-list-grid { grid-template-columns: 1fr; } }
-.search-suggestions-title { margin:3rem 0 1.5rem; font:400 clamp(1.8rem,3vw,2.8rem) 'Istok Web'; }
+.search-suggestions-title { margin:3rem 0 1.5rem; font:400 clamp(1.8rem,3vw,2.8rem) 'Istok Web', sans-serif; }
 .delivery-switch { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:16px 0; padding:4px; border-radius:12px; background:#f4f0eb; }
 .delivery-switch button { border:0; border-radius:9px; padding:10px; background:transparent; color:#7b7067; cursor:pointer; }
 .delivery-switch button.active { background:#fff; color:#24201c; box-shadow:0 2px 8px rgba(30,20,10,.08); }
