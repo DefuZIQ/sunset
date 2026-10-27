@@ -5,6 +5,13 @@ import { useCart } from "../components/HeaderParts/CartContext";
 import { createCustomerAddress, createOrder, deleteCustomerAddress, getLoyaltyAccount, listPickupStores, quoteDelivery, syncCustomerAddresses, updateCustomerAddress, validatePromoCode } from "../api/client";
 import "./ContentPages.css";
 
+function createCheckoutKey() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+  return `checkout-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
 export default function Cart({ user }) {
   const { cartItems, addToCart, decreaseQuantity, removeFromCart, clearCart } =
     useCart();
@@ -54,9 +61,7 @@ export default function Cart({ user }) {
     paymentMethod: "CARD",
   });
   const [deliveryQuote, setDeliveryQuote] = useState({ cost: 0, estimatedDays: 3 });
-  const [checkoutKey, setCheckoutKey] = useState(() =>
-    window.crypto?.randomUUID?.() || `checkout-${Date.now()}-${Math.random()}`,
-  );
+  const [checkoutKey, setCheckoutKey] = useState(createCheckoutKey);
   const [phoneEditable, setPhoneEditable] = useState(false);
   const [promo, setPromo] = useState(null);
   const [state, setState] = useState({ loading: false, error: "" });
@@ -243,7 +248,7 @@ export default function Cart({ user }) {
             quantity,
           })),
       });
-      setCheckoutKey(window.crypto?.randomUUID?.() || `checkout-${Date.now()}-${Math.random()}`);
+      setCheckoutKey(createCheckoutKey());
       clearCart();
       navigate("/profile/orders", { state: { orderNumber: data.orderNumber } });
     } catch (error) {

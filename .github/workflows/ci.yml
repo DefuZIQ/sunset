@@ -75,12 +75,12 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: sunset/frontend/package-lock.json
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run api:types:check
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - run: ./node_modules/.bin/playwright install --with-deps chromium
       - run: npm run test:e2e
       - name: Upload Playwright report
         if: always()
