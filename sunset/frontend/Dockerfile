@@ -9,5 +9,9 @@ COPY admin ./admin
 RUN npm run build
 
 FROM caddy:2-alpine
+RUN addgroup -S -g 10001 sunset && adduser -S -D -H -u 10001 -G sunset sunset
+ENV XDG_CONFIG_HOME=/tmp/caddy-config XDG_DATA_HOME=/tmp/caddy-data
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/dist /srv
+USER sunset
+EXPOSE 80

@@ -240,6 +240,8 @@ services:
     logging: *log-rotation
     ports:
       - "80:80"
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
     volumes:
       - caddy_data:/data
       - caddy_config:/config

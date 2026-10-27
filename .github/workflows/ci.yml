@@ -143,3 +143,18 @@ jobs:
           STAFF_DB_PASSWORD: ci-not-used-at-runtime
           INTERNAL_IAM_SECRET: ci-internal-iam-secret-at-least-32-bytes
         run: docker compose -f docker-compose.prod.yml build
+      - name: Smoke non-root images
+        run: |
+          set -eu
+          compose="docker compose --env-file .env.example -f docker-compose.prod.yml"
+          $compose run --rm --no-deps --entrypoint sh api-gateway -c 'test "$(id -u)" -eq 10001'
+          $compose run --rm --no-deps --entrypoint sh web -c 'test "$(id -u)" -eq 10001'
+          $compose up -d --no-deps web
+          trap '$compose down --remove-orphans' EXIT
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS --max-time 3 http://127.0.0.1/ -o /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
