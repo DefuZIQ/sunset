@@ -2,6 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 android {
     namespace 'pro.t3ch.sunset'
     compileSdk 36
