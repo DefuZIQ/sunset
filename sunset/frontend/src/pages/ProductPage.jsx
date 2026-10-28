@@ -185,7 +185,8 @@ function ReviewCard({ item, viewerId, busy, error, onVote, onEdit, onDelete, onO
 }
 
 function ReviewPhotoViewer({ review, onClose }) {
-  return createPortal(<div className="product-overlay review-photo-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return createPortal(<div className="product-overlay review-photo-overlay">
+    <button className="product-overlay__backdrop" type="button" aria-label="Закрыть фото" onClick={onClose} />
     <div className="review-photo-viewer" role="dialog" aria-modal="true" aria-label={`Фото и отзыв ${review.authorName}`}>
       <div className="review-photo-viewer__stage"><img src={review.photoUrl} alt={`Фото товара из отзыва ${review.authorName}`} />
         <div className="review-photo-viewer__caption"><span className="review-photo-viewer__stars" aria-label={`Оценка ${review.rating} из 5`}>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span><p>{review.body}</p><div><strong>{review.authorName || "Покупатель"}</strong><time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString("ru-RU")}</time></div></div>
@@ -240,7 +241,8 @@ function ReviewPhotoCarousel({ reviews, onOpenPhoto }) {
 function SizeGuide({ product, rows, selectedColorId, selectedSizeId, onSelect, onClose }) {
   const color = product.colors.find((item) => item.id === selectedColorId);
   const sizeType = rows[0]?.sizeType;
-  return createPortal(<div className="product-overlay size-guide-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return createPortal(<div className="product-overlay size-guide-overlay">
+    <button className="product-overlay__backdrop" type="button" aria-label="Закрыть таблицу размеров" onClick={onClose} />
     <div className="size-guide" role="dialog" aria-modal="true" aria-labelledby="size-guide-title">
       <header className="size-guide__header"><div><span className="page-kicker">SUNSET / ПОДБОР РАЗМЕРА</span><h2 id="size-guide-title">Размерная таблица</h2><p>{sizeTypeLabels[sizeType] || "Размеры товара"} · {product.gender === "MEN" ? "мужской" : product.gender === "WOMEN" ? "женский" : "унисекс"} раздел</p></div><button type="button" data-overlay-close onClick={onClose} aria-label="Закрыть таблицу размеров">×</button></header>
       <p className="size-guide__intro">Размеры и ориентиры из каталога для «{product.name}». Наличие показано для цвета {color?.name || "товара"}.</p>
@@ -251,7 +253,8 @@ function SizeGuide({ product, rows, selectedColorId, selectedSizeId, onSelect, o
 }
 
 function DeleteReviewDialog({ review, busy, error, onConfirm, onClose }) {
-  return createPortal(<div className="product-overlay review-delete-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+  return createPortal(<div className="product-overlay review-delete-overlay">
+    <button className="product-overlay__backdrop" type="button" aria-label="Закрыть подтверждение" onClick={onClose} disabled={busy} />
     <div className="review-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="review-delete-title" aria-describedby="review-delete-description">
       <button type="button" className="review-delete-dialog__close" data-overlay-close onClick={onClose} disabled={busy} aria-label="Закрыть подтверждение">×</button>
       <span className="page-kicker">ВАШ ОТЗЫВ</span>
