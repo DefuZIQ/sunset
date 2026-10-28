@@ -6,7 +6,7 @@ const synonymGroups = [
 ];
 
 export const normalizeSearchText = (value) => String(value || "").toLowerCase()
-  .replace(/ё/g, "е").replace(/[^a-zа-я0-9]+/gi, " ").trim();
+  .replaceAll("ё", "е").replace(/[^a-zа-я0-9]+/gi, " ").trim();
 
 const distance = (left, right) => {
   if (Math.abs(left.length - right.length) > 2) return 3;

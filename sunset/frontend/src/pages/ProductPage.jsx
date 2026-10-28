@@ -220,7 +220,7 @@ function ReviewPhotoCarousel({ reviews, onOpenPhoto }) {
     const track = trackRef.current;
     const card = track?.querySelector(".review-gallery__item");
     if (!track || !card) return;
-    const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+    const gap = Number.parseFloat(getComputedStyle(track).columnGap) || 0;
     track.scrollBy({ left: direction * (card.getBoundingClientRect().width + gap), behavior: "smooth" });
   };
 

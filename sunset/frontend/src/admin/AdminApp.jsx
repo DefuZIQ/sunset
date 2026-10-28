@@ -133,7 +133,7 @@ export default function AdminApp() {
             </form>}
             {status === "challenge" && <form onSubmit={finishMfa}>
               <p>Введите код из приложения-аутентификатора или резервный код.</p>
-              <label>Одноразовый код<input autoFocus autoComplete="one-time-code" inputMode="numeric" required value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} /></label>
+              <label>Одноразовый код<input autoComplete="one-time-code" inputMode="numeric" required value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} /></label>
               <button type="submit" disabled={busy}>{busy ? "Проверяем…" : "Подтвердить вход"}</button>
               <button type="button" className="admin-app__secondary" onClick={() => { setStatus("guest"); setChallengeToken(""); setMfaCode(""); }}>Назад к паролю</button>
             </form>}

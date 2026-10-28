@@ -29,7 +29,7 @@ export default function ProductCard({ product }) {
       if (!active) return;
       const buttons = [...probe.querySelectorAll("[data-size-probe]")];
       const more = probe.querySelector("[data-more-probe]");
-      const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+      const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0;
       const width = row.clientWidth;
       const moreWidth = more?.getBoundingClientRect().width || 0;
       let used = 0;
