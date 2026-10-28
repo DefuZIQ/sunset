@@ -1,9 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../HeaderParts/CartContext";
+import PopupActionIcon from "./PopupActionIcon";
+import usePopupDismissal from "./usePopupDismissal";
 import "./BasketButton.css";
 
 export default function BasketButton() {
+  const { dismissed, dismiss, reopen } = usePopupDismissal();
   const {
     cartItems,
     addToCart,
@@ -24,13 +27,16 @@ export default function BasketButton() {
   };
 
   return (
-    <div className="dropdown">
+    <div className={`dropdown dropdown--basket${dismissed ? " dropdown--dismissed" : ""}`} onClickCapture={(event) => { if (event.target.closest("a")) dismiss(); }}>
       <button
         className="basket cart"
         aria-haspopup="true"
         aria-expanded="false"
         aria-label="Корзина"
         type="button"
+        onMouseEnter={reopen}
+        onFocus={reopen}
+        onClick={reopen}
       >
         <svg
           width="22"
@@ -47,41 +53,42 @@ export default function BasketButton() {
         {cartItemCount > 0 && <div className="cart__num">{cartItemCount}</div>}
       </button>
 
-      <div className="dropdown-basket">
+      <div className="dropdown-basket cart-popup" role="dialog" aria-label="Корзина">
+        <div className="cart-popup__head">
+          <span className="cart-popup__avatar" aria-hidden="true">
+            <svg width="23" height="25" viewBox="0 0 23 25" fill="none">
+              <path d="M3 8h17l-1.4 14H4.4L3 8Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+              <path d="M7.5 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </span>
+          <div><span>SUNSET BAG</span><strong>Ваша корзина</strong><small>{cartItemCount > 0 ? `Товаров: ${cartItemCount}` : "Пока ни одной вещи"}</small></div>
+        </div>
         <div className="dropdown__background_basket">
           <div className="basket__mini basket__mini_scroll">
             {items.length === 0 ? (
-              <div className="cart__item">Ваша корзина пуста</div>
+              <div className="cart-empty-state"><div className="cart-empty-state__art" aria-hidden="true">🛍️</div><strong>Корзина отдыхает</strong><span>Добавьте пару вещей — они будут ждать вас здесь</span><Link className="cart-empty-state__link" to="/catalog">Перейти в каталог <PopupActionIcon name="catalog" /></Link></div>
             ) : (
               items.map(({ product, quantity }) => (
                 <div
                   className="cart__item"
-                  key={product.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
+                  key={`${product.id}-${product.selectedColorId || "default"}-${product.selectedSizeId || "default"}`}
                 >
-                  <span>
-                    {product.name || "Без названия"} — {product.price}₽
-                  </span>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
+                  <Link
+                    className="cart__item-link"
+                    to={`/catalog/product/${product.id}?color=${encodeURIComponent(product.selectedColorId || "")}&size=${encodeURIComponent(product.selectedSizeId || "")}`}
+                    aria-label={`Открыть ${product.name || "товар"} с выбранными параметрами`}
                   >
+                    <img className="cart__item-image" src={product.imageUrl || product.image_url} alt={product.name || "Товар"} />
+                    <span className="cart__item-copy">
+                      <strong>{product.name || "Без названия"}</strong>
+                      <small>{[product.selectedColorName, product.selectedSizeName].filter(Boolean).join(" · ") || "Выбранный вариант"}</small>
+                      <b>{Number(product.price || 0).toLocaleString("ru-RU")} ₽</b>
+                    </span>
+                  </Link>
+                  <div className="cart__item-actions">
                     <button
-                      onClick={() => decreaseQuantity(product.id)}
+                      onClick={() => decreaseQuantity(product.id, product.selectedColorId, product.selectedSizeId)}
                       aria-label="Уменьшить количество"
-                      style={{
-                        cursor: "pointer",
-                        padding: "0 8px",
-                        fontSize: "1.2rem",
-                      }}
                     >
                       −
                     </button>
@@ -89,25 +96,13 @@ export default function BasketButton() {
                     <button
                       onClick={() => increaseQuantity(product)}
                       aria-label="Увеличить количество"
-                      style={{
-                        cursor: "pointer",
-                        padding: "0 8px",
-                        fontSize: "1.2rem",
-                      }}
                     >
                       +
                     </button>
                     <button
-                      onClick={() => removeFromCart(product.id)}
+                      onClick={() => removeFromCart(product.id, product.selectedColorId, product.selectedSizeId)}
                       aria-label="Удалить товар"
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "#999",
-                        cursor: "pointer",
-                        fontSize: "1.2rem",
-                        marginLeft: "1rem",
-                      }}
+                      className="cart__item-remove"
                     >
                       &times;
                     </button>
@@ -118,14 +113,10 @@ export default function BasketButton() {
           </div>
 
           {cartItemCount > 0 && (
-            <>
-              <div style={{ padding: "0.5rem 1rem", fontWeight: "bold" }}>
-                Сумма: {totalPrice} ₽
-              </div>
-              <div className="MiniBasket" style={{ padding: "0.5rem 1rem" }}>
-                <Link to="/profile/basket">Перейти в корзину</Link>
-              </div>
-            </>
+            <div className="cart-popup__checkout">
+              <div className="cart-popup__total"><span>Итого</span><strong>{totalPrice.toLocaleString("ru-RU")} ₽</strong></div>
+              <Link className="cart-popup__primary" to="/profile/basket">Перейти в корзину <PopupActionIcon name="basket" /></Link>
+            </div>
           )}
         </div>
       </div>

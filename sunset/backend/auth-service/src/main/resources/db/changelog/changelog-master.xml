@@ -11,4 +11,40 @@
         <sqlFile path="classpath:/db/migrations/V1__init.sql"/>
     </changeSet>
 
+    <changeSet id="8" author="codex">
+        <sqlFile path="classpath:/db/migrations/V2__add_user_phone.sql"/>
+    </changeSet>
+
+    <changeSet id="9" author="codex">
+        <sqlFile path="classpath:/db/migrations/V3__add_user_role.sql"/>
+    </changeSet>
+
+    <changeSet id="10" author="codex">
+        <sqlFile path="classpath:/db/migrations/V4__customer_addresses.sql"/>
+    </changeSet>
+
+    <changeSet id="11" author="codex">
+        <sqlFile path="classpath:/db/migrations/V5__iam_permissions.sql"/>
+    </changeSet>
+
+    <changeSet id="12" author="codex">
+        <sqlFile path="classpath:/db/migrations/V6__auth_sessions.sql"/>
+    </changeSet>
+
+    <changeSet id="13" author="codex">
+        <sqlFile path="classpath:/db/migrations/V7__auth_session_expiry_index.sql"/>
+    </changeSet>
+
+    <changeSet id="14" author="codex">
+        <sqlFile path="classpath:/db/migrations/V8__admin_mfa.sql"/>
+    </changeSet>
+
+    <changeSet id="15" author="codex">
+        <sqlFile path="classpath:/db/migrations/V9__mandatory_staff_mfa.sql"/>
+    </changeSet>
+
+    <changeSet id="16" author="codex">
+        <sqlFile path="classpath:/db/migrations/V10__staff_role_assignments.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

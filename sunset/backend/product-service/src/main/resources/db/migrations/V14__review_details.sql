@@ -1,0 +1,5 @@
+ALTER TABLE product_reviews ADD COLUMN IF NOT EXISTS quality_rating INTEGER CHECK (quality_rating BETWEEN 1 AND 5);
+ALTER TABLE product_reviews ADD COLUMN IF NOT EXISTS fit VARCHAR(30);
+ALTER TABLE product_reviews ADD COLUMN IF NOT EXISTS photo_url TEXT;
+ALTER TABLE product_reviews ADD COLUMN IF NOT EXISTS verified_purchase BOOLEAN NOT NULL DEFAULT FALSE;
+

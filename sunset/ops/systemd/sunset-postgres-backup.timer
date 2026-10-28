@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily SUNSET PostgreSQL backup
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+RandomizedDelaySec=15min
+Persistent=true
+Unit=sunset-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

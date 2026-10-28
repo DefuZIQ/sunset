@@ -1,6 +1,7 @@
 package com.sunset.apigateway.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,12 +9,15 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import com.sunset.apigateway.config.WhitelistConfig;
+
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class JwtFilter implements GlobalFilter, Ordered {
@@ -24,9 +28,14 @@ public class JwtFilter implements GlobalFilter, Ordered {
     private String secretKey;
 
     private final WhitelistConfig whitelistConfig;
+    private final AuthSessionVerifier sessionVerifier;
+    private final AdminCookieCsrf adminCookieCsrf;
 
-    public JwtFilter(WhitelistConfig whitelistConfig) {
+    public JwtFilter(WhitelistConfig whitelistConfig, AuthSessionVerifier sessionVerifier,
+                     AdminCookieCsrf adminCookieCsrf) {
         this.whitelistConfig = whitelistConfig;
+        this.sessionVerifier = sessionVerifier;
+        this.adminCookieCsrf = adminCookieCsrf;
     }
 
     @Override
@@ -34,33 +43,64 @@ public class JwtFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
-        if (isPublicPath(path)) {
+        boolean publicRequest = isPublicRequest(request);
+        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        boolean bearerAuth = authHeader != null && authHeader.startsWith("Bearer ");
+        String cookieToken = adminCookieCsrf.sessionToken(request);
+
+        if (publicRequest && !bearerAuth) {
             log.debug("Путь {} разрешён без авторизации", path);
-            return chain.filter(exchange);
+            return chain.filter(withTrustedUserId(exchange, null));
         }
 
-        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (!bearerAuth && (cookieToken == null || cookieToken.isBlank())) {
             log.warn("Отсутствует или некорректный Authorization заголовок");
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
-        String token = authHeader.substring(7);
+        boolean cookieAuth = !bearerAuth;
+        String token = cookieAuth ? cookieToken : authHeader.substring(7);
+        if (cookieAuth && !safeMethod(request) && !adminCookieCsrf.valid(request, token)) {
+            exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+            return exchange.getResponse().setComplete();
+        }
         try {
             Claims claims = Jwts.parser()
-                    .setSigningKey(secretKey)
+                    .setSigningKey(Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8)))
                     .parseClaimsJws(token)
                     .getBody();
 
             String userId = claims.getSubject();
+            String realm = claims.get("realm", String.class);
+            if (cookieAuth && !"STAFF".equals(realm)) {
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }
+            if (realm != null && !"STAFF".equals(realm) && !"CUSTOMER".equals(realm)) {
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }
+            if (!publicRequest && isStaffOnlyPath(request) != "STAFF".equals(realm)) {
+                exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                return exchange.getResponse().setComplete();
+            }
             log.debug("JWT валиден. user-id: {}", userId);
 
-            ServerHttpRequest mutatedRequest = request.mutate()
-                    .header("user-id", userId)
-                    .build();
-
-            return chain.filter(exchange.mutate().request(mutatedRequest).build());
+            return (cookieAuth ? sessionVerifier.isAdminActive(token)
+                    : "STAFF".equals(realm) ? sessionVerifier.isStaffActive(token) : sessionVerifier.isActive(token))
+                    .onErrorResume(error -> {
+                        log.error("Проверка сеанса в Auth Service недоступна: {}", error.toString());
+                        exchange.getResponse().setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
+                        return Mono.empty();
+                    })
+                    .flatMap(active -> {
+                        if (!active) {
+                            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                            return exchange.getResponse().setComplete();
+                        }
+                        return chain.filter(withTrustedUserId(exchange, userId, cookieAuth ? token : null));
+                    });
 
         } catch (ExpiredJwtException e) {
             log.warn("JWT просрочен: {}", e.getMessage());
@@ -78,12 +118,60 @@ public class JwtFilter implements GlobalFilter, Ordered {
         return exchange.getResponse().setComplete();
     }
 
-    private boolean isPublicPath(String path) {
+    private static boolean safeMethod(ServerHttpRequest request) {
+        HttpMethod method = request.getMethod();
+        return HttpMethod.GET.equals(method) || HttpMethod.HEAD.equals(method) || HttpMethod.OPTIONS.equals(method);
+    }
+
+    private static boolean isStaffOnlyPath(ServerHttpRequest request) {
+        String path = request.getURI().getPath();
+        return path.startsWith("/auth/iam/")
+                || path.startsWith("/auth/admin/")
+                || path.startsWith("/auth/session/admin/")
+                || path.startsWith("/auth/mfa/")
+                || path.startsWith("/auth/staff/")
+                || path.equals("/products/admin") || path.startsWith("/products/admin/")
+                || path.startsWith("/order/admin/")
+                || path.equals("/order/stores/admin")
+                || (path.equals("/order/stores") && !HttpMethod.GET.equals(request.getMethod()));
+    }
+
+    private ServerWebExchange withTrustedUserId(ServerWebExchange exchange, String userId) {
+        return withTrustedUserId(exchange, userId, null);
+    }
+
+    private ServerWebExchange withTrustedUserId(ServerWebExchange exchange, String userId, String cookieToken) {
+        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                .headers(headers -> {
+                    headers.remove("user-id");
+                    headers.remove("X-Sunset-Request-Host");
+                    if (exchange.getRequest().getHeaders().getHost() != null) {
+                        headers.set("X-Sunset-Request-Host", exchange.getRequest().getHeaders().getHost().getHostString());
+                    }
+                    headers.remove(AdminCookieCsrf.HEADER);
+                    headers.remove(HttpHeaders.COOKIE);
+                    if (cookieToken != null) headers.setBearerAuth(cookieToken);
+                    if (userId != null && !userId.isBlank()) {
+                        headers.set("user-id", userId);
+                    }
+                })
+                .build();
+        return exchange.mutate().request(mutatedRequest).build();
+    }
+
+    private boolean isPublicRequest(ServerHttpRequest request) {
+        String path = request.getURI().getPath();
+        if (HttpMethod.POST.equals(request.getMethod()) && "/subscriptions".equals(path)) {
+            return true;
+        }
+        if (HttpMethod.GET.equals(request.getMethod()) && "/order/stores".equals(path)) {
+            return true;
+        }
         if (whitelistConfig.getWhitelistPaths() == null) {
             return false;
         }
         return whitelistConfig.getWhitelistPaths().stream()
-                .anyMatch(path::startsWith);
+                .anyMatch(publicPath -> path.equals(publicPath) || path.startsWith(publicPath + "/"));
     }
 
     @Override

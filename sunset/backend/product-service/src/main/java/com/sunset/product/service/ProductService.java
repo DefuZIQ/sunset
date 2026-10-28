@@ -10,30 +10,39 @@ import com.sunset.product.repository.ProductColorRepository;
 import com.sunset.product.repository.ProductRepository;
 import com.sunset.product.repository.ProductStockRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional(readOnly = true)
 public class ProductService {
 
     private final ProductRepository productRepository;
     private final ProductCategoryRepository productCategoryRepository;
     private final ProductColorRepository productColorRepository;
     private final ProductStockRepository productStockRepository;
+    private final JdbcTemplate jdbc;
 
     public ProductService(
             ProductRepository productRepository,
             ProductCategoryRepository productCategoryRepository,
             ProductColorRepository productColorRepository,
-            ProductStockRepository productStockRepository
+            ProductStockRepository productStockRepository,
+            JdbcTemplate jdbc
     ) {
         this.productRepository = productRepository;
         this.productCategoryRepository = productCategoryRepository;
         this.productColorRepository = productColorRepository;
         this.productStockRepository = productStockRepository;
+        this.jdbc = jdbc;
     }
 
     public List<ProductDTO> getProducts() {
@@ -46,6 +55,24 @@ public class ProductService {
     public Optional<ProductDTO> getProductById(UUID id) {
         return productRepository.findById(id)
                 .map(this::mapToDTO);
+    }
+
+    public ProductDTO toDTO(Product product) {
+        return mapToDTO(product);
+    }
+
+    public List<Map<String, Object>> getStoreAvailability(UUID storeId) {
+        Integer activeStore = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM stores WHERE id=? AND kind='STORE' AND active=TRUE", Integer.class, storeId);
+        if (activeStore == null || activeStore == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Магазин не найден");
+        }
+        return jdbc.queryForList("""
+                SELECT product_id AS "productId", size_id AS "sizeId",
+                       color_id AS "colorId", quantity
+                FROM location_stock
+                WHERE location_id=? AND quantity>0
+                """, storeId);
     }
 
     private ProductDTO mapToDTO(Product product) {
@@ -61,12 +88,26 @@ public class ProductService {
                 product.getPrice(),
                 imageUrl
         );
+        dto.setGender(product.getGender());
 
-        // Добавляем категории
-        List<String> categories = productCategoryRepository.findByProductId(product.getId())
-                .stream()
-                .map(rel -> rel.getCategory().getName())
-                .collect(Collectors.toList());
+        // Возвращаем полный путь от родительской категории до выбранной конечной
+        // подкатегории. Корневой раздел пола не дублируем: он уже есть в gender.
+        List<String> categories = jdbc.query("""
+                WITH RECURSIVE category_path AS (
+                    SELECT c.id,c.name,c.parent_id,0 AS depth
+                    FROM categories c
+                    JOIN product_categories pc ON pc.category_id=c.id
+                    WHERE pc.product_id=?
+                    UNION ALL
+                    SELECT parent.id,parent.name,parent.parent_id,path.depth+1
+                    FROM categories parent
+                    JOIN category_path path ON path.parent_id=parent.id
+                )
+                SELECT name FROM category_path
+                WHERE name NOT IN ('Для женщин','Для мужчин')
+                GROUP BY name,depth
+                ORDER BY depth DESC,name
+                """, (rs,n) -> rs.getString("name"), product.getId());
         dto.setCategories(categories);
 
         // Добавляем цвета
@@ -90,6 +131,9 @@ public class ProductService {
                     StockDTO stockDTO = new StockDTO();
                     stockDTO.setSizeId(stock.getSize().getId());
                     stockDTO.setSizeName(stock.getSize().getName());
+                    stockDTO.setSizeType(stock.getSize().getType());
+                    stockDTO.setSizeGender(stock.getSize().getGender());
+                    stockDTO.setSizeDescription(stock.getSize().getDescription());
                     stockDTO.setColorId(stock.getColor().getId());
                     stockDTO.setColorName(stock.getColor().getName());
                     stockDTO.setQuantity(stock.getQuantity());
@@ -97,6 +141,12 @@ public class ProductService {
                 })
                 .collect(Collectors.toList());
         dto.setStock(stockList);
+
+        Map<String, Object> reviewStats = jdbc.queryForMap(
+                "SELECT COALESCE(ROUND(AVG(rating)::numeric,1),0) AS rating, COUNT(*) AS count FROM product_reviews WHERE product_id=? AND NOT is_hidden",
+                product.getId());
+        dto.setRating(((Number) reviewStats.get("rating")).doubleValue());
+        dto.setReviewCount(((Number) reviewStats.get("count")).intValue());
 
         return dto;
     }

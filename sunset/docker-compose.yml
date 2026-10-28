@@ -4,9 +4,9 @@ services:
     container_name: postgres_db
     restart: always
     environment:
-      POSTGRES_USER: defuziq
-      POSTGRES_PASSWORD: 951753
-      POSTGRES_DB: sunset
+      POSTGRES_USER: ${POSTGRES_USER:-sunset}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-sunset}
     ports:
       - "5432:5432"
     volumes:
@@ -17,8 +17,8 @@ services:
     container_name: pgadmin
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: defuziq@gmail.com
-      PGADMIN_DEFAULT_PASSWORD: 951753
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.invalid}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Set PGADMIN_DEFAULT_PASSWORD in .env}
     ports:
       - "5050:80"
     depends_on:

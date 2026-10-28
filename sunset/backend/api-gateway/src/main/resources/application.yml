@@ -6,49 +6,97 @@ spring:
     name: sunset
   cloud:
     gateway:
-      routes:
-        - id: auth-service
-          uri: http://auth-service:8081
-          predicates:
-            - Path=/auth/**
-        - id: product-service
-          uri: http://product-service:8082
-          predicates:
-            - Path=/products/**
-        - id: order-service
-          uri: http://order-service:8083
-          predicates:
-            - Path=/order/**
-      globalcors:
-        corsConfigurations:
-          '[/**]':
-            allowedOrigins: "http://localhost:3000"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-            allowCredentials: true
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: http://auth-service:8081
+              predicates:
+                - Path=/auth/**
+            - id: product-service
+              uri: http://product-service:8082
+              predicates:
+                - Path=/products/**
+            - id: order-service
+              uri: http://order-service:8083
+              predicates:
+                - Path=/order/**
+            - id: notification-service
+              uri: http://notification-service:8084
+              predicates:
+                - Path=/notifications/**
+            - id: subscription-service
+              uri: http://notification-service:8084
+              predicates:
+                - Path=/subscriptions/**
+            - id: staff-auth-service
+              order: -1
+              uri: http://staff-auth-service:8081
+              predicates:
+                - Path=/auth/staff/**,/auth/mfa/**,/auth/iam/**,/auth/admin/**,/auth/session/admin/**
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origins:
+                  - http://localhost:3000
+                  - http://localhost:5173
+                  - http://192.168.1.186
+                  - https://t3ch.pro
+                  - https://www.t3ch.pro
+                  - https://admin.t3ch.pro
+                allowed-methods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowed-headers: "*"
+                allow-credentials: true
 
 jwt:
-  secret: MySuperSecretKeyThatIsAtLeast32BytesLong!!
+  secret: ${JWT_SECRET}
   expirationMs: 86400000
 
 logging:
   level:
     root: INFO
-    org.springframework.cloud.gateway: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.security: DEBUG
-    reactor.netty.http.client: DEBUG
-    reactor.netty.http.server: DEBUG
+    org.springframework.cloud.gateway: INFO
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    reactor.netty.http.client: INFO
+    reactor.netty.http.server: INFO
 
 security:
   whitelist-paths:
+    - /assistant/chat
     - /auth/register
     - /auth/login
+    - /auth/staff/login
+    - /auth/mfa/login
+    - /auth/mfa/setup/start
+    - /auth/mfa/setup/confirm
     - /products/all
+    - /products/search
     - /products/by-uuid
+    - /products/reviews
+    - /products/review-photos
+    - /products/categories
+    - /order/promotions
+    - /actuator/health
+
+management:
+  tracing:
+    enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+
+ollama:
+  url: ${OLLAMA_URL:http://172.18.0.1:11434}
+  model: ${OLLAMA_MODEL:qwen2.5:0.5b}
 

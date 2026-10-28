@@ -1,0 +1,304 @@
+package com.sunset.product;
+
+import com.sunset.product.dto.OrderDtos.CreateOrderRequest;
+import com.sunset.product.dto.OrderDtos.OrderItemRequest;
+import com.sunset.product.service.OrderService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@SpringBootTest
+class OrderPostgresIntegrationTest {
+    private static final UUID CUSTOMER_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
+    private static final UUID ADMIN_ID = UUID.fromString("10000000-0000-0000-0000-000000000002");
+    private static final UUID SECOND_CUSTOMER_ID = UUID.fromString("10000000-0000-0000-0000-000000000003");
+    private static final UUID PRODUCT_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
+    private static final UUID COLOR_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
+    private static final UUID SIZE_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
+    private static final UUID STORE_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
+    private static final UUID OTHER_STORE_ID = UUID.fromString("50000000-0000-0000-0000-000000000002");
+    private static final UUID STORE_MANAGER_ID = UUID.fromString("10000000-0000-0000-0000-000000000004");
+
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine")
+            .withDatabaseName("sunset_order_test")
+            .withUsername("sunset")
+            .withPassword("sunset-test")
+            .withInitScript("db/test-support.sql");
+
+    static {
+        POSTGRES.start();
+    }
+
+    @DynamicPropertySource
+    static void postgresProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        registry.add("spring.jpa.database", () -> "postgresql");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.liquibase.enabled", () -> "true");
+        registry.add("spring.security.jwt.secret", () -> "test-secret-that-is-at-least-32-bytes");
+    }
+
+    @Autowired private OrderService service;
+    @Autowired private JdbcTemplate jdbc;
+
+    @BeforeEach
+    void resetDatabase() {
+        jdbc.execute("TRUNCATE TABLE return_requests, order_events, stock_reservations, payments, deliveries, location_stock, " +
+                "order_items, orders, loyalty_transactions, loyalty_accounts, product_images, images, " +
+                "product_stock, products, colors, sizes, users RESTART IDENTITY CASCADE");
+        jdbc.execute("ALTER SEQUENCE order_number_seq RESTART WITH 1001");
+        jdbc.update("UPDATE promotions SET usage_count=0");
+
+        jdbc.update("INSERT INTO users(id,email,password,first_name,last_name,phone,role) VALUES (?,?,?,?,?,?,?)",
+                CUSTOMER_ID, "customer@sunset.test", "hash", "Иван", "Соколов", "+79990000001", "CUSTOMER");
+        jdbc.update("INSERT INTO users(id,email,password,first_name,last_name,phone,role) VALUES (?,?,?,?,?,?,?)",
+                ADMIN_ID, "admin@sunset.test", "hash", "Анна", "Администратор", "+79990000002", "ADMIN");
+        jdbc.update("INSERT INTO products(id,name,price) VALUES (?,?,?)", PRODUCT_ID, "Тестовое пальто", new BigDecimal("4000.00"));
+        jdbc.update("INSERT INTO colors(id,name,hex_code) VALUES (?,?,?)", COLOR_ID, "Карамельный", "#A56B46");
+        jdbc.update("INSERT INTO sizes(id,name,type,gender,region,sort_order) VALUES (?,?,?,?,?,?)", SIZE_ID, "M", "clothes", "female", "RU", 20);
+        jdbc.update("INSERT INTO product_stock(product_id,size_id,color_id,quantity) VALUES (?,?,?,5)", PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("INSERT INTO stores(id,name,city,address,kind,active) VALUES (?,?,?,?,'STORE',TRUE) ON CONFLICT (id) DO NOTHING",
+                STORE_ID, "SUNSET Тестовый", "Нижний Новгород", "Большая Покровская, 34");
+        jdbc.update("INSERT INTO location_stock(location_id,product_id,size_id,color_id,quantity) VALUES ('00000000-0000-4000-8000-000000000001',?,?,?,5)", PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("INSERT INTO loyalty_accounts(user_id,balance,lifetime_earned,tier) VALUES (?,?,?,?)", CUSTOMER_ID, 1000, 0, "SUNRISE");
+    }
+
+    @Test
+    void assemblesThenCancelsOrderWithoutEarlyBonusCredit() {
+        Map<String, Object> created = service.create(CUSTOMER_ID, order("checkout-complete", "WELCOME10", 500, 1, "CARD"));
+        UUID orderId = (UUID) created.get("id");
+
+        assertThat(created.get("status")).isEqualTo("PENDING");
+        assertThat(created.get("bonusesEarned")).isEqualTo(155);
+        assertThat(balance()).isEqualTo(500);
+        assertThat(stock()).isEqualTo(4);
+        assertThat(transactionCount("EARN")).isZero();
+
+        service.updateStatus(ADMIN_ID, orderId, "ASSEMBLING");
+
+        assertThat(balance()).isEqualTo(500);
+        assertThat(transactionCount("EARN")).isZero();
+
+        Map<String, Object> cancelled = service.cancel(CUSTOMER_ID, orderId);
+
+        assertThat(cancelled.get("status")).isEqualTo("CANCELLED");
+        assertThat(balance()).isEqualTo(1000);
+        assertThat(stock()).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String.class, orderId)).isEqualTo("REFUNDED");
+        assertThat(jdbc.queryForObject("SELECT status FROM stock_reservations WHERE order_id=?", String.class, orderId)).isEqualTo("RELEASED");
+        assertThat(jdbc.queryForObject("SELECT usage_count FROM promotions WHERE code='WELCOME10'", Integer.class)).isZero();
+        assertThat(transactionCount("CANCEL_ADJUST")).isEqualTo(1);
+
+        // Network retries and double clicks must not refund stock or bonuses twice.
+        service.cancel(CUSTOMER_ID, orderId);
+        assertThat(balance()).isEqualTo(1000);
+        assertThat(stock()).isEqualTo(5);
+        assertThat(transactionCount("CANCEL_ADJUST")).isEqualTo(1);
+    }
+
+    @Test
+    void creditsBonusOnlyAfterDeliveryAndOnlyOnce() {
+        Map<String, Object> created = service.create(CUSTOMER_ID, order("delivered-bonus", null, 0, 1, "CARD"));
+        UUID orderId = (UUID) created.get("id");
+        int earned = ((Number) created.get("bonusesEarned")).intValue();
+
+        service.updateStatus(ADMIN_ID, orderId, "ASSEMBLING");
+        service.updateStatus(ADMIN_ID, orderId, "SHIPPED");
+        assertThat(jdbc.queryForObject("SELECT delivery_status FROM deliveries WHERE order_id=?", String.class, orderId))
+                .isEqualTo("ready_for_pickup");
+        assertThat(jdbc.queryForObject("SELECT tracking_number FROM deliveries WHERE order_id=?", String.class, orderId))
+                .isNull();
+        assertThat(balance()).isEqualTo(1000);
+        assertThat(transactionCount("EARN")).isZero();
+
+        service.updateStatus(ADMIN_ID, orderId, "DELIVERED");
+        service.updateStatus(ADMIN_ID, orderId, "DELIVERED");
+        assertThat(balance()).isEqualTo(1000 + earned);
+        assertThat(transactionCount("EARN")).isEqualTo(1);
+    }
+
+    @Test
+    void storeManagerSeesAndProcessesOnlyOwnPickupOrders() {
+        jdbc.update("INSERT INTO stores(id,name,city,address,kind,active) VALUES (?,?,?,?,'STORE',TRUE) ON CONFLICT (id) DO NOTHING",
+                OTHER_STORE_ID, "SUNSET Другой", "Нижний Новгород", "Другая улица, 1");
+        jdbc.update("INSERT INTO users(id,email,password,role) VALUES (?,?,?,'STAFF')",
+                STORE_MANAGER_ID, "manager@sunset.test", "hash");
+        jdbc.update("INSERT INTO iam_staff_role_assignments(user_id,role_code,location_id) VALUES (?,'STORE_MANAGER',?)",
+                STORE_MANAGER_ID, STORE_ID);
+
+        UUID ownOrder = (UUID) service.create(CUSTOMER_ID, order("own-store", null, 0, 1, "CARD")).get("id");
+        CreateOrderRequest otherRequest = new CreateOrderRequest("Иван Соколов", "customer@sunset.test", "+79990000001",
+                "SUNSET Другой, Нижний Новгород, Другая улица, 1", "pickup", "CARD",
+                "other-store", null, 0, OTHER_STORE_ID,
+                List.of(new OrderItemRequest(PRODUCT_ID, COLOR_ID, SIZE_ID, 1)));
+        UUID otherOrder = (UUID) service.create(CUSTOMER_ID, otherRequest).get("id");
+
+        assertThat(service.adminOrders(STORE_MANAGER_ID)).extracting(item -> item.get("id")).containsExactly(ownOrder);
+        assertThat(service.updateStatus(STORE_MANAGER_ID, ownOrder, "ASSEMBLING").get("status")).isEqualTo("ASSEMBLING");
+        assertThatThrownBy(() -> service.updateStatus(STORE_MANAGER_ID, otherOrder, "ASSEMBLING"))
+                .isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> service.updateStatus(STORE_MANAGER_ID, ownOrder, "CANCELLED"))
+                .isInstanceOf(SecurityException.class);
+    }
+
+    @Test
+    void idempotencyPreventsDuplicateOrdersAndStockOverselling() {
+        CreateOrderRequest request = order("same-checkout", null, 0, 1, "CARD");
+
+        UUID first = (UUID) service.create(CUSTOMER_ID, request).get("id");
+        UUID replay = (UUID) service.create(CUSTOMER_ID, request).get("id");
+
+        assertThat(replay).isEqualTo(first);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(1);
+        assertThat(stock()).isEqualTo(4);
+
+        assertThatThrownBy(() -> service.create(CUSTOMER_ID, order("too-many", null, 0, 5, "CARD")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("недостаточно");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(1);
+        assertThat(stock()).isEqualTo(4);
+    }
+
+    @Test
+    void concurrentRetriesWithTheSameKeyReturnTheSameOrder() throws Exception {
+        jdbc.update("UPDATE product_stock SET quantity=1 WHERE product_id=? AND size_id=? AND color_id=?",
+                PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("UPDATE location_stock SET quantity=1 WHERE product_id=? AND size_id=? AND color_id=?",
+                PRODUCT_ID, SIZE_ID, COLOR_ID);
+        CreateOrderRequest request = order("concurrent-retry", null, 0, 1, "CARD");
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<UUID> first = executor.submit(() -> createAfterSignal(request, ready, start));
+            Future<UUID> second = executor.submit(() -> createAfterSignal(request, ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(first.get(30, TimeUnit.SECONDS)).isEqualTo(second.get(30, TimeUnit.SECONDS));
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(1);
+            assertThat(stock()).isZero();
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private UUID createAfterSignal(CreateOrderRequest request, CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent checkouts did not start together");
+        return (UUID) service.create(CUSTOMER_ID, request).get("id");
+    }
+
+    @Test
+    void paymentFailureRollsBackOrderAndReservation() {
+        assertThatThrownBy(() -> service.create(CUSTOMER_ID, order("bad-payment", null, 0, 1, "CRYPTO")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("способ оплаты");
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM stock_reservations", Integer.class)).isZero();
+        assertThat(stock()).isEqualTo(5);
+        assertThat(balance()).isEqualTo(1000);
+    }
+
+    @Test
+    void pickupUsesSelectedStoreStockBeforeWarehouseAndRestoresItOnCancellation() {
+        UUID storeId = jdbc.queryForObject("SELECT id FROM stores WHERE kind='STORE' LIMIT 1", UUID.class);
+        jdbc.update("INSERT INTO location_stock(location_id,product_id,size_id,color_id,quantity) VALUES (?,?,?,?,2)", storeId, PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("UPDATE product_stock SET quantity=7 WHERE product_id=? AND size_id=? AND color_id=?", PRODUCT_ID, SIZE_ID, COLOR_ID);
+        CreateOrderRequest request = new CreateOrderRequest("Иван Соколов", "customer@sunset.test", "+79990000001",
+                "Магазин самовывоза", "pickup", "CARD", "store-pickup", null, 0, storeId,
+                List.of(new OrderItemRequest(PRODUCT_ID, COLOR_ID, SIZE_ID, 1)));
+
+        UUID orderId = (UUID) service.create(CUSTOMER_ID, request).get("id");
+        assertThat(jdbc.queryForObject("SELECT quantity FROM location_stock WHERE location_id=? AND product_id=?", Integer.class, storeId, PRODUCT_ID)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM location_stock WHERE location_id='00000000-0000-4000-8000-000000000001' AND product_id=?", Integer.class, PRODUCT_ID)).isEqualTo(5);
+        assertThat(stock()).isEqualTo(6);
+        service.cancel(CUSTOMER_ID, orderId);
+        assertThat(jdbc.queryForObject("SELECT quantity FROM location_stock WHERE location_id=? AND product_id=?", Integer.class, storeId, PRODUCT_ID)).isEqualTo(2);
+        assertThat(stock()).isEqualTo(7);
+    }
+
+    @Test
+    void concurrentCustomersCannotBuyTheLastItemTwice() throws Exception {
+        jdbc.update("UPDATE product_stock SET quantity=1 WHERE product_id=? AND size_id=? AND color_id=?",
+                PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("UPDATE location_stock SET quantity=1 WHERE product_id=? AND size_id=? AND color_id=?",
+                PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("INSERT INTO users(id,email,password,first_name,last_name,phone,role) VALUES (?,?,?,?,?,?,?)",
+                SECOND_CUSTOMER_ID, "second@sunset.test", "hash", "Мария", "Соколова", "+79990000003", "CUSTOMER");
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> first = executor.submit(() -> attemptLastItemCheckout(CUSTOMER_ID, "last-item-first", ready, start));
+            Future<Boolean> second = executor.submit(() -> attemptLastItemCheckout(SECOND_CUSTOMER_ID, "last-item-second", ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            assertThat(List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(true, false);
+            assertThat(stock()).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM stock_reservations WHERE status='RESERVED'", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT MIN(quantity) FROM product_stock", Integer.class)).isZero();
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private boolean attemptLastItemCheckout(UUID customerId, String key, CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent checkouts did not start together");
+        try {
+            service.create(customerId, order(key, null, 0, 1, "CARD"));
+            return true;
+        } catch (IllegalArgumentException exception) {
+            if (!exception.getMessage().contains("недостаточно")) throw exception;
+            return false;
+        }
+    }
+
+    private CreateOrderRequest order(String key, String promoCode, int bonuses, int quantity, String paymentMethod) {
+        return new CreateOrderRequest("Иван Соколов", "customer@sunset.test", "+79990000001",
+                "SUNSET Нижний Новгород, Большая Покровская, 34", "pickup", paymentMethod,
+                key, promoCode, bonuses, STORE_ID, List.of(new OrderItemRequest(PRODUCT_ID, COLOR_ID, SIZE_ID, quantity)));
+    }
+
+    private int balance() {
+        return jdbc.queryForObject("SELECT balance FROM loyalty_accounts WHERE user_id=?", Integer.class, CUSTOMER_ID);
+    }
+
+    private int stock() {
+        return jdbc.queryForObject("SELECT quantity FROM product_stock WHERE product_id=? AND size_id=? AND color_id=?",
+                Integer.class, PRODUCT_ID, SIZE_ID, COLOR_ID);
+    }
+
+    private int transactionCount(String type) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM loyalty_transactions WHERE user_id=? AND type=?",
+                Integer.class, CUSTOMER_ID, type);
+    }
+}

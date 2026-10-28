@@ -1,0 +1,738 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SUNSET Store API — core client operations",
+    "version": "1.0.0",
+    "description": "Подтверждённое по контроллерам ядро клиентского API. Это не полный перечень административных и вспомогательных маршрутов. Старые пути без /api/v1 пока сохранены."
+  },
+  "servers": [{ "url": "/api/v1", "description": "Версионированный путь через Caddy и Gateway" }],
+  "tags": [
+    { "name": "Auth" }, { "name": "Products" }, { "name": "Orders" }, { "name": "Promotions" },
+    { "name": "Reviews" }, { "name": "Notifications" }, { "name": "Subscriptions" }, { "name": "Administration" }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"], "operationId": "registerCustomer", "summary": "Регистрация клиента",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } } },
+        "responses": { "200": { "description": "Создан аккаунт; JWT выдаётся при последующем входе", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "400": { "$ref": "#/components/responses/BadRequest" } }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"], "operationId": "loginCustomer", "summary": "Вход",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
+        "responses": { "200": { "description": "Клиенту выдан JWT; сотруднику возвращён TOTP- или setup-challenge без JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/auth/staff/login": {
+      "post": {
+        "tags": ["Auth", "Administration"], "operationId": "loginStaff", "summary": "Отдельный вход сотрудника с обязательным MFA",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
+        "responses": { "200": { "description": "TOTP- или setup-challenge без JWT", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/session/validate": {
+      "get": {
+        "tags": ["Auth"], "operationId": "validateSession", "summary": "Проверить действующий сеанс", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Сеанс активен" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/admin/session": {
+      "get": {
+        "tags": ["Auth", "Administration"], "operationId": "getAdminSession", "summary": "Восстановить CSRF-токен активной cookie-сессии администратора", "security": [{ "adminCookie": [] }],
+        "responses": { "200": { "description": "CSRF-токен (не JWT)", "content": { "application/json": { "schema": { "type": "object", "required": ["csrfToken"], "properties": { "csrfToken": { "type": "string" } } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"], "operationId": "revokeSession", "summary": "Отозвать текущий сеанс", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Сеанс завершён" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/mfa/login": {
+      "post": {
+        "tags": ["Auth"], "operationId": "verifyMfaLogin", "summary": "Завершить вход сотрудника одноразовым или резервным кодом",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["challengeToken", "code"], "properties": { "challengeToken": { "type": "string" }, "code": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Выдан HttpOnly cookie-сеанс и CSRF-токен; JWT в JSON не возвращается", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/mfa/setup/start": {
+      "post": {
+        "tags": ["Auth", "Administration"], "operationId": "startMandatoryMfaSetup", "summary": "Начать обязательную настройку TOTP после пароля",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["setupToken"], "properties": { "setupToken": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Секрет для приложения-аутентификатора", "content": { "application/json": { "schema": { "type": "object", "properties": { "secret": { "type": "string" }, "otpauthUri": { "type": "string" } } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/mfa/setup/confirm": {
+      "post": {
+        "tags": ["Auth", "Administration"], "operationId": "confirmMandatoryMfaSetup", "summary": "Включить MFA, выдать резервные коды и cookie-сеанс",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["setupToken", "code"], "properties": { "setupToken": { "type": "string" }, "code": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Вход завершён после проверки TOTP", "content": { "application/json": { "schema": { "type": "object", "properties": { "auth": { "$ref": "#/components/schemas/AuthResponse" }, "recoveryCodes": { "type": "array", "items": { "type": "string" } } } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/mfa/status": {
+      "get": {
+        "tags": ["Auth", "Administration"], "operationId": "getMfaStatus", "summary": "Состояние MFA", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Состояние MFA", "content": { "application/json": { "schema": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "recoveryCodesRemaining": { "type": "integer" } } } } } } }
+      }
+    },
+    "/auth/iam/me": {
+      "get": {
+        "tags": ["Auth", "Administration"], "operationId": "getIamIdentity", "summary": "Текущая роль и действующие разрешения", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "IAM-доступ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/iam/audit": {
+      "get": {
+        "tags": ["Administration"], "operationId": "getIamAudit", "summary": "История изменений доступа сотрудников", "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 1000, "default": 0 } },
+          { "name": "targetId", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Страница журнала (20 записей)", "content": { "application/json": { "schema": { "type": "object", "required": ["items", "page", "hasMore"], "properties": { "items": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "actorId": { "type": "string", "format": "uuid", "nullable": true }, "actorEmail": { "type": "string", "nullable": true }, "targetId": { "type": "string", "format": "uuid", "nullable": true }, "targetEmail": { "type": "string", "nullable": true }, "oldPermissions": { "type": "string" }, "newPermissions": { "type": "string" }, "occurredAt": { "type": "string", "format": "date-time" } } } }, "page": { "type": "integer" }, "hasMore": { "type": "boolean" } } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/auth/iam/staff/{id}/permissions": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Administration"], "operationId": "getIamUserPermissions", "summary": "Права пользователя для администратора", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Права пользователя", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      },
+      "put": {
+        "tags": ["Administration"], "operationId": "updateIamUserPermissions", "summary": "Изменить индивидуальные права сотрудника без назначенной роли (старый режим)", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamPermissionUpdate" } } } },
+        "responses": { "200": { "description": "Права сохранены", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/auth/iam/staff/{id}/role": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Administration"], "operationId": "updateIamUserRole", "summary": "Назначить рабочую роль и точку сотруднику", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamRoleUpdate" } } } },
+        "responses": { "200": { "description": "Роль сохранена", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IamIdentity" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/auth/profile": {
+      "get": {
+        "tags": ["Auth"], "operationId": "getProfile", "summary": "Профиль текущего клиента", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Профиль", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserProfile" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "put": {
+        "tags": ["Auth"], "operationId": "updateProfile", "summary": "Изменить профиль", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateProfileRequest" } } } },
+        "responses": { "200": { "description": "Обновлённый профиль", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserProfile" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/profile/password": {
+      "put": {
+        "tags": ["Auth"], "operationId": "changePassword", "summary": "Сменить пароль", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangePasswordRequest" } } } },
+        "responses": { "200": { "description": "Пароль изменён", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Message" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/addresses": {
+      "get": {
+        "tags": ["Auth"], "operationId": "listCustomerAddresses", "summary": "Адресная книга текущего клиента", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Сохранённые адреса", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CustomerAddress" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "post": {
+        "tags": ["Auth"], "operationId": "createCustomerAddress", "summary": "Сохранить адрес", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerAddressInput" } } } },
+        "responses": { "201": { "description": "Адрес сохранён", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerAddress" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/auth/addresses/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Auth"], "operationId": "updateCustomerAddress", "summary": "Изменить свой адрес", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerAddressInput" } } } },
+        "responses": { "200": { "description": "Адрес изменён", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerAddress" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "delete": {
+        "tags": ["Auth"], "operationId": "deleteCustomerAddress", "summary": "Удалить свой адрес", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Адрес удалён" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/auth/addresses/geocoder": {
+      "get": {
+        "tags": ["Auth"], "operationId": "getAddressGeocoderStatus", "summary": "Доступность проверки адреса", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Статус", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddressGeocoderStatus" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "post": {
+        "tags": ["Auth"], "operationId": "lookupAddress", "summary": "Найти адрес после явного действия клиента", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddressLookupRequest" } } } },
+        "responses": { "200": { "description": "Варианты адреса", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddressLookupResult" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/products/all": {
+      "get": {
+        "tags": ["Products"], "operationId": "listProducts", "summary": "Каталог",
+        "responses": { "200": { "description": "Список товаров", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } } } } } }
+      }
+    },
+    "/products/search": {
+      "get": {
+        "tags": ["Products"], "operationId": "searchProducts", "summary": "Фильтрованный каталог с серверной пагинацией",
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string", "maxLength": 100 } },
+          { "name": "min", "in": "query", "schema": { "type": "number" } },
+          { "name": "max", "in": "query", "schema": { "type": "number" } },
+          { "name": "category[]", "in": "query", "schema": { "type": "array", "items": { "type": "string" } }, "style": "form", "explode": true },
+          { "name": "gender", "in": "query", "schema": { "type": "string", "enum": ["all", "WOMEN", "MEN"] } },
+          { "name": "color[]", "in": "query", "schema": { "type": "array", "items": { "type": "string" } }, "style": "form", "explode": true },
+          { "name": "size[]", "in": "query", "schema": { "type": "array", "items": { "type": "string" } }, "style": "form", "explode": true },
+          { "name": "availability", "in": "query", "schema": { "type": "string", "enum": ["all", "in-stock", "low-stock"] } },
+          { "name": "store", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "ratingMin", "in": "query", "schema": { "type": "number" } },
+          { "name": "ratingMax", "in": "query", "schema": { "type": "number" } },
+          { "name": "reviewed", "in": "query", "schema": { "type": "string", "enum": ["1"] } },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["new", "price-asc", "price-desc", "rating-desc", "name"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 10000 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } }
+        ],
+        "responses": { "200": { "description": "Страница каталога", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogPage" } } } }, "400": { "$ref": "#/components/responses/BadRequest" } }
+      }
+    },
+    "/products/all/availability": {
+      "get": {
+        "tags": ["Products"], "operationId": "getStoreAvailability", "summary": "Доступные варианты в выбранном магазине",
+        "parameters": [{ "name": "storeId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Варианты с положительным остатком", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/StoreAvailability" } } } } }, "404": { "description": "Активный магазин не найден" } }
+      }
+    },
+    "/products/admin/variants": {
+      "get": {
+        "tags": ["Administration"], "operationId": "listAdminVariants", "summary": "Справочник цветов и размеров для управления остатками", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Доступные цвета и размеры", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminVariants" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/products/admin": {
+      "post": {
+        "tags": ["Administration"], "operationId": "createAdminProduct", "summary": "Добавить товар", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminProductRequest" } } } },
+        "responses": { "201": { "description": "Товар создан", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminProductResult" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/products/admin/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Administration"], "operationId": "updateAdminProduct", "summary": "Изменить карточку товара", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminProductRequest" } } } },
+        "responses": { "200": { "description": "Товар изменён", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminProductResult" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      },
+      "delete": {
+        "tags": ["Administration"], "operationId": "deleteAdminProduct", "summary": "Удалить товар", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Товар удалён; тело ответа отсутствует" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/products/admin/{id}/stock": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Administration"], "operationId": "getAdminLocationStock", "summary": "Остатки товара в выбранном магазине или складе", "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "locationId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Остатки точки", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ProductStock" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      },
+      "put": {
+        "tags": ["Administration"], "operationId": "updateAdminStock", "summary": "Полностью заменить остатки товара в одной точке", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminStockRequest" } } } },
+        "responses": { "200": { "description": "Остатки сохранены", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminStockResult" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/products/by-uuid": {
+      "post": {
+        "tags": ["Products"], "operationId": "getProductByUuid", "summary": "Карточка товара по UUID",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductUuidRequest" } } } },
+        "responses": {
+          "200": { "description": "Товар", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Product" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/products/categories/tree": {
+      "get": {
+        "tags": ["Products"], "operationId": "getCategoryTree", "summary": "Дерево категорий",
+        "responses": { "200": { "description": "Дерево категорий", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CategoryNode" } } } } } }
+      }
+    },
+    "/products/reviews/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Reviews"], "operationId": "listProductReviews", "summary": "Отзывы о товаре",
+        "responses": { "200": { "description": "Отзывы", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ProductReview" } } } } } }
+      },
+      "delete": {
+        "tags": ["Reviews"], "operationId": "deleteOwnProductReview", "summary": "Удалить свой отзыв", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Отзыв удалён" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/products/reviews/{id}/comments": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Reviews"], "operationId": "listReviewComments", "summary": "Комментарии к отзыву, по 20 с новых",
+        "parameters": [{ "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 } }],
+        "responses": { "200": { "description": "Страница комментариев", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewCommentPage" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      },
+      "post": {
+        "tags": ["Reviews"], "operationId": "createReviewComment", "summary": "Написать комментарий к видимому отзыву", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewCommentRequest" } } } },
+        "responses": { "201": { "description": "Комментарий создан", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewComment" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/products/review-comments/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "delete": {
+        "tags": ["Reviews"], "operationId": "deleteReviewComment", "summary": "Удалить свой комментарий; администратор может удалить любой", "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Комментарий удалён" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/products/review/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "post": {
+        "tags": ["Reviews"], "operationId": "saveProductReview", "summary": "Создать или обновить свой отзыв", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SaveReviewRequest" } } } },
+        "responses": { "200": { "description": "Сохранённый отзыв", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductReview" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/products/review/{id}/photo": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "post": {
+        "tags": ["Reviews"], "operationId": "uploadProductReviewPhoto", "summary": "Загрузить JPEG или PNG к своему отзыву (до 5 МБ)", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } } },
+        "responses": { "200": { "description": "Адрес загруженного фото", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewPhotoUpload" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/products/review-photos/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "get": {
+        "tags": ["Reviews"], "operationId": "getPublishedReviewPhoto", "summary": "Фото опубликованного отзыва",
+        "responses": { "200": { "description": "Изображение", "content": { "image/jpeg": { "schema": { "type": "string", "format": "binary" } }, "image/png": { "schema": { "type": "string", "format": "binary" } } } }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/products/reviews/{id}/helpful": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Reviews"], "operationId": "markProductReviewHelpful", "summary": "Отметить чужой отзыв полезным (повторный вызов идемпотентен)", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Актуальный счётчик", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewHelpfulVote" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/products/reviews/{id}/vote": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Reviews"], "operationId": "voteProductReview", "summary": "Поставить, изменить или убрать лайк/дизлайк отзыва", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewReactionRequest" } } } },
+        "responses": { "200": { "description": "Актуальные реакции и голос пользователя", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReviewReactionVote" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/products/admin/reviews": {
+      "get": {
+        "tags": ["Reviews", "Admin"], "operationId": "listAdminReviews", "summary": "Последние 200 отзывов для администратора", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Отзывы для ответа магазина", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AdminReview" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/products/admin/reviews/{id}/reply": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Reviews", "Admin"], "operationId": "saveAdminReviewReply", "summary": "Добавить, изменить или убрать ответ магазина", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StoreReplyRequest" } } } },
+        "responses": { "200": { "description": "Обновлённый отзыв", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminReview" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/products/admin/reviews/{id}/moderation": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "put": {
+        "tags": ["Reviews", "Admin"], "operationId": "moderateAdminReview", "summary": "Скрыть или снова опубликовать отзыв", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ModerateReviewRequest" } } } },
+        "responses": { "200": { "description": "Обновлённый отзыв", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminReview" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/order": {
+      "post": {
+        "tags": ["Orders"], "operationId": "createOrder", "summary": "Оформить заказ", "security": [{ "bearerAuth": [] }],
+        "description": "Повтор с тем же непустым idempotencyKey для клиента возвращает прежний заказ. Цена и остаток проверяются сервером.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateOrderRequest" } } } },
+        "responses": {
+          "201": { "description": "Заказ создан", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/order/my": {
+      "get": {
+        "tags": ["Orders"], "operationId": "listMyOrders", "summary": "Мои заказы", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Заказы клиента", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/my/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "get": {
+        "tags": ["Orders"], "operationId": "getMyOrder", "summary": "Подробности заказа", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Заказ, состав, получение, оплата и события", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "put": {
+        "tags": ["Orders"], "operationId": "updatePendingOrder", "summary": "Изменить получателя или получение до начала сборки", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdatePendingOrderRequest" } } } },
+        "responses": { "200": { "description": "Обновлённый заказ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/my/{id}/cancel": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "post": {
+        "tags": ["Orders"], "operationId": "cancelMyOrder", "summary": "Отменить заказ", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Отменённый заказ; повторная отмена безопасна", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/my/{id}/returns": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "post": {
+        "tags": ["Orders"], "operationId": "createOrderReturn", "summary": "Создать заявку на возврат доставленного заказа", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReturnRequest" } } } },
+        "responses": { "201": { "description": "Заявка создана", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderReturn" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/promotions": {
+      "get": {
+        "tags": ["Promotions"], "operationId": "listPromotions", "summary": "Активные акции",
+        "responses": { "200": { "description": "Акции", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Promotion" } } } } } }
+      }
+    },
+    "/order/promo/validate": {
+      "post": {
+        "tags": ["Promotions"], "operationId": "validatePromo", "summary": "Проверить промокод", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ValidatePromoRequest" } } } },
+        "responses": { "200": { "description": "Данные применимого промокода", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/loyalty": {
+      "get": {
+        "tags": ["Orders"], "operationId": "getLoyaltyAccount", "summary": "Баланс и история бонусов", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Программа лояльности клиента", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoyaltyAccount" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/delivery/quote": {
+      "post": {
+        "tags": ["Orders"], "operationId": "quoteDelivery", "summary": "Рассчитать получение", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeliveryQuoteRequest" } } } },
+        "responses": { "200": { "description": "Стоимость и срок; сейчас используется заглушка доставки", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeliveryQuote" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/order/stores": {
+      "get": {
+        "tags": ["Orders"], "operationId": "listPickupStores", "summary": "Активные магазины и пункты самовывоза", "security": [],
+        "responses": { "200": { "description": "Активные магазины", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PickupStore" } } } } } }
+      }
+    },
+    "/order/stores/admin": {
+      "get": {
+        "tags": ["Administration"], "operationId": "listAdminLocations", "summary": "Все магазины и склады для управления остатками", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Магазины и склады", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PickupStore" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/order/admin/orders": {
+      "get": {
+        "tags": ["Administration"], "operationId": "listAdminOrders", "summary": "Заказы всех клиентов", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Заказы", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/order/admin/orders/{id}/status": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "patch": {
+        "tags": ["Administration"], "operationId": "updateAdminOrderStatus", "summary": "Изменить статус заказа", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminStatusRequest" } } } },
+        "responses": { "200": { "description": "Заказ с новым статусом", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderDetail" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/order/admin/users": {
+      "get": {
+        "tags": ["Administration"], "operationId": "listAdminUsers", "summary": "Клиенты с итогами заказов и бонусами", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Клиенты", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AdminUser" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/order/admin/users/{id}/bonuses": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "post": {
+        "tags": ["Administration"], "operationId": "adjustAdminBonuses", "summary": "Скорректировать бонусы клиента", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminBonusRequest" } } } },
+        "responses": { "200": { "description": "Фактически применённая корректировка", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminBonusResult" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/order/admin/promotions": {
+      "get": {
+        "tags": ["Administration"], "operationId": "listAdminPromotions", "summary": "Все промокоды", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Промокоды", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AdminPromotion" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      },
+      "post": {
+        "tags": ["Administration"], "operationId": "createAdminPromotion", "summary": "Создать промокод", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminPromotionRequest" } } } },
+        "responses": { "201": { "description": "Промокод создан", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminPromotion" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/order/admin/returns": {
+      "get": {
+        "tags": ["Administration"], "operationId": "listAdminReturns", "summary": "Заявки на возврат всех клиентов", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Заявки", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AdminReturn" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/order/admin/returns/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "patch": {
+        "tags": ["Administration"], "operationId": "updateAdminReturnStatus", "summary": "Изменить статус возврата", "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminReturnStatusRequest" } } } },
+        "responses": { "200": { "description": "Возврат обновлён", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderReturn" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/order/admin/analytics": {
+      "get": {
+        "tags": ["Administration"], "operationId": "getAdminAnalytics", "summary": "Показатели магазина", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Показатели", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminAnalytics" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" } }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": ["Notifications"], "operationId": "listNotifications", "summary": "Уведомления клиента", "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 30 } }],
+        "responses": { "200": { "description": "Последние уведомления", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Notification" } } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "tags": ["Notifications"], "operationId": "countUnreadNotifications", "summary": "Число непрочитанных уведомлений", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Число непрочитанных", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UnreadNotificationCount" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/notifications/{id}/read": {
+      "parameters": [{ "$ref": "#/components/parameters/ResourceId" }],
+      "patch": {
+        "tags": ["Notifications"], "operationId": "markNotificationRead", "summary": "Пометить своё уведомление прочитанным", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Уведомление прочитано", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MarkNotificationReadResult" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/subscriptions": {
+      "post": {
+        "tags": ["Subscriptions"], "operationId": "subscribeNewsletter", "summary": "Подписаться на новости; вход необязателен",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscribeRequest" } } } },
+        "responses": { "200": { "description": "Подписка активна", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionStatus" } } } }, "400": { "$ref": "#/components/responses/BadRequest" } }
+      },
+      "delete": {
+        "tags": ["Subscriptions"], "operationId": "unsubscribeNewsletter", "summary": "Отписаться от новостей", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Подписка отключена", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionStatus" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/subscriptions/status": {
+      "get": {
+        "tags": ["Subscriptions"], "operationId": "getSubscriptionStatus", "summary": "Статус подписки клиента", "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Текущий статус", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionStatus" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }, "adminCookie": { "type": "apiKey", "in": "cookie", "name": "SUNSET_ADMIN_SESSION", "description": "HttpOnly cookie после MFA; для POST/PUT/PATCH/DELETE нужен X-SUNSET-CSRF" } },
+    "parameters": {
+      "OrderId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "ResourceId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Нет токена, JWT неверен или указаны неверные учётные данные",
+        "headers": { "X-Request-Id": { "description": "Доверенный ID запроса", "schema": { "type": "string", "format": "uuid" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } }
+      },
+      "BadRequest": { "description": "Некорректный запрос", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "Forbidden": { "description": "Нет прав администратора", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "NotFound": { "description": "Ресурс не найден", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+    },
+    "schemas": {
+      "IamIdentity": { "type": "object", "required": ["role", "permissions"], "properties": { "role": { "type": "string" }, "staffRole": { "type": "string", "nullable": true }, "locationId": { "type": "string", "format": "uuid", "nullable": true }, "permissions": { "type": "array", "items": { "type": "string" } } } },
+      "IamPermissionUpdate": { "type": "object", "required": ["permissions"], "properties": { "permissions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true } } },
+      "IamRoleUpdate": { "type": "object", "required": ["roleCode"], "properties": { "roleCode": { "type": "string", "enum": ["CUSTOMER", "ADMIN", "WAREHOUSE_ADMIN", "STORE_MANAGER", "CONTENT_MARKETING"], "description": "ADMIN может назначать только владелец" }, "locationId": { "type": "string", "format": "uuid", "nullable": true } } },
+      "Message": { "type": "object", "properties": { "message": { "type": "string" } } },
+      "ApiError": {
+        "type": "object", "required": ["code", "message", "fieldErrors", "requestId", "timestamp"],
+        "properties": {
+          "code": { "type": "string", "description": "Стабильный машинный код, например BAD_REQUEST, NOT_FOUND или INVALID_TOKEN" },
+          "message": { "type": "string" }, "fieldErrors": { "type": "object", "additionalProperties": true },
+          "requestId": { "type": "string", "format": "uuid" }, "timestamp": { "type": "string", "format": "date-time" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object", "required": ["email", "password", "firstName", "lastName"],
+        "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string", "format": "password" }, "firstName": { "type": "string" }, "lastName": { "type": "string" } }
+      },
+      "LoginRequest": {
+        "type": "object", "required": ["email", "password"],
+        "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string", "format": "password" } }
+      },
+      "CustomerAddressInput": {
+        "type": "object", "required": ["label", "city", "street", "house"],
+        "properties": { "label": { "type": "string", "maxLength": 60 }, "city": { "type": "string", "maxLength": 120 }, "street": { "type": "string", "maxLength": 160 }, "house": { "type": "string", "maxLength": 40 }, "building": { "type": "string", "nullable": true }, "structure": { "type": "string", "nullable": true }, "entrance": { "type": "string", "nullable": true }, "floor": { "type": "string", "nullable": true }, "apartment": { "type": "string", "nullable": true }, "intercom": { "type": "string", "nullable": true }, "postalCode": { "type": "string", "nullable": true }, "comment": { "type": "string", "nullable": true }, "lat": { "type": "number", "nullable": true, "minimum": -90, "maximum": 90 }, "lon": { "type": "number", "nullable": true, "minimum": -180, "maximum": 180 } }
+      },
+      "CustomerAddress": {
+        "allOf": [{ "$ref": "#/components/schemas/CustomerAddressInput" }, { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "format": "uuid" } } }]
+      },
+      "AddressGeocoderStatus": { "type": "object", "required": ["available"], "properties": { "available": { "type": "boolean" } } },
+      "AddressLookupRequest": { "type": "object", "required": ["query", "selected"], "properties": { "query": { "type": "string", "minLength": 5, "maxLength": 300 }, "selected": { "type": "boolean" } } },
+      "AddressLookupCandidate": { "type": "object", "required": ["query", "city", "street", "house"], "properties": { "value": { "type": "string", "nullable": true }, "query": { "type": "string" }, "city": { "type": "string" }, "street": { "type": "string" }, "house": { "type": "string" }, "building": { "type": "string", "nullable": true }, "postalCode": { "type": "string", "nullable": true }, "lat": { "type": "number", "nullable": true }, "lon": { "type": "number", "nullable": true } } },
+      "AddressLookupResult": { "type": "object", "required": ["available", "suggestions"], "properties": { "available": { "type": "boolean" }, "suggestions": { "type": "array", "items": { "$ref": "#/components/schemas/AddressLookupCandidate" } } } },
+      "AuthResponse": {
+        "type": "object", "required": ["uuid", "email", "role", "token"],
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" }, "email": { "type": "string", "format": "email" },
+          "firstName": { "type": "string" }, "lastName": { "type": "string" }, "phone": { "type": "string", "nullable": true },
+          "role": { "type": "string" }, "token": { "type": "string", "nullable": true, "description": "JWT только для клиента; у администратора всегда null" },
+          "csrfToken": { "type": "string", "nullable": true, "description": "CSRF-токен админского cookie-сеанса; не является учётными данными для входа" },
+          "mfaRequired": { "type": "boolean" }, "challengeToken": { "type": "string", "nullable": true },
+          "mfaEnrollmentRequired": { "type": "boolean" }, "setupToken": { "type": "string", "nullable": true }
+        }
+      },
+      "UserProfile": {
+        "type": "object", "required": ["id", "email", "role"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" }, "email": { "type": "string", "format": "email" },
+          "firstName": { "type": "string" }, "lastName": { "type": "string" }, "phone": { "type": "string", "nullable": true },
+          "birthday": { "type": "string", "format": "date", "nullable": true }, "avatar": { "type": "string", "nullable": true }, "role": { "type": "string" }
+        }
+      },
+      "UpdateProfileRequest": {
+        "type": "object", "required": ["email", "firstName", "lastName"], "properties": {
+          "email": { "type": "string", "format": "email" }, "firstName": { "type": "string" }, "lastName": { "type": "string" },
+          "phone": { "type": "string" }, "birthday": { "type": "string", "format": "date" }, "avatar": { "type": "string" }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object", "required": ["currentPassword", "newPassword"],
+        "properties": { "currentPassword": { "type": "string", "format": "password" }, "newPassword": { "type": "string", "format": "password" } }
+      },
+      "ProductUuidRequest": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "format": "uuid" } } },
+      "Product": {
+        "type": "object", "required": ["id", "name", "price"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "description": { "type": "string", "nullable": true },
+          "price": { "type": "number" }, "gender": { "type": "string", "nullable": true }, "imageUrl": { "type": "string", "nullable": true },
+          "rating": { "type": "number" }, "reviewCount": { "type": "integer" },
+          "categories": { "type": "array", "items": { "type": "string" } },
+          "colors": { "type": "array", "items": { "$ref": "#/components/schemas/ProductColor" } },
+          "stock": { "type": "array", "items": { "$ref": "#/components/schemas/ProductStock" } }
+        }
+      },
+      "CatalogPage": { "type": "object", "required": ["items", "total", "page", "pageSize"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } }, "total": { "type": "integer", "minimum": 0 }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1 } } },
+      "ProductColor": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "hexCode": { "type": "string" } } },
+      "ProductStock": {
+        "type": "object", "properties": {
+          "sizeId": { "type": "string", "format": "uuid" }, "sizeName": { "type": "string" }, "sizeType": { "type": "string" },
+          "sizeGender": { "type": "string" }, "sizeDescription": { "type": "string" },
+          "colorId": { "type": "string", "format": "uuid" }, "colorName": { "type": "string" }, "quantity": { "type": "integer" }
+        }
+      },
+      "StoreAvailability": { "type": "object", "required": ["productId", "sizeId", "colorId", "quantity"], "properties": { "productId": { "type": "string", "format": "uuid" }, "sizeId": { "type": "string", "format": "uuid" }, "colorId": { "type": "string", "format": "uuid" }, "quantity": { "type": "integer", "minimum": 1 } } },
+      "AdminVariants": { "type": "object", "required": ["colors", "sizes"], "properties": { "colors": { "type": "array", "items": { "$ref": "#/components/schemas/ProductColor" } }, "sizes": { "type": "array", "items": { "$ref": "#/components/schemas/AdminSize" } } } },
+      "AdminSize": { "type": "object", "required": ["id", "name", "type"], "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "type": { "type": "string" }, "gender": { "type": "string", "nullable": true }, "region": { "type": "string", "nullable": true }, "description": { "type": "string", "nullable": true } } },
+      "AdminProductRequest": { "type": "object", "required": ["name", "price"], "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "price": { "type": "number", "exclusiveMinimum": 0 }, "quantity": { "type": "integer", "minimum": 0, "description": "Используется только при создании" }, "category": { "type": "string" }, "gender": { "type": "string", "enum": ["WOMEN", "MEN", "UNISEX"] }, "imageUrl": { "type": "string" } } },
+      "AdminProductResult": { "type": "object", "required": ["id", "name", "price"], "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "price": { "type": "number" }, "quantity": { "type": "integer" }, "imageUrl": { "type": "string" } } },
+      "AdminStockRequest": { "type": "object", "required": ["locationId", "stock"], "properties": { "locationId": { "type": "string", "format": "uuid" }, "stock": { "type": "array", "items": { "type": "object", "required": ["sizeId", "colorId", "quantity"], "properties": { "sizeId": { "type": "string", "format": "uuid" }, "colorId": { "type": "string", "format": "uuid" }, "quantity": { "type": "integer", "minimum": 0 } } } } } },
+      "AdminStockResult": { "type": "object", "required": ["id", "totalQuantity", "totalVariants"], "properties": { "id": { "type": "string", "format": "uuid" }, "totalQuantity": { "type": "integer" }, "totalVariants": { "type": "integer" } } },
+      "OrderItemRequest": {
+        "type": "object", "required": ["productId", "colorId", "sizeId", "quantity"],
+        "properties": {
+          "productId": { "type": "string", "format": "uuid" }, "colorId": { "type": "string", "format": "uuid" },
+          "sizeId": { "type": "string", "format": "uuid" }, "quantity": { "type": "integer", "minimum": 1, "maximum": 20 }
+        }
+      },
+      "CreateOrderRequest": {
+        "type": "object", "required": ["address", "items"],
+        "properties": {
+          "customerName": { "type": "string" }, "customerEmail": { "type": "string", "format": "email" }, "customerPhone": { "type": "string", "description": "Если не передан, сервер берёт телефон из профиля; в итоге телефон обязателен" },
+          "address": { "type": "string", "description": "Адрес доставки или название/адрес магазина самовывоза" },
+          "deliveryMethod": { "type": "string", "enum": ["courier", "pickup"] },
+          "storeId": { "type": "string", "format": "uuid", "description": "Выбранный магазин самовывоза; при наличии его остаток резервируется первым" },
+          "paymentMethod": { "type": "string", "enum": ["CARD", "SBP", "ON_RECEIPT"] },
+          "idempotencyKey": { "type": "string", "description": "Ключ идемпотентности передаётся в JSON-теле, не в HTTP-заголовке" },
+          "promoCode": { "type": "string", "nullable": true }, "bonusesToUse": { "type": "integer", "minimum": 0 },
+          "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/components/schemas/OrderItemRequest" } }
+        }
+      },
+      "Order": {
+        "type": "object", "required": ["id", "orderNumber", "status", "totalAmount"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" }, "orderNumber": { "type": "string" }, "userId": { "type": "string", "format": "uuid" },
+          "customerName": { "type": "string" }, "customerEmail": { "type": "string" }, "customerPhone": { "type": "string" },
+          "status": { "type": "string", "enum": ["PENDING", "CONFIRMED", "ASSEMBLING", "SHIPPED", "DELIVERED", "CANCELLED"] },
+          "deliveryMethod": { "type": "string", "nullable": true, "enum": ["courier", "pickup"] },
+          "subtotal": { "type": "number" }, "discountAmount": { "type": "number" },
+          "bonusesUsed": { "type": "integer" }, "bonusesEarned": { "type": "integer" }, "promoCode": { "type": "string", "nullable": true },
+          "totalAmount": { "type": "number" }, "createdAt": { "type": "string", "format": "date-time" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/OrderItem" } }
+        }
+      },
+      "OrderDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Order" },
+          { "type": "object", "properties": {
+            "delivery": { "type": "object", "nullable": true, "additionalProperties": true },
+            "payment": { "type": "object", "nullable": true, "additionalProperties": true },
+            "returns": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+            "events": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+          } }
+        ]
+      },
+      "OrderItem": {
+        "type": "object", "properties": {
+          "productId": { "type": "string", "format": "uuid" }, "colorId": { "type": "string", "format": "uuid" },
+          "colorName": { "type": "string", "nullable": true }, "sizeId": { "type": "string", "format": "uuid" },
+          "sizeName": { "type": "string", "nullable": true }, "name": { "type": "string" },
+          "imageUrl": { "type": "string" }, "quantity": { "type": "integer" }, "price": { "type": "number" }
+        }
+      },
+      "UpdatePendingOrderRequest": {
+        "type": "object", "required": ["address"], "properties": {
+          "customerName": { "type": "string" }, "customerEmail": { "type": "string", "format": "email" },
+          "customerPhone": { "type": "string" }, "address": { "type": "string" },
+          "deliveryMethod": { "type": "string", "enum": ["courier", "pickup"] }
+        }
+      },
+      "CreateReturnRequest": { "type": "object", "required": ["reason"], "properties": { "reason": { "type": "string", "enum": ["SIZE", "QUALITY", "WRONG_ITEM", "OTHER"] }, "comment": { "type": "string" } } },
+      "OrderReturn": { "type": "object", "required": ["id", "orderId", "reason", "status", "refundAmount", "createdAt"], "properties": { "id": { "type": "string", "format": "uuid" }, "orderId": { "type": "string", "format": "uuid" }, "reason": { "type": "string" }, "comment": { "type": "string", "nullable": true }, "status": { "type": "string" }, "refundAmount": { "type": "number" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "AdminUser": { "type": "object", "required": ["id", "email", "role", "bonusBalance", "orderCount", "orderTotal"], "properties": { "id": { "type": "string", "format": "uuid" }, "email": { "type": "string", "format": "email" }, "firstName": { "type": "string", "nullable": true }, "lastName": { "type": "string", "nullable": true }, "phone": { "type": "string", "nullable": true }, "birthday": { "type": "string", "format": "date", "nullable": true }, "role": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" }, "bonusBalance": { "type": "integer" }, "orderCount": { "type": "integer" }, "orderTotal": { "type": "number" } } },
+      "AdminStatusRequest": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["PENDING", "CONFIRMED", "ASSEMBLING", "SHIPPED", "DELIVERED", "CANCELLED"] } } },
+      "AdminBonusRequest": { "type": "object", "required": ["amount"], "properties": { "amount": { "type": "integer", "minimum": -100000, "maximum": 100000 }, "reason": { "type": "string" } } },
+      "AdminBonusResult": { "type": "object", "required": ["userId", "balance", "applied"], "properties": { "userId": { "type": "string", "format": "uuid" }, "balance": { "type": "integer" }, "applied": { "type": "integer" } } },
+      "AdminPromotion": { "type": "object", "required": ["id", "code", "title", "active"], "properties": { "id": { "type": "string", "format": "uuid" }, "code": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string", "nullable": true }, "active": { "type": "boolean" }, "usage_count": { "type": "integer" }, "discount_percent": { "type": "integer" }, "bonus_multiplier": { "type": "number" }, "min_order": { "type": "number" }, "birthday_only": { "type": "boolean" } } },
+      "AdminPromotionRequest": { "type": "object", "required": ["code", "title"], "properties": { "code": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" }, "discountPercent": { "type": "integer", "minimum": 0, "maximum": 100 }, "bonusMultiplier": { "type": "number" }, "minOrder": { "type": "number" }, "birthdayOnly": { "type": "boolean" }, "active": { "type": "boolean" }, "validFrom": { "type": "string", "format": "date-time" }, "validUntil": { "type": "string", "format": "date-time" }, "usageLimit": { "type": "integer" } } },
+      "AdminReturn": { "type": "object", "required": ["id", "orderNumber", "email", "reason", "status", "refund_amount", "created_at"], "properties": { "id": { "type": "string", "format": "uuid" }, "orderNumber": { "type": "string" }, "email": { "type": "string", "format": "email" }, "reason": { "type": "string" }, "comment": { "type": "string", "nullable": true }, "status": { "type": "string" }, "refund_amount": { "type": "number" }, "created_at": { "type": "string", "format": "date-time" } } },
+      "AdminReturnStatusRequest": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["REQUESTED", "APPROVED", "REJECTED", "RECEIVED", "REFUNDED"] }, "comment": { "type": "string" } } },
+      "AdminAnalytics": { "type": "object", "required": ["orders", "returns", "lowStock", "topProducts"], "properties": { "orders": { "type": "object", "required": ["total", "last30Days", "revenue"], "properties": { "total": { "type": "integer" }, "last30Days": { "type": "integer" }, "revenue": { "type": "number" } } }, "returns": { "type": "object", "required": ["total", "requested"], "properties": { "total": { "type": "integer" }, "requested": { "type": "integer" } } }, "lowStock": { "type": "integer" }, "topProducts": { "type": "array", "items": { "type": "object", "required": ["id", "name", "quantity", "revenue"], "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "quantity": { "type": "integer" }, "revenue": { "type": "number" } } } } } },
+      "CategoryNode": { "type": "object", "required": ["id", "name", "children"], "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "parentId": { "type": "string", "format": "uuid", "nullable": true }, "children": { "type": "array", "items": { "$ref": "#/components/schemas/CategoryNode" } } } },
+      "Promotion": {
+        "type": "object", "properties": {
+          "id": { "type": "string", "format": "uuid" }, "code": { "type": "string" }, "title": { "type": "string" },
+          "description": { "type": "string" }, "discountPercent": { "type": "integer" }, "bonusMultiplier": { "type": "number" },
+          "minOrder": { "type": "number" }, "birthdayOnly": { "type": "boolean" }, "validUntil": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "ValidatePromoRequest": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "subtotal": { "type": "number" } } },
+      "SaveReviewRequest": { "type": "object", "required": ["rating", "body"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5 }, "qualityRating": { "type": "integer", "minimum": 1, "maximum": 5 }, "fit": { "type": "string", "enum": ["SMALL", "AS_EXPECTED", "LARGE"] }, "photoUrl": { "type": "string", "maxLength": 1000, "description": "Адрес, полученный от uploadProductReviewPhoto; внешние ссылки для новых отзывов не принимаются" }, "body": { "type": "string", "minLength": 3, "maxLength": 1500 } } },
+      "ReviewPhotoUpload": { "type": "object", "required": ["photoUrl"], "properties": { "photoUrl": { "type": "string" } } },
+      "ProductReview": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "rating": { "type": "integer" }, "qualityRating": { "type": "integer" }, "fit": { "type": "string" }, "photoUrl": { "type": "string", "nullable": true }, "verifiedPurchase": { "type": "boolean" }, "helpfulCount": { "type": "integer", "minimum": 0 }, "likeCount": { "type": "integer", "minimum": 0 }, "dislikeCount": { "type": "integer", "minimum": 0 }, "commentCount": { "type": "integer", "minimum": 0 }, "myVote": { "type": "string", "enum": ["LIKE", "DISLIKE"], "nullable": true }, "body": { "type": "string" }, "storeReply": { "type": "string", "nullable": true }, "storeRepliedAt": { "type": "string", "format": "date-time", "nullable": true }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "ReviewCommentRequest": { "type": "object", "required": ["body"], "properties": { "body": { "type": "string", "minLength": 2, "maxLength": 1000 } } },
+      "ReviewComment": { "type": "object", "required": ["id", "reviewId", "userId", "authorName", "body", "createdAt"], "properties": { "id": { "type": "string", "format": "uuid" }, "reviewId": { "type": "string", "format": "uuid" }, "userId": { "type": "string", "format": "uuid" }, "authorName": { "type": "string" }, "body": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "ReviewCommentPage": { "type": "object", "required": ["items", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/ReviewComment" } }, "total": { "type": "integer", "minimum": 0 } } },
+      "AdminReview": { "allOf": [{ "$ref": "#/components/schemas/ProductReview" }, { "type": "object", "required": ["productId", "productName", "isHidden"], "properties": { "productId": { "type": "string", "format": "uuid" }, "productName": { "type": "string" }, "isHidden": { "type": "boolean" }, "moderatedAt": { "type": "string", "format": "date-time", "nullable": true } } }] },
+      "StoreReplyRequest": { "type": "object", "required": ["reply"], "properties": { "reply": { "type": "string", "maxLength": 1500, "description": "Пустая строка удаляет ответ" } } },
+      "ModerateReviewRequest": { "type": "object", "required": ["isHidden"], "properties": { "isHidden": { "type": "boolean" } } },
+      "ReviewHelpfulVote": { "type": "object", "required": ["reviewId", "helpfulCount"], "properties": { "reviewId": { "type": "string", "format": "uuid" }, "helpfulCount": { "type": "integer", "minimum": 0 } } },
+      "ReviewReactionRequest": { "type": "object", "required": ["vote"], "properties": { "vote": { "type": "string", "enum": ["LIKE", "DISLIKE"] } } },
+      "ReviewReactionVote": { "type": "object", "required": ["reviewId", "likeCount", "dislikeCount", "myVote"], "properties": { "reviewId": { "type": "string", "format": "uuid" }, "likeCount": { "type": "integer", "minimum": 0 }, "dislikeCount": { "type": "integer", "minimum": 0 }, "myVote": { "type": "string", "enum": ["LIKE", "DISLIKE"], "nullable": true } } },
+      "LoyaltyAccount": { "type": "object", "properties": { "balance": { "type": "integer" }, "lifetimeEarned": { "type": "integer" }, "tier": { "type": "string" }, "updatedAt": { "type": "string", "format": "date-time" }, "birthdayToday": { "type": "boolean" }, "birthdayBenefit": { "type": "string" }, "transactions": { "type": "array", "items": { "$ref": "#/components/schemas/LoyaltyTransaction" } } } },
+      "LoyaltyTransaction": { "type": "object", "properties": { "amount": { "type": "integer" }, "type": { "type": "string" }, "description": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "DeliveryQuoteRequest": { "type": "object", "properties": { "method": { "type": "string", "enum": ["courier", "pickup"] }, "subtotal": { "type": "number" } } },
+      "DeliveryQuote": { "type": "object", "properties": { "method": { "type": "string", "enum": ["courier", "pickup"] }, "cost": { "type": "number" }, "estimatedDays": { "type": "integer" }, "provider": { "type": "string" } } },
+      "PickupStore": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" }, "city": { "type": "string" }, "address": { "type": "string" }, "phone": { "type": "string", "nullable": true }, "hours": { "type": "string", "nullable": true }, "latitude": { "type": "number", "nullable": true }, "longitude": { "type": "number", "nullable": true }, "active": { "type": "boolean" }, "kind": { "type": "string", "enum": ["STORE", "WAREHOUSE"] } } },
+      "Notification": { "type": "object", "required": ["id", "type", "title", "message", "read", "createdAt"], "properties": { "id": { "type": "string", "format": "uuid" }, "recipientUuid": { "type": "string" }, "type": { "type": "string" }, "title": { "type": "string" }, "message": { "type": "string" }, "read": { "type": "boolean" }, "createdAt": { "type": "string", "format": "date-time" } } },
+      "UnreadNotificationCount": { "type": "object", "required": ["count"], "properties": { "count": { "type": "integer" } } },
+      "MarkNotificationReadResult": { "type": "object", "required": ["read"], "properties": { "read": { "type": "boolean" } } },
+      "SubscribeRequest": { "type": "object", "required": ["email"], "properties": { "email": { "type": "string", "format": "email" } } },
+      "SubscriptionStatus": { "type": "object", "required": ["active"], "properties": { "active": { "type": "boolean" }, "email": { "type": "string", "format": "email" } } }
+    }
+  }
+}

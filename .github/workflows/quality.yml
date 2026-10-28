@@ -1,0 +1,92 @@
+name: Quality gate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@c7c7bcb0773cc4678a674ada03a66cc5c4325476 # v2.6.0
+    with:
+      scan-args: |-
+        --include-git-root
+        -r
+        ./sunset
+      fail-on-vuln: false # Inspect the baseline before enforcing a release block.
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      MFA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    defaults:
+      run:
+        working-directory: sunset
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tracked credentials and required production secrets
+        run: sh scripts/check-secrets.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: sunset/pom.xml
+      - name: Test services and Liquibase migrations
+        run: mvn -B --no-transfer-progress verify
+      - name: Verify safe web deployment and rollback
+        run: sh scripts/test-deploy-web.sh
+      - name: Verify PostgreSQL backup failure handling
+        run: sh scripts/test-backup-postgres.sh
+      - name: Verify OpenAPI contract
+        shell: pwsh
+        run: ./scripts/verify-openapi.ps1
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: sunset/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sunset/frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Check production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm run api:types:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: ./node_modules/.bin/playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload browser failures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: sunset/frontend/playwright-report/
+          if-no-files-found: ignore

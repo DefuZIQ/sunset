@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <!-- The isolated Auth runtime uses its own empty database and the same
+         session/MFA/IAM tables. Commerce services never connect to it. -->
+    <include file="classpath:/db/changelog/changelog-master.xml"/>
+    <changeSet id="staff-copy-staging-1" author="codex">
+        <sqlFile path="classpath:/db/staff/V1__staff_identity.sql"/>
+    </changeSet>
+</databaseChangeLog>

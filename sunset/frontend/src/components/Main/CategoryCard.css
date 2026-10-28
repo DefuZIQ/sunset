@@ -1,7 +1,7 @@
 .category-card {
   margin-top: 1.76%;
   width: 32%;
-  height: 53.5vh;
+  height: clamp(360px, 53.5vh, 680px);
   display: block;
   position: relative;
   transition: 1s;
@@ -10,6 +10,15 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+@media (max-width: 900px) {
+  .category-card { width: 49%; height: clamp(340px, 55vw, 520px); }
+}
+
+@media (max-width: 540px) {
+  .category-card { width: 100%; height: min(125vw, 540px); margin-top: .75rem; }
+  .category-card p { font-size: 1.15rem; }
 }
 
 .category-card::before {
@@ -30,12 +39,6 @@
 }
 
 /* добавляем изображение через JS (ниже) */
-.category-card[data-bg]::before {
-  background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.3), rgba(255, 253, 251, 0.1)), url("");
-  background-size: cover;
-  background-position: center;
-}
-
 /* эффект при наведении */
 .category-card:hover::before {
   opacity: 1;

@@ -1,13 +1,15 @@
-import React, { useState } from "react";
+import React from "react";
+import { Link } from "react-router-dom";
+import { useFavorites } from "../../contexts/FavoritesContext";
 import "./LikesButton.css"; // путь к твоему CSS
 
 export default function LikesButton() {
-  const [isLiked, setIsLiked] = useState(false);
+  const { favoriteCount } = useFavorites();
 
   return (
-    <button
-      className={`likes-button ${isLiked ? "active" : ""}`}
-      onClick={() => setIsLiked(!isLiked)}
+    <Link
+      to="/profile/favorites"
+      className={`likes-button ${favoriteCount ? "active" : ""}`}
       aria-label="Избранное"
     >
       <svg
@@ -23,6 +25,7 @@ export default function LikesButton() {
           className="like-path"
         />
       </svg>
-    </button>
+      {favoriteCount > 0 && <span className="icon-count">{favoriteCount}</span>}
+    </Link>
   );
 }

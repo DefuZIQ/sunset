@@ -6,15 +6,24 @@ public class AuthResponse {
     private String email;
     private String firstName;
     private String lastName;
+    private String phone;
+    private String role;
     private String token;  // Токен в DTO
+    private String csrfToken;
+    private boolean mfaRequired;
+    private String challengeToken;
+    private boolean mfaEnrollmentRequired;
+    private String setupToken;
 
     public AuthResponse() {}
 
-    public AuthResponse(String uuid, String email, String firstName, String lastName, String token) {
+    public AuthResponse(String uuid, String email, String firstName, String lastName, String phone, String role, String token) {
         this.uuid = uuid;
         this.email = email;
         this.firstName = firstName;
         this.lastName = lastName;
+        this.phone = phone;
+        this.role = role;
         this.token = token;
     }
 
@@ -52,6 +61,17 @@ public class AuthResponse {
         this.lastName = lastName;
     }
 
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+
     public String getToken() {
         return token;
     }
@@ -59,4 +79,16 @@ public class AuthResponse {
     public void setToken(String token) {
         this.token = token;
     }
+
+    public String getCsrfToken() { return csrfToken; }
+    public void setCsrfToken(String csrfToken) { this.csrfToken = csrfToken; }
+
+    public boolean isMfaRequired() { return mfaRequired; }
+    public void setMfaRequired(boolean mfaRequired) { this.mfaRequired = mfaRequired; }
+    public String getChallengeToken() { return challengeToken; }
+    public void setChallengeToken(String challengeToken) { this.challengeToken = challengeToken; }
+    public boolean isMfaEnrollmentRequired() { return mfaEnrollmentRequired; }
+    public void setMfaEnrollmentRequired(boolean mfaEnrollmentRequired) { this.mfaEnrollmentRequired = mfaEnrollmentRequired; }
+    public String getSetupToken() { return setupToken; }
+    public void setSetupToken(String setupToken) { this.setupToken = setupToken; }
 }

@@ -1,0 +1,7 @@
+.product-card-skeleton { min-width: 0; min-height: 390px; height: 48vh; background: linear-gradient(105deg, #e9e2dc 8%, #f4efeb 18%, #e9e2dc 33%); background-size: 220% 100%; animation: catalog-skeleton 1.6s linear infinite; }
+.catalog-grid .product-card-skeleton { height: clamp(360px, 48vw, 690px); max-height: 58vh; min-height: 340px; }
+.new__card .product-card-skeleton { flex: 1 1 22%; }
+@keyframes catalog-skeleton { to { background-position-x: -220%; } }
+@media (max-width: 760px) { .catalog-grid .product-card-skeleton, .product-list-grid .product-card-skeleton { min-height: 300px; height: 62vw; } }
+@media (max-width: 420px) { .catalog-grid .product-card-skeleton { height: 118vw; max-height: 560px; } }
+@media (prefers-reduced-motion: reduce) { .product-card-skeleton { animation: none; } }

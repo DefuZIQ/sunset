@@ -1,34 +1,49 @@
 package com.sunset.auth.service;
 
 import com.sunset.auth.dto.AuthResponse;
+import com.sunset.auth.dto.ChangePasswordRequest;
 import com.sunset.auth.dto.LoginRequest;
 import com.sunset.auth.dto.RegisterRequest;
+import com.sunset.auth.dto.UpdateProfileRequest;
+import com.sunset.auth.dto.UserDTO;
 import com.sunset.auth.exceptions.UserNotFoundException;
 import com.sunset.auth.exceptions.InvalidPasswordException;
 import com.sunset.auth.model.User;
 import com.sunset.auth.repository.UserRepository;
 import com.sunset.auth.security.JwtUtil;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.UUID;
+import java.time.LocalDate;
 
 @Service
 public class AuthService {
 
+    @Value("${auth.realm:LEGACY}")
+    private String authRealm = "LEGACY";
+
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final JwtUtil jwtUtil;
+    private final AuthSessionService sessions;
+    private final MfaService mfa;
 
-    public AuthService(UserRepository userRepository, JwtUtil jwtUtil) {
+    public AuthService(UserRepository userRepository, JwtUtil jwtUtil, AuthSessionService sessions, MfaService mfa) {
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
+        this.sessions = sessions;
+        this.mfa = mfa;
     }
 
     public AuthResponse registerUser(RegisterRequest request) {
+        if ("STAFF".equalsIgnoreCase(authRealm)) throw new SecurityException("Регистрация покупателей недоступна");
         // Проверка на существующего пользователя
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already in use");
+            throw new IllegalArgumentException("Этот email уже используется");
         }
 
         User user = new User();
@@ -40,23 +55,133 @@ public class AuthService {
         userRepository.save(user);
 
         // Преобразуем user.getId() в String для ответа
-        return new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(), user.getLastName(), null);
+        return new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhone(), user.getRole(), null);
     }
 
+    @Transactional
     public AuthResponse loginUser(LoginRequest request) {
+        if ("STAFF".equalsIgnoreCase(authRealm)) throw new InvalidPasswordException("Неверный email или пароль");
+        return login(request, false);
+    }
+
+    @Transactional
+    public AuthResponse loginStaff(LoginRequest request) {
+        if ("CUSTOMER".equalsIgnoreCase(authRealm)) throw new InvalidPasswordException("Неверные данные для входа сотрудника");
+        return login(request, true);
+    }
+
+    private AuthResponse login(LoginRequest request, boolean staffOnly) {
         Optional<User> optionalUser = userRepository.findByEmail(request.getEmail());
         if (optionalUser.isEmpty()) {
+            if (staffOnly) throw new InvalidPasswordException("Неверные данные для входа сотрудника");
             throw new UserNotFoundException("User with email " + request.getEmail() + " not found");
         }
 
         User user = optionalUser.get();
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            if (staffOnly) throw new InvalidPasswordException("Неверные данные для входа сотрудника");
             throw new InvalidPasswordException("Invalid password for user " + request.getEmail());
         }
 
-        // Преобразуем UUID в строку для генерации токена
-        String token = jwtUtil.generateToken(user.getId());
+        boolean staff = "ADMIN".equalsIgnoreCase(user.getRole()) || "STAFF".equalsIgnoreCase(user.getRole());
+        if (staffOnly && !staff) {
+            throw new InvalidPasswordException("Неверные данные для входа сотрудника");
+        }
+        if (!staffOnly && staff) {
+            throw new InvalidPasswordException("Используйте вход для сотрудников");
+        }
 
-        return new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(), user.getLastName(), token);
+        if (staff) {
+            AuthResponse challenge = new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(),
+                    user.getLastName(), user.getPhone(), user.getRole(), null);
+            if (mfa.enabled(user.getId())) {
+                challenge.setMfaRequired(true);
+                challenge.setChallengeToken(mfa.beginChallenge(user.getId()));
+            } else {
+                challenge.setMfaEnrollmentRequired(true);
+                challenge.setSetupToken(mfa.beginSetupChallenge(user.getId()));
+            }
+            return challenge;
+        }
+
+        // Преобразуем UUID в строку для генерации токена
+        String token = jwtUtil.generateToken(user.getId(), user.getRole());
+        sessions.record(token, user.getId());
+
+        return new AuthResponse(user.getId().toString(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhone(), user.getRole(), token);
+    }
+
+    public UserDTO getProfile(UUID userId) {
+        return UserDTO.fromUser(findUser(userId));
+    }
+
+    public UserDTO updateProfile(UUID userId, UpdateProfileRequest request) {
+        User user = findUser(userId);
+        String email = cleanRequired(request.getEmail(), "Email");
+        String firstName = cleanRequired(request.getFirstName(), "Имя");
+        String lastName = cleanRequired(request.getLastName(), "Фамилия");
+
+        if (!email.equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(email)) {
+            throw new IllegalArgumentException("Этот email уже используется");
+        }
+
+        String phone = request.getPhone() == null ? null : request.getPhone().trim();
+        if (phone != null && phone.length() > 30) {
+            throw new IllegalArgumentException("Номер телефона слишком длинный");
+        }
+
+        user.setEmail(email);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setPhone(phone == null || phone.isBlank() ? null : phone);
+        LocalDate birthday = request.getBirthday();
+        if (birthday != null && (birthday.isAfter(LocalDate.now()) || birthday.isBefore(LocalDate.now().minusYears(120)))) {
+            throw new IllegalArgumentException("Проверьте дату рождения");
+        }
+        user.setBirthday(birthday);
+        String avatar = request.getAvatar();
+        if (avatar != null && avatar.length() > 700_000) throw new IllegalArgumentException("Файл аватара слишком большой");
+        if (avatar != null && !avatar.isBlank() && !avatar.startsWith("data:image/")) throw new IllegalArgumentException("Некорректный формат аватара");
+        user.setAvatar(avatar == null || avatar.isBlank() ? null : avatar);
+        return UserDTO.fromUser(userRepository.save(user));
+    }
+
+    @Transactional
+    public void changePassword(UUID userId, ChangePasswordRequest request) {
+        User user = findUser(userId);
+        String currentPassword = request == null ? null : request.getCurrentPassword();
+        String newPassword = request == null ? null : request.getNewPassword();
+
+        if (currentPassword == null || currentPassword.isEmpty()) {
+            throw new IllegalArgumentException("Введите текущий пароль");
+        }
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new InvalidPasswordException("Текущий пароль указан неверно");
+        }
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("Новый пароль должен содержать не менее 8 символов");
+        }
+        if (newPassword.length() > 72) {
+            throw new IllegalArgumentException("Новый пароль должен содержать не более 72 символов");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Новый пароль должен отличаться от текущего");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        sessions.revokeAll(userId);
+    }
+
+    private User findUser(UUID userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("Пользователь не найден"));
+    }
+
+    private String cleanRequired(String value, String fieldName) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException(fieldName + " не может быть пустым");
+        }
+        return value.trim();
     }
 }

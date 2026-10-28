@@ -1,0 +1,11 @@
+FROM eclipse-temurin:17-jre-alpine
+
+ARG MODULE
+ARG JAR_NAME
+
+RUN addgroup -S -g 10001 sunset && adduser -S -D -H -u 10001 -G sunset sunset
+WORKDIR /app
+COPY backend/${MODULE}/target/${JAR_NAME}.jar /app/app.jar
+USER sunset
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.sunset.auth.service.AuthSessionService;
+import org.springframework.dao.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,13 +23,13 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtFilter.class);
 
-    private final JwtUtil jwtUtil;
+    private final AuthSessionService sessions;
 
     @Value("${spring.security.jwt.secret}")
     private String secretKey;
 
-    public JwtFilter(JwtUtil jwtUtil) {
-        this.jwtUtil = jwtUtil;
+    public JwtFilter(AuthSessionService sessions) {
+        this.sessions = sessions;
     }
 
     @Override
@@ -55,7 +57,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
         try {
-            UUID userId = jwtUtil.extractUserId(token);
+            UUID userId = sessions.authenticatedUser(token);
 
             if (userId == null) {
                 logger.warn("Не удалось извлечь userId из токена.");
@@ -71,8 +73,14 @@ public class JwtFilter extends OncePerRequestFilter {
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
+        } catch (DataAccessException e) {
+            logger.error("Хранилище сеансов недоступно: {}", e.getMessage());
+            SecurityContextHolder.clearContext();
+            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            return;
         } catch (Exception e) {
             logger.error("Ошибка при проверке токена: {}", e.getMessage());
+            SecurityContextHolder.clearContext();
             reject(response, "Ошибка авторизации.");
             return;
         }
@@ -81,7 +89,17 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private boolean isPublicPath(String path) {
-        return path.startsWith("/auth/login") || path.startsWith("/auth/register");
+        return path.startsWith("/auth/login")
+                || path.startsWith("/internal/iam/")
+                || path.equals("/internal/customers")
+                || path.startsWith("/internal/customers/")
+                || path.equals("/auth/staff/login")
+                || path.equals("/auth/mfa/login")
+                || path.equals("/auth/mfa/setup/start")
+                || path.equals("/auth/mfa/setup/confirm")
+                || path.startsWith("/auth/register")
+                || path.startsWith("/actuator/health")
+                || path.startsWith("/actuator/prometheus");
     }
 
     private void reject(HttpServletResponse response, String message) throws IOException {

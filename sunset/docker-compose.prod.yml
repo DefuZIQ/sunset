@@ -1,0 +1,255 @@
+x-log-rotation: &log-rotation
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *log-rotation
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sunset}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-sunset}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        MODULE: api-gateway
+        JAR_NAME: api-gateway
+    restart: unless-stopped
+    logging: *log-rotation
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      OLLAMA_URL: ${OLLAMA_URL:-http://172.18.0.1:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:0.5b}
+      SPRING_APPLICATION_NAME: api-gateway
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      staff-auth-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  auth-service:
+    image: sunset-auth-service:db-split
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        MODULE: auth-service
+        JAR_NAME: auth-service
+    restart: unless-stopped
+    logging: *log-rotation
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sunset}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sunset}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      AUTH_REALM: CUSTOMER
+      SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Set a persistent 32-byte Base64 MFA_ENCRYPTION_KEY in .env}
+      INTERNAL_IAM_SECRET: ${INTERNAL_IAM_SECRET:-}
+      DADATA_API_KEY: ${DADATA_API_KEY:-}
+      SPRING_APPLICATION_NAME: auth-service
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  staff-auth-service:
+    image: sunset-auth-service:db-split
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        MODULE: auth-service
+        JAR_NAME: auth-service
+    restart: unless-stopped
+    logging: *log-rotation
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sunset_staff
+      SPRING_DATASOURCE_USERNAME: ${STAFF_DB_USER:?Set STAFF_DB_USER in .env}
+      SPRING_DATASOURCE_PASSWORD: ${STAFF_DB_PASSWORD:?Set STAFF_DB_PASSWORD in .env}
+      SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Set MFA_ENCRYPTION_KEY in .env}
+      INTERNAL_IAM_SECRET: ${INTERNAL_IAM_SECRET:?Set INTERNAL_IAM_SECRET in .env}
+      AUTH_REALM: STAFF
+      SPRING_LIQUIBASE_CHANGE_LOG: classpath:/db/staff/runtime-changelog.xml
+      SPRING_APPLICATION_NAME: staff-auth-service
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  staff-migration:
+    profiles: ["ops"]
+    image: sunset-auth-service:db-split
+    entrypoint: ["java", "-Dloader.main=com.sunset.auth.service.StaffMigrationCli", "-cp", "/app/app.jar", "org.springframework.boot.loader.launch.PropertiesLauncher", "copy"]
+    environment:
+      SOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sunset}
+      SOURCE_DB_USER: ${POSTGRES_USER:-sunset}
+      SOURCE_DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      STAFF_JDBC_URL: jdbc:postgresql://postgres:5432/sunset_staff
+      STAFF_DB_USER: ${STAFF_DB_USER:?Set STAFF_DB_USER in .env}
+      STAFF_DB_PASSWORD: ${STAFF_DB_PASSWORD:?Set STAFF_DB_PASSWORD in .env}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Set MFA_ENCRYPTION_KEY in .env}
+      STAFF_MIGRATION_CONFIRM: ${STAFF_MIGRATION_CONFIRM:-}
+    depends_on:
+      staff-auth-service:
+        condition: service_healthy
+
+  product-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        MODULE: product-service
+        JAR_NAME: product-service
+    restart: unless-stopped
+    logging: *log-rotation
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${COMMERCE_DB:-${POSTGRES_DB:-sunset}}
+      SPRING_DATASOURCE_USERNAME: ${COMMERCE_DB_USER:-${POSTGRES_USER:-sunset}}
+      SPRING_DATASOURCE_PASSWORD: ${COMMERCE_DB_PASSWORD:-${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}}
+      SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      IAM_MODE: remote
+      IAM_AUTH_URL: http://staff-auth-service:8081
+      CUSTOMER_PROFILE_MODE: remote
+      CUSTOMER_PROFILE_AUTH_URL: http://auth-service:8081
+      INTERNAL_IAM_SECRET: ${INTERNAL_IAM_SECRET:-}
+      SPRING_APPLICATION_NAME: product-service
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        MODULE: order-service
+        JAR_NAME: order-service
+    restart: unless-stopped
+    logging: *log-rotation
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${COMMERCE_DB:-${POSTGRES_DB:-sunset}}
+      SPRING_DATASOURCE_USERNAME: ${COMMERCE_DB_USER:-${POSTGRES_USER:-sunset}}
+      SPRING_DATASOURCE_PASSWORD: ${COMMERCE_DB_PASSWORD:-${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}}
+      SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      IAM_MODE: remote
+      IAM_AUTH_URL: http://staff-auth-service:8081
+      CUSTOMER_PROFILE_MODE: remote
+      CUSTOMER_PROFILE_AUTH_URL: http://auth-service:8081
+      INTERNAL_IAM_SECRET: ${INTERNAL_IAM_SECRET:-}
+      SPRING_APPLICATION_NAME: order-service
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        MODULE: notification-service
+        JAR_NAME: notification-service
+    restart: unless-stopped
+    logging: *log-rotation
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sunset}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sunset}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      SPRING_SECURITY_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      SPRING_APPLICATION_NAME: notification-service
+      MANAGEMENT_TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.1}
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://tempo:4318/v1/traces}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    logging: *log-rotation
+    ports:
+      - "80:80"
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

@@ -9,7 +9,10 @@ public class ProductDTO {
     private String name;
     private String description;
     private BigDecimal price;
+    private String gender;
     private String imageUrl;
+    private double rating;
+    private int reviewCount;
 
     private List<String> categories;
     private List<ColorDTO> colors;
@@ -38,8 +41,15 @@ public class ProductDTO {
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
 
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
+
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public double getRating() { return rating; }
+    public void setRating(double rating) { this.rating = rating; }
+    public int getReviewCount() { return reviewCount; }
+    public void setReviewCount(int reviewCount) { this.reviewCount = reviewCount; }
 
     public List<String> getCategories() { return categories; }
     public void setCategories(List<String> categories) { this.categories = categories; }
@@ -68,6 +78,9 @@ public class ProductDTO {
     public static class StockDTO {
         private UUID sizeId;
         private String sizeName;
+        private String sizeType;
+        private String sizeGender;
+        private String sizeDescription;
         private UUID colorId;
         private String colorName;
         private int quantity;
@@ -77,6 +90,13 @@ public class ProductDTO {
 
         public String getSizeName() { return sizeName; }
         public void setSizeName(String sizeName) { this.sizeName = sizeName; }
+
+        public String getSizeType() { return sizeType; }
+        public void setSizeType(String sizeType) { this.sizeType = sizeType; }
+        public String getSizeGender() { return sizeGender; }
+        public void setSizeGender(String sizeGender) { this.sizeGender = sizeGender; }
+        public String getSizeDescription() { return sizeDescription; }
+        public void setSizeDescription(String sizeDescription) { this.sizeDescription = sizeDescription; }
 
         public UUID getColorId() { return colorId; }
         public void setColorId(UUID colorId) { this.colorId = colorId; }

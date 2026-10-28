@@ -1,7 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
+import { subscribeNewsletter } from "../../api/client";
 import "./SubscribeSection.css";
 
 export default function SubscribeSection() {
+  const [email,setEmail]=useState(""); const [message,setMessage]=useState(""); const [loading,setLoading]=useState(false);
+  const subscribe=async(event)=>{event.preventDefault();setLoading(true);setMessage("");const token=localStorage.getItem("authToken");try{await subscribeNewsletter(email,token||undefined);setMessage("Готово! Скидка и новости уже ваши.");setEmail("");}catch(error){setMessage(error.message||"Не удалось подписаться");}finally{setLoading(false);}};
   return (
     <section className="subscribe">
       <div className="container subscribe__container">
@@ -13,32 +16,36 @@ export default function SubscribeSection() {
             </p>
           </div>
 
-          <form
-            id="subscribe-form"
-            className="subscribe__form-styled"
-            action="http://localhost:8080/user/subscribe"
-            method="POST"
-          >
-            <input
-              type="email"
-              name="email"
-              placeholder="Ваш e-mail"
-              required
-            />
-            <button type="submit">Подписаться</button>
-          </form>
+          <div className="subscribe__form-wrap">
+            <form
+              id="subscribe-form"
+              className="subscribe__form-styled"
+              onSubmit={subscribe}
+            >
+              <input
+                type="email"
+                name="email"
+                placeholder="Ваш e-mail"
+                required
+                value={email}
+                onChange={(event)=>setEmail(event.target.value)}
+              />
+              <button type="submit" disabled={loading}>{loading?"Отправляем…":"Подписаться"}</button>
+            </form>
+            <div className="subscribe__message" aria-live="polite">{message}</div>
+          </div>
 
           <div className="subscribe__social">
-            {/* Instagram */}
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+            {/* Telegram */}
+            <a href="https://t.me" target="_blank" rel="noopener noreferrer" aria-label="Telegram">
               <svg width="60" height="73" viewBox="0 0 60 73" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="32.5" cy="37" r="27.5" fill="#FFFDFB" />
                 <path d="M26.286 47.9875L26.7521 40.9953L39.5353 29.5566C40.1012 29.0442 39.4188 28.7962 38.6698 29.2425L22.8905 39.144L16.0661 36.9951C14.6013 36.5818 14.5847 35.5735 16.399 34.8462L42.9808 24.6637C44.1959 24.1182 45.361 24.9613 44.895 26.8126L40.3676 47.9875C40.0513 49.4918 39.1358 49.8554 37.8708 49.1612L30.9799 44.103L27.6675 47.2933C27.2847 47.6735 26.9684 47.9875 26.286 47.9875Z" fill="#222222" />
               </svg>
             </a>
 
-            {/* Telegram */}
-            <a href="https://t.me" target="_blank" rel="noopener noreferrer" aria-label="Telegram">
+            {/* Instagram */}
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
               <svg width="72" height="67" viewBox="0 0 72 67" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="36.5" cy="34" r="27.5" fill="#FFFDFB" />
                 <g clipPath="url(#clip0_138_15)">

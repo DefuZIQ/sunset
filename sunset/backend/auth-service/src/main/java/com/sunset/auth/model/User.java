@@ -26,11 +26,17 @@ public class User {
     @Column(nullable = false)
     private String lastName;
 
+    @Column(nullable = true, length = 30)
+    private String phone;
+
     @Column(nullable = true)
     private LocalDate birthday;
 
     @Column(nullable = true)
     private String avatar;
+
+    @Column(nullable = false, length = 20)
+    private String role = "CUSTOMER";
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Timestamp createdAt;
@@ -80,6 +86,14 @@ public class User {
         this.lastName = lastName;
     }
 
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
     public LocalDate getBirthday() {
         return birthday;
     }
@@ -95,6 +109,9 @@ public class User {
     public void setAvatar(String avatar) {
         this.avatar = avatar;
     }
+
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
 
     public Timestamp getCreatedAt() {
         return createdAt;

@@ -1,0 +1,30 @@
+name: Улучшение
+description: Предложить изменение продукта или технической части
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Проблема и цель
+      description: Что мешает пользователю или команде сейчас?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Предлагаемое решение
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии готовности
+      placeholder: Проверяемые сценарии, включая мобильную версию и права доступа, если применимо
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Риски и зависимости
+      description: Миграции, внешние сервисы, оплаты, персональные данные, обратная совместимость

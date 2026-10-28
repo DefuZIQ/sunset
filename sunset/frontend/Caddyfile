@@ -1,0 +1,35 @@
+:80 {
+    encode zstd gzip
+
+    @adminRoot path /admin
+    redir @adminRoot /admin/ 308
+
+    @adminEntry path /admin/ /admin/*
+    handle @adminEntry {
+        root * /srv
+        try_files /admin/index.html
+        file_server
+        header Cache-Control "no-cache"
+    }
+
+  @api path /api/v1/* /auth /auth/* /products /products/* /order /order/* /notifications /notifications/* /subscriptions /subscriptions/* /assistant /assistant/* /actuator/health /actuator/health/*
+    handle @api {
+        reverse_proxy api-gateway:8080
+    }
+
+    @spaEntry path / /index.html
+    header @spaEntry Cache-Control "no-cache, no-store, must-revalidate"
+
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+}

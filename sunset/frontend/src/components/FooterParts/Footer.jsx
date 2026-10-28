@@ -20,18 +20,18 @@ export default function Footer() {
               title="Магазин"
               links={[
                 { to: "/about", text: "О нас" },
-                { to: "/new", text: "Новая коллекция" },
-                { to: "#subscribe-form", text: "Рассылка" },
+                { to: "/newproducts", text: "Новая коллекция" },
+                { to: "/promotions", text: "Акции" },
               ]}
             />
 
             <FooterBlock
               title="Каталог"
               links={[
-                { to: "/catalog/summer", text: "Летняя коллекция" },
-                { to: "/catalog/dresses", text: "Платья" },
-                { to: "/delivery", text: "Доставка" },
-                { to: "/contacts", text: "Контакты" },
+                { to: "/catalog", text: "Все товары" },
+                { to: "/catalog?gender=WOMEN", text: "Женщинам" },
+                { to: "/catalog?gender=MEN", text: "Мужчинам" },
+                { to: "/catalog?category%5B%5D=%D0%96%D0%B5%D0%BD%D1%81%D0%BA%D0%B8%D0%B5+%D0%BF%D0%BB%D0%B0%D1%82%D1%8C%D1%8F", text: "Платья" },
               ]}
             />
 
@@ -44,6 +44,7 @@ export default function Footer() {
               ]}
             />
           </div>
+          <div className="footer__bottom"><span>© {new Date().getFullYear()} SUNSET</span><span>Создано для вашего стиля</span></div>
         </div>
       </section>
     </footer>

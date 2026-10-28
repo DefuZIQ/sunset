@@ -14,6 +14,12 @@ public class Size {
     @Column(nullable = false)
     private String label; // Например: "S", "M", "L", "XL"
 
+    @Column(nullable = false)
+    private String type;
+
+    private String gender;
+    private String description;
+
     // Геттеры и сеттеры
     public UUID getId() {
         return id;
@@ -35,4 +41,8 @@ public class Size {
     public String getName() {
         return this.label;
     }
+
+    public String getType() { return type; }
+    public String getGender() { return gender; }
+    public String getDescription() { return description; }
 }

@@ -37,14 +37,17 @@ main, .main-content {
 }
 
 .container {
-  padding-left: 25rem !important;
-  padding-right: 25rem !important;
-  max-width: 100% !important;
+  width: min(1440px, calc(100% - clamp(2rem, 5vw, 6rem)));
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  max-width: 1440px !important;
   box-sizing: border-box !important;
   margin: 0 auto !important;
 }
 
 /* Добавь отступ к основному контенту, чтобы он не прятался за фиксированным header */
-main, .content, .subscribe, .catalog-container, .product-page {
-  padding-top: 3vh !important;
-}
+body { background: #fffdfb; color: #3d3530; }
+button, input, select { font: inherit; }
+.link-button { padding: .5rem 0; color: #6d625b; text-decoration: underline; }
+@media (max-width: 760px) { .container { width: calc(100% - 2rem); } }
+@media (max-width: 360px) { .container { width: calc(100% - 1.25rem); } }

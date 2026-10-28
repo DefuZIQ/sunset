@@ -11,3 +11,6 @@ spring:
 
   liquibase:
     enabled: false
+  security:
+    jwt:
+      secret: test-secret-that-is-at-least-32-bytes

@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.Sunset.Base" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@color/sunset_cream</item>
+        <item name="android:colorAccent">@color/sunset_brown</item>
+        <item name="android:statusBarColor">@color/sunset_dark</item>
+        <item name="android:navigationBarColor">@color/sunset_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="Theme.Sunset" parent="Theme.Sunset.Base" />
+</resources>
