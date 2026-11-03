@@ -13,6 +13,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -263,6 +264,46 @@ class OrderPostgresIntegrationTest {
             assertThat(stock()).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM stock_reservations WHERE status='RESERVED'", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT MIN(quantity) FROM product_stock", Integer.class)).isZero();
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void concurrentCheckoutBurstNeverOversellsFiveItems() throws Exception {
+        int available = 5;
+        int customers = 12;
+        jdbc.update("UPDATE product_stock SET quantity=? WHERE product_id=? AND size_id=? AND color_id=?",
+                available, PRODUCT_ID, SIZE_ID, COLOR_ID);
+        jdbc.update("UPDATE location_stock SET quantity=? WHERE product_id=? AND size_id=? AND color_id=?",
+                available, PRODUCT_ID, SIZE_ID, COLOR_ID);
+
+        CountDownLatch ready = new CountDownLatch(customers);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(customers);
+        try {
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (int index = 0; index < customers; index++) {
+                UUID customerId = UUID.randomUUID();
+                jdbc.update("INSERT INTO users(id,email,password,role) VALUES (?,?,?,'CUSTOMER')",
+                        customerId, "burst-" + index + "@sunset.test", "hash");
+                String key = "burst-" + index;
+                results.add(executor.submit(() -> attemptLastItemCheckout(customerId, key, ready, start)));
+            }
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            int successes = 0;
+            for (Future<Boolean> result : results) {
+                if (result.get(60, TimeUnit.SECONDS)) successes++;
+            }
+            assertThat(successes).isEqualTo(available);
+            assertThat(stock()).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(available);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM stock_reservations WHERE status='RESERVED'", Integer.class))
+                    .isEqualTo(available);
             assertThat(jdbc.queryForObject("SELECT MIN(quantity) FROM product_stock", Integer.class)).isZero();
         } finally {
             start.countDown();
