@@ -197,12 +197,21 @@ created=$(docker exec "$gateway" wget -qO - \
   --header 'Content-Type: application/json' --header "Authorization: Bearer $token" \
   --post-data "$order_body" http://localhost:8080/order)
 order_id=$(printf '%s' "$created" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["status"]=="PENDING"; print(d["id"])')
+replayed=$(docker exec "$gateway" wget -qO - \
+  --header 'Content-Type: application/json' --header "Authorization: Bearer $token" \
+  --post-data "$order_body" http://localhost:8080/order)
+replayed_id=$(printf '%s' "$replayed" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+test "$order_id" = "$replayed_id" || { echo 'Idempotent checkout created another order' >&2; exit 1; }
 docker exec "$gateway" wget -qO /dev/null \
   --header "Authorization: Bearer $token" "http://localhost:8080/order/my/$order_id"
 cancelled=$(docker exec "$gateway" wget -qO - \
   --header "Authorization: Bearer $token" --post-data '{}' \
   "http://localhost:8080/order/my/$order_id/cancel")
 printf '%s' "$cancelled" | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"]=="CANCELLED"'
+cancelled_again=$(docker exec "$gateway" wget -qO - \
+  --header "Authorization: Bearer $token" --post-data '{}' \
+  "http://localhost:8080/order/my/$order_id/cancel")
+printf '%s' "$cancelled_again" | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"]=="CANCELLED"'
 stock_after=$(docker exec "$db" psql -U postgres -d sunset_commerce -Atqc \
   "SELECT quantity FROM product_stock WHERE product_id='$product_id' AND size_id='$size_id' AND color_id='$color_id'")
 test "$stock_before" = "$stock_after" || { echo 'Stock did not return after cancellation' >&2; exit 1; }
@@ -210,4 +219,4 @@ balance_after=$(docker exec "$gateway" wget -qO - \
   --header "Authorization: Bearer $token" http://localhost:8080/order/loyalty |
   python3 -c 'import json,sys; print(json.load(sys.stdin)["balance"])')
 test "$balance_before" = "$balance_after" || { echo 'Bonus balance changed after cancellation' >&2; exit 1; }
-printf 'Split auth runtime passed: customer login, staff MFA, admin reads, checkout, cancellation, stock, loyalty\n'
+printf 'Split auth runtime passed: customer login, staff MFA, admin reads, idempotent checkout/cancellation, stock, loyalty\n'
