@@ -15,6 +15,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -254,12 +255,12 @@ class OrderPostgresIntegrationTest {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            Future<Boolean> first = executor.submit(() -> attemptLastItemCheckout(CUSTOMER_ID, "last-item-first", ready, start));
-            Future<Boolean> second = executor.submit(() -> attemptLastItemCheckout(SECOND_CUSTOMER_ID, "last-item-second", ready, start));
+            Future<CheckoutAttempt> first = executor.submit(() -> attemptLastItemCheckout(CUSTOMER_ID, "last-item-first", ready, start));
+            Future<CheckoutAttempt> second = executor.submit(() -> attemptLastItemCheckout(SECOND_CUSTOMER_ID, "last-item-second", ready, start));
             assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
             start.countDown();
 
-            assertThat(List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS)))
+            assertThat(List.of(first.get(30, TimeUnit.SECONDS).success(), second.get(30, TimeUnit.SECONDS).success()))
                     .containsExactlyInAnyOrder(true, false);
             assertThat(stock()).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(1);
@@ -284,7 +285,7 @@ class OrderPostgresIntegrationTest {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(customers);
         try {
-            List<Future<Boolean>> results = new ArrayList<>();
+            List<Future<CheckoutAttempt>> results = new ArrayList<>();
             for (int index = 0; index < customers; index++) {
                 UUID customerId = UUID.randomUUID();
                 jdbc.update("INSERT INTO users(id,email,password,role) VALUES (?,?,?,'CUSTOMER')",
@@ -293,12 +294,24 @@ class OrderPostgresIntegrationTest {
                 results.add(executor.submit(() -> attemptLastItemCheckout(customerId, key, ready, start)));
             }
             assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            long burstStart = System.nanoTime();
             start.countDown();
 
             int successes = 0;
-            for (Future<Boolean> result : results) {
-                if (result.get(60, TimeUnit.SECONDS)) successes++;
+            List<Long> latencies = new ArrayList<>();
+            for (Future<CheckoutAttempt> result : results) {
+                CheckoutAttempt attempt = result.get(60, TimeUnit.SECONDS);
+                if (attempt.success()) successes++;
+                latencies.add(attempt.durationNanos());
             }
+            long burstNanos = System.nanoTime() - burstStart;
+            latencies.sort(Long::compare);
+            System.out.printf(Locale.ROOT,
+                    "checkout burst: requests=%d successes=%d p50=%.1f ms p95=%.1f ms throughput=%.1f req/s%n",
+                    customers, successes,
+                    latencies.get((customers - 1) / 2) / 1_000_000.0,
+                    latencies.get((int) Math.ceil(customers * 0.95) - 1) / 1_000_000.0,
+                    customers * 1_000_000_000.0 / burstNanos);
             assertThat(successes).isEqualTo(available);
             assertThat(stock()).isZero();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM orders", Integer.class)).isEqualTo(available);
@@ -311,15 +324,18 @@ class OrderPostgresIntegrationTest {
         }
     }
 
-    private boolean attemptLastItemCheckout(UUID customerId, String key, CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+    private record CheckoutAttempt(boolean success, long durationNanos) {}
+
+    private CheckoutAttempt attemptLastItemCheckout(UUID customerId, String key, CountDownLatch ready, CountDownLatch start) throws InterruptedException {
         ready.countDown();
         if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent checkouts did not start together");
+        long startedAt = System.nanoTime();
         try {
             service.create(customerId, order(key, null, 0, 1, "CARD"));
-            return true;
+            return new CheckoutAttempt(true, System.nanoTime() - startedAt);
         } catch (IllegalArgumentException exception) {
             if (!exception.getMessage().contains("недостаточно")) throw exception;
-            return false;
+            return new CheckoutAttempt(false, System.nanoTime() - startedAt);
         }
     }
 
